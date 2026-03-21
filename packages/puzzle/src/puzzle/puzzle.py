@@ -1,4 +1,4 @@
-from typing import Hashable
+from typing import Hashable, Sequence
 
 from ortools.sat.python import cp_model
 
@@ -66,7 +66,7 @@ class Puzzle:
         return VarGrid(vars)
 
     def bool_var_map(
-        self, name: str, keys: list[Hashable]
+        self, name: str, keys: Sequence[Hashable]
     ) -> BoolVarMap:
         vars = {
             key: Var(self._model.new_bool_var(f"{name}_{key}"))

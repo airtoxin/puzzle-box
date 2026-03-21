@@ -9,7 +9,7 @@ dependencies = []
 members = ["packages/*"]
 
 [tool.pyright]
-extraPaths = ["packages/puzzle/src", "packages/sudoku/src"]
+extraPaths = ["packages/puzzle/src", "packages/sudoku/src", "packages/slitherlink/src"]
 
 [dependency-groups]
 dev = [
