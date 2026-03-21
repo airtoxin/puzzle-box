@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Hashable, Iterable
+from typing import Any, Hashable, Iterable
 
 from ortools.sat.python import cp_model
 
@@ -10,8 +10,8 @@ from puzzle.grid import Cell
 class LinearConstraint:
     """Public wrapper around a bounded linear expression."""
 
-    def __init__(self, _internal: cp_model.BoundedLinearExpression) -> None:
-        self._internal = _internal
+    def __init__(self, _internal: cp_model.BoundedLinearExpression | Any) -> None:
+        self._internal: cp_model.BoundedLinearExpression = _internal
 
 
 class Expr:
