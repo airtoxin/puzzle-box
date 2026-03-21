@@ -17,6 +17,7 @@ def solve(
     pieces: list[Polyomino],
     max_uses: dict[str, int] | None = None,
     forbidden_internal_edges: set[Edge] | None = None,
+    board_cells: set[Cell] | None = None,
 ) -> list[Placement] | None:
     """Solve a tiling puzzle: fill the board with given pieces.
 
@@ -28,6 +29,9 @@ def solve(
                   If None, each piece can be used unlimited times.
                   Use {name: 1} to restrict a piece to one use.
         forbidden_internal_edges: Edges (walls) that pieces cannot cross.
+        board_cells: Optional set of cells to tile. If None, all cells
+                     in the height x width grid are used. Use this for
+                     non-rectangular boards.
 
     Returns:
         List of chosen placements, or None if no solution exists.
@@ -35,27 +39,31 @@ def solve(
     p = Puzzle("tiling")
     board = square_grid(height, width)
     walls = forbidden_internal_edges or set()
+    target_cells = board_cells if board_cells is not None else set(board.cells)
 
     # Enumerate all valid placements for all pieces
     all_placements: list[Placement] = []
     placements_by_piece: dict[str, list[Placement]] = {}
     for piece in pieces:
         pls = enumerate_placements(board, piece, walls)
-        all_placements.extend(pls)
-        placements_by_piece.setdefault(piece.name, []).extend(pls)
+        # Filter: placement cells must be within target cells
+        for pl in pls:
+            if pl.cells.issubset(target_cells):
+                all_placements.append(pl)
+                placements_by_piece.setdefault(piece.name, []).append(pl)
 
     if not all_placements:
         return None
 
     use = p.bool_var_map("use", all_placements)
 
-    # Each cell is covered by exactly one placement
+    # Each target cell is covered by exactly one placement
     placements_by_cell: dict[Cell, list[Placement]] = {}
     for pl in all_placements:
         for cell in pl.cells:
             placements_by_cell.setdefault(cell, []).append(pl)
 
-    for cell in board.cells:
+    for cell in target_cells:
         covering = placements_by_cell.get(cell, [])
         if not covering:
             return None  # Cell cannot be covered
