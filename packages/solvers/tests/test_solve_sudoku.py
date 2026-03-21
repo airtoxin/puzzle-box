@@ -1,4 +1,4 @@
-from sudoku import solve
+from solvers.sudoku import solve
 
 
 def _is_valid_solution(grid: list[list[int]]) -> bool:

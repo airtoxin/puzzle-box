@@ -1,4 +1,4 @@
-from nurikabe import solve
+from solvers.nurikabe import solve
 
 N = None
 

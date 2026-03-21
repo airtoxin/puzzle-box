@@ -1,7 +1,6 @@
 from collections import deque
 
-from yajilin import solve
-from yajilin.solver import DIRECTIONS, Clue
+from solvers.yajilin import solve, DIRECTIONS, Clue
 
 N = None
 

@@ -1,6 +1,6 @@
 from puzzle.grid import Edge, Vertex, SquareGrid, _make_edge
 
-from slitherlink import solve
+from solvers.slitherlink import solve
 
 
 def _validate(grid: list[list[int | None]], edges: set[Edge]) -> None:

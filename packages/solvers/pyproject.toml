@@ -1,7 +1,7 @@
 [project]
-name = "yajilin"
+name = "solvers"
 version = "0.1.0"
-description = "Yajilin solver using puzzle DSL"
+description = "Puzzle solvers using puzzle DSL"
 authors = [
     { name = "airtoxin", email = "airtoxin@icloud.com" }
 ]
