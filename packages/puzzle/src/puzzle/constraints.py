@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Iterable, Sequence
 
 if TYPE_CHECKING:
-    from puzzle.expr import BoolExpr, LinearConstraint, Var, VarMap
+    from puzzle.expr import BoolExpr, Expr, LinearConstraint, Var, VarMap
     from puzzle.grid import Cell, SquareGrid
 
 
@@ -60,7 +60,14 @@ def connected(
 
 
 def count_eq(exprs: Iterable[BoolExpr], n: int) -> LinearConstraint:
-    from puzzle.expr import Expr, LinearConstraint as LC, sum_expr
+    from puzzle.expr import sum_expr
 
     result = sum_expr(exprs)
     return result == n  # type: ignore[return-value]
+
+
+def exactly_one(exprs: Iterable[Expr]) -> LinearConstraint:
+    from puzzle.expr import sum_expr
+
+    result = sum_expr(exprs)
+    return result == 1  # type: ignore[return-value]

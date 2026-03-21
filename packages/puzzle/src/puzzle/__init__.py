@@ -7,12 +7,14 @@ from puzzle.constraints import (
     all_different,
     connected,
     count_eq,
+    exactly_one,
     one_of,
     single_cycle,
     unique,
 )
 from puzzle.expr import BoolExpr, BoolVarMap, Expr, LinearConstraint, Var, VarGrid, VarMap, sum_expr
 from puzzle.grid import Cell, Edge, SquareGrid, Vertex, square_grid
+from puzzle.polyomino import Placement, Polyomino, enumerate_placements, polyomino
 from puzzle.puzzle import Puzzle, Solution
 
 Constraint = (
@@ -36,6 +38,8 @@ __all__ = [
     "Expr",
     "LinearConstraint",
     "OneOfConstraint",
+    "Placement",
+    "Polyomino",
     "Puzzle",
     "SingleCycleConstraint",
     "Solution",
@@ -48,7 +52,10 @@ __all__ = [
     "all_different",
     "connected",
     "count_eq",
+    "enumerate_placements",
+    "exactly_one",
     "one_of",
+    "polyomino",
     "single_cycle",
     "square_grid",
     "sum_expr",
