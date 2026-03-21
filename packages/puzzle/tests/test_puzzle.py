@@ -1,4 +1,4 @@
-from puzzle import Puzzle, all_different, square_grid
+from puzzle import Puzzle, all_different, square_grid, unique
 
 
 EASY_PUZZLE = [
@@ -109,3 +109,32 @@ def test_fixed_values():
     assert solution is not None
     assert solution.value(cell_value[board.cell(0, 0)]) == 5
     assert solution.value(cell_value[board.cell(0, 1)]) == 3
+
+
+def test_unique_with_unique_solution():
+    """A well-defined sudoku has exactly one solution."""
+    p, board, cell_value = _define_sudoku(EASY_PUZZLE)
+    p.add(unique())
+    solution = p.solve()
+    assert solution is not None
+    assert _is_valid_solution(solution.grid_values(cell_value, 9, 9))
+
+
+def test_unique_rejects_multiple_solutions():
+    """A sudoku with too few givens has multiple solutions."""
+    p = Puzzle("ambiguous")
+    board = square_grid(9, 9)
+    cell_value = p.int_var_grid("cell_value", board.cells, 1, 9)
+
+    for row in board.rows():
+        p.add(all_different(cell_value[c] for c in row))
+    for col in board.cols():
+        p.add(all_different(cell_value[c] for c in col))
+    for box in board.blocks(3, 3):
+        p.add(all_different(cell_value[c] for c in box))
+
+    # Only one given — many solutions exist
+    p.add(cell_value[board.cell(0, 0)] == 5)
+    p.add(unique())
+
+    assert p.solve() is None

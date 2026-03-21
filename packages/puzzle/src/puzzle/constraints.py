@@ -12,5 +12,14 @@ class AllDifferentConstraint:
     vars: list[Var]
 
 
+@dataclass
+class UniqueConstraint:
+    pass
+
+
 def all_different(vars: Iterable[Var]) -> AllDifferentConstraint:
     return AllDifferentConstraint(list(vars))
+
+
+def unique() -> UniqueConstraint:
+    return UniqueConstraint()

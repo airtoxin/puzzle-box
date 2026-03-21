@@ -1,9 +1,9 @@
-from puzzle.constraints import AllDifferentConstraint, all_different
+from puzzle.constraints import AllDifferentConstraint, UniqueConstraint, all_different, unique
 from puzzle.expr import LinearConstraint, Var, VarGrid
 from puzzle.grid import Cell, SquareGrid, square_grid
 from puzzle.puzzle import Puzzle, Solution
 
-Constraint = AllDifferentConstraint | LinearConstraint
+Constraint = AllDifferentConstraint | LinearConstraint | UniqueConstraint
 
 __all__ = [
     "AllDifferentConstraint",
@@ -15,6 +15,8 @@ __all__ = [
     "SquareGrid",
     "Var",
     "VarGrid",
+    "UniqueConstraint",
     "all_different",
     "square_grid",
+    "unique",
 ]

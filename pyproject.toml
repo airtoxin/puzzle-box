@@ -7,3 +7,6 @@ dependencies = []
 
 [tool.uv.workspace]
 members = ["packages/*"]
+
+[tool.pyright]
+extraPaths = ["packages/puzzle/src", "packages/sudoku/src"]
