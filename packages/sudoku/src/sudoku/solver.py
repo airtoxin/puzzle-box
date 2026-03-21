@@ -1,4 +1,4 @@
-from ortools.sat.python import cp_model
+from puzzle import Puzzle, all_different, square_grid
 
 Grid = list[list[int]]
 
@@ -12,44 +12,28 @@ def solve(grid: Grid) -> Grid | None:
     Returns:
         Solved 9x9 grid, or None if no solution exists.
     """
-    model = cp_model.CpModel()
+    p = Puzzle("sudoku")
+    board = square_grid(9, 9)
 
-    # Create variables
-    cells = [
-        [model.new_int_var(1, 9, f"cell_{r}_{c}") for c in range(9)]
-        for r in range(9)
-    ]
+    cell_value = p.int_var_grid("cell_value", board.cells, 1, 9)
 
     # Fix given values
     for r in range(9):
         for c in range(9):
             if grid[r][c] != 0:
-                model.add(cells[r][c] == grid[r][c])
+                p.add(cell_value[board.cell(r, c)] == grid[r][c])
 
-    # Row constraints: all different in each row
-    for r in range(9):
-        model.add_all_different(cells[r])
+    for row in board.rows():
+        p.add(all_different(cell_value[c] for c in row))
 
-    # Column constraints: all different in each column
-    for c in range(9):
-        model.add_all_different([cells[r][c] for r in range(9)])
+    for col in board.cols():
+        p.add(all_different(cell_value[c] for c in col))
 
-    # 3x3 box constraints
-    for box_r in range(3):
-        for box_c in range(3):
-            model.add_all_different([
-                cells[box_r * 3 + r][box_c * 3 + c]
-                for r in range(3)
-                for c in range(3)
-            ])
+    for box in board.blocks(3, 3):
+        p.add(all_different(cell_value[c] for c in box))
 
-    solver = cp_model.CpSolver()
-    status = solver.solve(model)
-
-    if status != cp_model.OPTIMAL and status != cp_model.FEASIBLE:
+    solution = p.solve()
+    if solution is None:
         return None
 
-    return [
-        [solver.value(cells[r][c]) for c in range(9)]
-        for r in range(9)
-    ]
+    return solution.grid_values(cell_value, 9, 9)

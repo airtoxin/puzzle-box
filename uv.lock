@@ -380,7 +380,7 @@ name = "sudoku"
 version = "0.1.0"
 source = { editable = "packages/sudoku" }
 dependencies = [
-    { name = "ortools" },
+    { name = "puzzle" },
 ]
 
 [package.dev-dependencies]
@@ -389,7 +389,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ortools", specifier = ">=9.15.6755" }]
+requires-dist = [{ name = "puzzle", editable = "packages/puzzle" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.2" }]
