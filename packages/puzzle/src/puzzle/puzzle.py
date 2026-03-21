@@ -1,14 +1,15 @@
-from typing import Hashable, Sequence
+from typing import Hashable, Sequence, cast
 
 from ortools.sat.python import cp_model
 
 from puzzle.constraints import (
     AllDifferentConstraint,
+    ConnectedConstraint,
     OneOfConstraint,
     SingleCycleConstraint,
     UniqueConstraint,
 )
-from puzzle.expr import BoolVarMap, LinearConstraint, Var, VarGrid
+from puzzle.expr import BoolExpr, LinearConstraint, Var, VarGrid, VarMap
 from puzzle.grid import Cell, SquareGrid
 
 
@@ -40,10 +41,12 @@ class _SolutionCounter(cp_model.CpSolverSolutionCallback):
 
 ConstraintType = (
     AllDifferentConstraint
+    | BoolExpr
     | LinearConstraint
     | UniqueConstraint
     | OneOfConstraint
     | SingleCycleConstraint
+    | ConnectedConstraint
 )
 
 
@@ -59,25 +62,46 @@ class Puzzle:
         self, name: str, cells: list[Cell], lo: int, hi: int
     ) -> VarGrid:
         vars = {
-            cell: Var(self._model.new_int_var(lo, hi, f"{name}_{cell.row}_{cell.col}"))
+            cell: Var(
+                self._model.new_int_var(lo, hi, f"{name}_{cell.row}_{cell.col}"),
+                self._model,
+            )
             for cell in cells
         }
         self._vars.extend(vars.values())
         return VarGrid(vars)
 
-    def bool_var_map(
-        self, name: str, keys: Sequence[Hashable]
-    ) -> BoolVarMap:
+    def int_var_map(
+        self, name: str, keys: Sequence[Hashable], lo: int, hi: int
+    ) -> VarMap:
         vars = {
-            key: Var(self._model.new_bool_var(f"{name}_{key}"))
+            key: Var(
+                self._model.new_int_var(lo, hi, f"{name}_{key}"),
+                self._model,
+            )
             for key in keys
         }
         self._vars.extend(vars.values())
-        return BoolVarMap(vars)
+        return VarMap(vars)
+
+    def bool_var_map(
+        self, name: str, keys: Sequence[Hashable]
+    ) -> VarMap:
+        vars = {
+            key: Var(
+                self._model.new_bool_var(f"{name}_{key}"),
+                self._model,
+            )
+            for key in keys
+        }
+        self._vars.extend(vars.values())
+        return VarMap(vars)
 
     def add(self, constraint: ConstraintType) -> None:
         if isinstance(constraint, AllDifferentConstraint):
             self._model.add_all_different([v._internal for v in constraint.vars])
+        elif isinstance(constraint, BoolExpr):
+            self._model.add(constraint._constraint)
         elif isinstance(constraint, LinearConstraint):
             self._model.add(constraint._internal)
         elif isinstance(constraint, UniqueConstraint):
@@ -86,19 +110,22 @@ class Puzzle:
             self._add_one_of(constraint)
         elif isinstance(constraint, SingleCycleConstraint):
             self._add_single_cycle(constraint.edge_vars, constraint.grid)
+        elif isinstance(constraint, ConnectedConstraint):
+            self._add_connected(constraint)
 
     def _add_one_of(self, constraint: OneOfConstraint) -> None:
-        indicators = []
+        indicators: list[cp_model.IntVar] = []
         for c in constraint.constraints:
-            b = self._model.new_bool_var(f"_one_of_{self._indicator_count}")
-            self._indicator_count += 1
-            self._model.add(c._internal).only_enforce_if(b)
-            indicators.append(b)
+            if isinstance(c, BoolExpr):
+                indicators.append(cast(cp_model.IntVar, c._internal))
+            else:
+                b = self._model.new_bool_var(f"_one_of_{self._indicator_count}")
+                self._indicator_count += 1
+                self._model.add(c._internal).only_enforce_if(b)
+                indicators.append(b)
         self._model.add_exactly_one(indicators)
 
-    def _add_single_cycle(
-        self, edge_vars: BoolVarMap, grid: SquareGrid
-    ) -> None:
+    def _add_single_cycle(self, edge_vars: VarMap, grid: SquareGrid) -> None:
         vertices = grid.vertices
         vertex_id = {v: i for i, v in enumerate(vertices)}
 
@@ -112,19 +139,96 @@ class Puzzle:
             arc_fwd = self._model.new_bool_var(f"_arc_{id1}_{id2}")
             arc_bwd = self._model.new_bool_var(f"_arc_{id2}_{id1}")
 
-            # edge_on ↔ exactly one direction
             self._model.add(arc_fwd + arc_bwd == edge_var._internal)
 
             arcs.append((id1, id2, arc_fwd))
             arcs.append((id2, id1, arc_bwd))
 
-        # Self-loops for vertices not in the cycle
         for v in vertices:
             vid = vertex_id[v]
             self_loop = self._model.new_bool_var(f"_self_loop_{vid}")
             arcs.append((vid, vid, self_loop))
 
         self._model.add_circuit(arcs)
+
+    def _add_connected(self, constraint: ConnectedConstraint) -> None:
+        cells = constraint.cells
+        indicators = constraint.indicators
+        n = len(cells)
+        cell_set = set(cells)
+
+        active: dict[Cell, cp_model.IntVar] = {
+            c: cast(cp_model.IntVar, indicators[c]._internal) for c in cells
+        }
+
+        order_vars = {
+            c: self._model.new_int_var(0, n - 1, f"_conn_ord_{c}")
+            for c in cells
+        }
+        is_root = {
+            c: self._model.new_bool_var(f"_conn_root_{c}")
+            for c in cells
+        }
+
+        for c in cells:
+            nbrs = [
+                Cell(c.row + dr, c.col + dc)
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+                if Cell(c.row + dr, c.col + dc) in cell_set
+            ]
+
+            parent_vars: list[cp_model.IntVar] = []
+            for nbr in nbrs:
+                p_var = self._model.new_bool_var(f"_conn_par_{c}_{nbr}")
+                parent_vars.append(p_var)
+                # If this is c's parent: neighbor must be active, order increases
+                self._model.add(active[nbr] == 1).only_enforce_if(p_var)
+                self._model.add(
+                    order_vars[c] == order_vars[nbr] + 1
+                ).only_enforce_if(p_var)
+
+            # Not active → not root, no parent
+            self._model.add(is_root[c] == 0).only_enforce_if(active[c].Not())
+            if parent_vars:
+                self._model.add(
+                    cp_model.LinearExpr.sum(parent_vars) == 0
+                ).only_enforce_if(active[c].Not())
+
+            # Root → order = 0, no parent
+            self._model.add(order_vars[c] == 0).only_enforce_if(is_root[c])
+            if parent_vars:
+                self._model.add(
+                    cp_model.LinearExpr.sum(parent_vars) == 0
+                ).only_enforce_if(is_root[c])
+
+            # Active and not root → exactly one parent
+            if parent_vars:
+                self._model.add(
+                    cp_model.LinearExpr.sum(parent_vars) == 1
+                ).only_enforce_if(active[c]).only_enforce_if(is_root[c].Not())
+            else:
+                # No neighbors in cell set: if active, must be root
+                self._model.add(is_root[c] == 1).only_enforce_if(active[c])
+
+        # At most one root
+        root_list = [is_root[c] for c in cells]
+        self._model.add(cp_model.LinearExpr.sum(root_list) <= 1)
+
+        # If any active cell exists, exactly one root
+        active_list = [active[c] for c in cells]
+        any_active = self._model.new_bool_var(
+            f"_conn_any_{self._indicator_count}"
+        )
+        self._indicator_count += 1
+        self._model.add(
+            cp_model.LinearExpr.sum(active_list) >= 1
+        ).only_enforce_if(any_active)
+        self._model.add(
+            cp_model.LinearExpr.sum(active_list) == 0
+        ).only_enforce_if(any_active.Not())
+        self._model.add(
+            cp_model.LinearExpr.sum(root_list) == 1
+        ).only_enforce_if(any_active)
 
     def solve(self) -> Solution | None:
         solver = cp_model.CpSolver()

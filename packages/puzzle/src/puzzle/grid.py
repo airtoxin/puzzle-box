@@ -57,6 +57,27 @@ class SquareGrid:
                 blocks.append(block)
         return blocks
 
+    def windows(self, win_rows: int, win_cols: int) -> list[list[Cell]]:
+        """All overlapping sub-rectangles of the given size."""
+        result: list[list[Cell]] = []
+        for r in range(self._rows - win_rows + 1):
+            for c in range(self._cols - win_cols + 1):
+                result.append([
+                    Cell(r + dr, c + dc)
+                    for dr in range(win_rows)
+                    for dc in range(win_cols)
+                ])
+        return result
+
+    def neighbors(self, cell: Cell) -> list[Cell]:
+        """Return orthogonally adjacent cells within the grid."""
+        result: list[Cell] = []
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nr, nc = cell.row + dr, cell.col + dc
+            if 0 <= nr < self._rows and 0 <= nc < self._cols:
+                result.append(Cell(nr, nc))
+        return result
+
     @property
     def vertices(self) -> list[Vertex]:
         return [

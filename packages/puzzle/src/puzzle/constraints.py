@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Callable, Iterable, Sequence
 
 if TYPE_CHECKING:
-    from puzzle.expr import BoolVarMap, LinearConstraint, Var
-    from puzzle.grid import SquareGrid
+    from puzzle.expr import BoolExpr, LinearConstraint, Var, VarMap
+    from puzzle.grid import Cell, SquareGrid
 
 
 @dataclass
@@ -20,13 +20,19 @@ class UniqueConstraint:
 
 @dataclass
 class OneOfConstraint:
-    constraints: list[LinearConstraint]
+    constraints: list[LinearConstraint | BoolExpr]
 
 
 @dataclass
 class SingleCycleConstraint:
-    edge_vars: BoolVarMap
+    edge_vars: VarMap
     grid: SquareGrid
+
+
+@dataclass
+class ConnectedConstraint:
+    cells: list[Cell]
+    indicators: dict[Cell, BoolExpr] = field(repr=False)
 
 
 def all_different(vars: Iterable[Var]) -> AllDifferentConstraint:
@@ -37,9 +43,24 @@ def unique() -> UniqueConstraint:
     return UniqueConstraint()
 
 
-def one_of(*constraints: LinearConstraint) -> OneOfConstraint:
+def one_of(*constraints: LinearConstraint | BoolExpr) -> OneOfConstraint:
     return OneOfConstraint(list(constraints))
 
 
-def single_cycle(edge_vars: BoolVarMap, grid: SquareGrid) -> SingleCycleConstraint:
+def single_cycle(edge_vars: VarMap, grid: SquareGrid) -> SingleCycleConstraint:
     return SingleCycleConstraint(edge_vars, grid)
+
+
+def connected(
+    cells: Sequence[Cell], predicate: Callable[[Cell], BoolExpr]
+) -> ConnectedConstraint:
+    cell_list = list(cells)
+    indicators = {c: predicate(c) for c in cell_list}
+    return ConnectedConstraint(cell_list, indicators)
+
+
+def count_eq(exprs: Iterable[BoolExpr], n: int) -> LinearConstraint:
+    from puzzle.expr import Expr, LinearConstraint as LC, sum_expr
+
+    result = sum_expr(exprs)
+    return result == n  # type: ignore[return-value]
