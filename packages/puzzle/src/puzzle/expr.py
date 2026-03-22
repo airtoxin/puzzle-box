@@ -155,6 +155,9 @@ class VarMap:
     def __getitem__(self, key: Hashable) -> Var:
         return self._vars[key]
 
+    def __contains__(self, key: Hashable) -> bool:
+        return key in self._vars
+
 
 BoolVarMap = VarMap
 

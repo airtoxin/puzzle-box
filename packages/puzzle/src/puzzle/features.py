@@ -25,6 +25,7 @@ CONSTRAINT_REQUIRES: dict[str, frozenset[str]] = {
     "ConnectedConstraint": frozenset(),
     "ShapeAcrossConstraint": frozenset({"region_partition", "shape_class"}),
     "NoBoundaryCrossConstraint": frozenset({"region_partition"}),
+    "CompoundConstraint": frozenset(),
 }
 
 

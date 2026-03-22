@@ -122,6 +122,17 @@ class SquareGrid:
         return result
 
 
+    def king_neighbor_pairs(self) -> list[tuple[Cell, Cell]]:
+        """All pairs of king-adjacent cells (8 directions including diagonals)."""
+        pairs: list[tuple[Cell, Cell]] = []
+        for r in range(self._rows):
+            for c in range(self._cols):
+                for dr, dc in [(0, 1), (1, 0), (1, 1), (1, -1)]:
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < self._rows and 0 <= nc < self._cols:
+                        pairs.append((Cell(r, c), Cell(nr, nc)))
+        return pairs
+
     def adjacent_cell_pairs(self) -> list[tuple[Cell, Cell]]:
         """All pairs of orthogonally adjacent cells."""
         pairs: list[tuple[Cell, Cell]] = []

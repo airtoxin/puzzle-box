@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Callable, Iterable, Sequence
 
 if TYPE_CHECKING:
     from puzzle.expr import BoolExpr, Expr, LinearConstraint, Var, VarMap
+    from puzzle.grid import Cell
     from puzzle.grid import Cell, SquareGrid
 
 
@@ -85,3 +86,26 @@ def at_most_one(exprs: Iterable[Expr]) -> LinearConstraint:
 
     result = sum_expr(exprs)
     return result <= 1  # type: ignore[return-value]
+
+
+@dataclass
+class CompoundConstraint:
+    """Multiple constraints to be added together."""
+
+    constraints: list[LinearConstraint]
+
+
+def non_touching(
+    var_map: VarMap,
+    adjacency: Sequence[tuple[Cell, Cell]],
+) -> CompoundConstraint:
+    """No two selected variables in adjacent pairs are both true."""
+    from puzzle.expr import sum_expr
+
+    constraints: list[LinearConstraint] = []
+    for a, b in adjacency:
+        if a in var_map and b in var_map:  # type: ignore[operator]
+            constraints.append(
+                sum_expr([var_map[a], var_map[b]]) <= 1  # type: ignore[return-value]
+            )
+    return CompoundConstraint(constraints)

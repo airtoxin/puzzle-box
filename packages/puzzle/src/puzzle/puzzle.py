@@ -4,12 +4,14 @@ from ortools.sat.python import cp_model
 
 from puzzle.constraints import (
     AllDifferentConstraint,
+    CompoundConstraint,
     ConnectedConstraint,
     OneOfConstraint,
     SingleCycleConstraint,
     UniqueConstraint,
 )
 from puzzle.expr import BoolExpr, LinearConstraint, Var, VarGrid, VarMap
+from puzzle.match import MatchVarMap
 from puzzle.features import CONSTRAINT_REQUIRES, MissingFeatureError
 from puzzle.grid import Cell, SquareGrid
 from puzzle.polyomino import NoBoundaryCrossConstraint, ShapeAcrossConstraint
@@ -51,6 +53,7 @@ ConstraintType = (
     | ConnectedConstraint
     | ShapeAcrossConstraint
     | NoBoundaryCrossConstraint
+    | CompoundConstraint
 )
 
 
@@ -119,6 +122,31 @@ class Puzzle:
         self._vars.extend(vars.values())
         return VarMap(vars)
 
+    def match_var_map(
+        self,
+        name: str,
+        left: Sequence[Hashable],
+        right: Sequence[Hashable],
+        allowed_pairs: Sequence[tuple[Hashable, Hashable]],
+    ) -> MatchVarMap:
+        """Create boolean match variables for a bipartite matching."""
+        vars: dict[tuple[Hashable, Hashable], Var] = {}
+        pairs_by_left: dict[Hashable, list[tuple[Hashable, Hashable]]] = {}
+        pairs_by_right: dict[Hashable, list[tuple[Hashable, Hashable]]] = {}
+
+        for a, b in allowed_pairs:
+            pair = (a, b)
+            v = Var(
+                self._model.new_bool_var(f"{name}_{a}_{b}"),
+                self._model,
+            )
+            vars[pair] = v
+            self._vars.append(v)
+            pairs_by_left.setdefault(a, []).append(pair)
+            pairs_by_right.setdefault(b, []).append(pair)
+
+        return MatchVarMap(vars, list(left), list(right), pairs_by_left, pairs_by_right)
+
     def add(self, constraint: ConstraintType) -> None:
         self._check_requires(constraint)
 
@@ -138,6 +166,9 @@ class Puzzle:
             self._add_connected(constraint)
         elif isinstance(constraint, ShapeAcrossConstraint):
             self._add_shape_across(constraint)
+        elif isinstance(constraint, CompoundConstraint):
+            for c in constraint.constraints:
+                self.add(c)
         elif isinstance(constraint, NoBoundaryCrossConstraint):
             self._add_no_boundary_cross(constraint)
 

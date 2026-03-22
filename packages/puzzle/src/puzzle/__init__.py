@@ -4,12 +4,14 @@ from puzzle.constraints import (
     OneOfConstraint,
     SingleCycleConstraint,
     UniqueConstraint,
+    CompoundConstraint,
     all_different,
     at_least_one,
     at_most_one,
     connected,
     count_eq,
     exactly_one,
+    non_touching,
     one_of,
     single_cycle,
     unique,
@@ -29,6 +31,7 @@ from puzzle.polyomino import (
     polyomino,
     same_shape_across,
 )
+from puzzle.match import MatchVarMap
 from puzzle.puzzle import Puzzle, Solution
 from puzzle.regions import (
     Region,
@@ -58,10 +61,12 @@ __all__ = [
     "BoolVarMap",
     "Cell",
     "ConnectedConstraint",
+    "CompoundConstraint",
     "Constraint",
     "Edge",
     "Expr",
     "LinearConstraint",
+    "MatchVarMap",
     "MissingFeatureError",
     "OneOfConstraint",
     "Placement",
@@ -92,6 +97,7 @@ __all__ = [
     "no_boundary_cross",
     "enumerate_shikaku_rectangles",
     "exactly_one",
+    "non_touching",
     "filter_number_equals_area",
     "filter_one_number_per_region",
     "filter_same_number_combination",
