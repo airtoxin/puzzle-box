@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Hashable, Iterable
+from typing import Any, Hashable, Iterable, cast
 
 from ortools.sat.python import cp_model
 
@@ -62,6 +62,13 @@ class Expr:
             return LinearConstraint(self._internal > other._internal)
         return NotImplemented
 
+    def __or__(self, other: Expr) -> LinearConstraint:  # type: ignore[override]
+        """At least one is true: self + other >= 1."""
+        if isinstance(other, Expr):
+            s = cp_model.LinearExpr.sum([self._internal, other._internal])
+            return LinearConstraint(s >= 1)
+        return NotImplemented
+
     def __hash__(self) -> int:
         return id(self._internal)
 
@@ -120,6 +127,14 @@ class Var(Expr):
                 self._internal == other._internal,
             )
         return NotImplemented  # type: ignore[return-value]
+
+    def __invert__(self) -> BoolExpr:
+        """Negate a boolean variable: ~black[c] is true when black[c] is false."""
+        internal = cast(cp_model.IntVar, self._internal)
+        return BoolExpr(
+            cast(cp_model.IntVar, internal.Not()),
+            self._internal == 0,
+        )
 
     def __hash__(self) -> int:
         return id(self._internal)

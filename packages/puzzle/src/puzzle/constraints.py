@@ -71,3 +71,17 @@ def exactly_one(exprs: Iterable[Expr]) -> LinearConstraint:
 
     result = sum_expr(exprs)
     return result == 1  # type: ignore[return-value]
+
+
+def at_least_one(exprs: Iterable[Expr]) -> LinearConstraint:
+    from puzzle.expr import sum_expr
+
+    result = sum_expr(exprs)
+    return result >= 1  # type: ignore[return-value]
+
+
+def at_most_one(exprs: Iterable[Expr]) -> LinearConstraint:
+    from puzzle.expr import sum_expr
+
+    result = sum_expr(exprs)
+    return result <= 1  # type: ignore[return-value]

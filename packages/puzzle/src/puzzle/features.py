@@ -22,7 +22,7 @@ CONSTRAINT_REQUIRES: dict[str, frozenset[str]] = {
     "UniqueConstraint": frozenset(),
     "OneOfConstraint": frozenset(),
     "SingleCycleConstraint": frozenset({"edge_vars"}),
-    "ConnectedConstraint": frozenset({"cell_vars"}),
+    "ConnectedConstraint": frozenset(),
     "ShapeAcrossConstraint": frozenset({"region_partition", "shape_class"}),
     "NoBoundaryCrossConstraint": frozenset({"region_partition"}),
 }

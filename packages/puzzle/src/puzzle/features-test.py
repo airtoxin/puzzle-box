@@ -44,13 +44,14 @@ def test_single_cycle_requires_edge_vars():
         p.add(single_cycle(None, board))  # type: ignore[arg-type]
 
 
-def test_connected_requires_cell_vars():
+def test_connected_works_with_bool_vars():
+    """connected() works with bool_var_map (no cell_vars needed)."""
     p = Puzzle("test")
     board = square_grid(3, 3)
+    black = p.bool_var_map("b", board.cells)
 
-    # No cell_vars — should fail
-    with pytest.raises(MissingFeatureError, match="cell_vars"):
-        p.add(connected(board.cells, lambda c: None))  # type: ignore[arg-type]
+    # Should not raise — connected works with any variable type
+    p.add(connected(board.cells, lambda c: ~black[c]))
 
 
 def test_shape_across_requires_region_partition_and_shape_class():

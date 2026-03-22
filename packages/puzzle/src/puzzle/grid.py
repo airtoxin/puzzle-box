@@ -122,6 +122,17 @@ class SquareGrid:
         return result
 
 
+    def adjacent_cell_pairs(self) -> list[tuple[Cell, Cell]]:
+        """All pairs of orthogonally adjacent cells."""
+        pairs: list[tuple[Cell, Cell]] = []
+        for r in range(self._rows):
+            for c in range(self._cols):
+                if c + 1 < self._cols:
+                    pairs.append((Cell(r, c), Cell(r, c + 1)))
+                if r + 1 < self._rows:
+                    pairs.append((Cell(r, c), Cell(r + 1, c)))
+        return pairs
+
     def cells_sharing_edge(self, edge: Edge) -> tuple[Cell, Cell]:
         """Return the two cells separated by a grid edge."""
         v1, v2 = edge.v1, edge.v2
