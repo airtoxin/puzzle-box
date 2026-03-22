@@ -3,6 +3,7 @@ from solvers.slitherlink import solve as solve_slitherlink
 from solvers.nurikabe import solve as solve_nurikabe
 from solvers.yajilin import solve as solve_yajilin
 from solvers.tiling import solve as solve_tiling
+from solvers.shikaku import solve as solve_shikaku
 
 __all__ = [
     "solve_sudoku",
@@ -10,4 +11,5 @@ __all__ = [
     "solve_nurikabe",
     "solve_yajilin",
     "solve_tiling",
+    "solve_shikaku",
 ]

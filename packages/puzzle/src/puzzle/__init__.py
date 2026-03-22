@@ -26,6 +26,7 @@ from puzzle.polyomino import (
     same_shape_across,
 )
 from puzzle.puzzle import Puzzle, Solution
+from puzzle.shikaku import ShikakuRect, enumerate_shikaku_rectangles
 
 Constraint = (
     AllDifferentConstraint
@@ -62,12 +63,14 @@ __all__ = [
     "VarMap",
     "Vertex",
     "ShapeAcrossConstraint",
+    "ShikakuRect",
     "all_adjacent_different_shape",
     "all_different",
     "different_shape_across",
     "connected",
     "count_eq",
     "enumerate_placements",
+    "enumerate_shikaku_rectangles",
     "exactly_one",
     "one_of",
     "polyomino",
