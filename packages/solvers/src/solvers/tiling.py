@@ -37,6 +37,8 @@ def solve(
         List of chosen placements, or None if no solution exists.
     """
     p = Puzzle("tiling")
+    p.add_feature("region_partition")
+    p.add_feature("shape_class")
     board = square_grid(height, width)
     walls = forbidden_internal_edges or set()
     target_cells = board_cells if board_cells is not None else set(board.cells)

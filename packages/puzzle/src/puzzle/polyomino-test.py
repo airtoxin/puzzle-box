@@ -16,6 +16,8 @@ def _solve_tiling(height, width, pieces, board_cells=None,
                   same_edges=None, different_edges=None,
                   adj_different=False):
     p = Puzzle("tiling")
+    p.add_feature("region_partition")
+    p.add_feature("shape_class")
     board = square_grid(height, width)
     target = board_cells if board_cells is not None else set(board.cells)
 

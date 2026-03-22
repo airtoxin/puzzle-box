@@ -13,6 +13,7 @@ from puzzle.constraints import (
     unique,
 )
 from puzzle.expr import BoolExpr, BoolVarMap, Expr, LinearConstraint, Var, VarGrid, VarMap, sum_expr
+from puzzle.features import MissingFeatureError
 from puzzle.grid import Cell, Edge, SquareGrid, Vertex, square_grid
 from puzzle.polyomino import (
     Placement,
@@ -47,6 +48,7 @@ __all__ = [
     "Edge",
     "Expr",
     "LinearConstraint",
+    "MissingFeatureError",
     "OneOfConstraint",
     "Placement",
     "Polyomino",

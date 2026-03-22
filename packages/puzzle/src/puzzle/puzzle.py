@@ -10,6 +10,7 @@ from puzzle.constraints import (
     UniqueConstraint,
 )
 from puzzle.expr import BoolExpr, LinearConstraint, Var, VarGrid, VarMap
+from puzzle.features import CONSTRAINT_REQUIRES, MissingFeatureError
 from puzzle.grid import Cell, SquareGrid
 from puzzle.polyomino import ShapeAcrossConstraint
 
@@ -57,12 +58,28 @@ class Puzzle:
         self.name = name
         self._model = cp_model.CpModel()
         self._vars: list[Var] = []
+        self._features: set[str] = set()
         self._require_unique = False
         self._indicator_count = 0
+
+    @property
+    def features(self) -> frozenset[str]:
+        return frozenset(self._features)
+
+    def add_feature(self, feature: str) -> None:
+        self._features.add(feature)
+
+    def _check_requires(self, constraint: ConstraintType) -> None:
+        cls_name = type(constraint).__name__
+        requires = CONSTRAINT_REQUIRES.get(cls_name, frozenset())
+        missing = requires - self._features
+        if missing:
+            raise MissingFeatureError(cls_name, missing)
 
     def int_var_grid(
         self, name: str, cells: list[Cell], lo: int, hi: int
     ) -> VarGrid:
+        self._features.add("cell_vars")
         vars = {
             cell: Var(
                 self._model.new_int_var(lo, hi, f"{name}_{cell.row}_{cell.col}"),
@@ -76,6 +93,7 @@ class Puzzle:
     def int_var_map(
         self, name: str, keys: Sequence[Hashable], lo: int, hi: int
     ) -> VarMap:
+        self._features.add("cell_vars")
         vars = {
             key: Var(
                 self._model.new_int_var(lo, hi, f"{name}_{key}"),
@@ -89,6 +107,7 @@ class Puzzle:
     def bool_var_map(
         self, name: str, keys: Sequence[Hashable]
     ) -> VarMap:
+        self._features.add("edge_vars")
         vars = {
             key: Var(
                 self._model.new_bool_var(f"{name}_{key}"),
@@ -100,6 +119,8 @@ class Puzzle:
         return VarMap(vars)
 
     def add(self, constraint: ConstraintType) -> None:
+        self._check_requires(constraint)
+
         if isinstance(constraint, AllDifferentConstraint):
             self._model.add_all_different([v._internal for v in constraint.vars])
         elif isinstance(constraint, BoolExpr):
@@ -185,40 +206,33 @@ class Puzzle:
             for nbr in nbrs:
                 p_var = self._model.new_bool_var(f"_conn_par_{c}_{nbr}")
                 parent_vars.append(p_var)
-                # If this is c's parent: neighbor must be active, order increases
                 self._model.add(active[nbr] == 1).only_enforce_if(p_var)
                 self._model.add(
                     order_vars[c] == order_vars[nbr] + 1
                 ).only_enforce_if(p_var)
 
-            # Not active → not root, no parent
             self._model.add(is_root[c] == 0).only_enforce_if(active[c].Not())
             if parent_vars:
                 self._model.add(
                     cp_model.LinearExpr.sum(parent_vars) == 0
                 ).only_enforce_if(active[c].Not())
 
-            # Root → order = 0, no parent
             self._model.add(order_vars[c] == 0).only_enforce_if(is_root[c])
             if parent_vars:
                 self._model.add(
                     cp_model.LinearExpr.sum(parent_vars) == 0
                 ).only_enforce_if(is_root[c])
 
-            # Active and not root → exactly one parent
             if parent_vars:
                 self._model.add(
                     cp_model.LinearExpr.sum(parent_vars) == 1
                 ).only_enforce_if(active[c]).only_enforce_if(is_root[c].Not())
             else:
-                # No neighbors in cell set: if active, must be root
                 self._model.add(is_root[c] == 1).only_enforce_if(active[c])
 
-        # At most one root
         root_list = [is_root[c] for c in cells]
         self._model.add(cp_model.LinearExpr.sum(root_list) <= 1)
 
-        # If any active cell exists, exactly one root
         active_list = [active[c] for c in cells]
         any_active = self._model.new_bool_var(
             f"_conn_any_{self._indicator_count}"
