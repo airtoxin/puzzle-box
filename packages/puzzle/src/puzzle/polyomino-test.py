@@ -189,6 +189,36 @@ def test_all_adjacent_different_infeasible_single_piece():
     assert result is None
 
 
+def _validate_adj_different(result, board_cells, board):
+    """Verify no two adjacent pieces share the same shape name."""
+    by_cell = {}
+    for pl in result:
+        for cell in pl.cells:
+            by_cell[cell] = pl
+    for cell in board_cells:
+        for nbr in board.neighbors(cell):
+            if nbr not in board_cells:
+                continue
+            pa = by_cell[cell]
+            pb = by_cell[nbr]
+            if pa is not pb:
+                assert pa.piece_name != pb.piece_name, (
+                    f"Adjacent same shape: {cell}({pa.piece_name}) - {nbr}({pb.piece_name})"
+                )
+
+
+def test_all_adjacent_different_infeasible_2x3():
+    """2x3 board with I and L trominoes: 2 pieces always adjacent, only 2 types.
+
+    Any tiling of 2x3 with two trominoes forces them to share a boundary.
+    With only I and L, adj_different is satisfiable — but with only I-trominoes
+    it's not (both pieces same shape). Test with single piece type.
+    """
+    I3 = polyomino("I", [(0, 0), (0, 1), (0, 2)], allow_rotate=True)
+    result = _solve_tiling(2, 3, [I3], adj_different=True)
+    assert result is None
+
+
 def test_polyomino_rotation_variants():
     """Verify rotation and reflection generate correct variant counts."""
     # Square: rotation doesn't change shape
