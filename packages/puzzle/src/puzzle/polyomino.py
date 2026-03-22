@@ -186,3 +186,35 @@ def different_shape_across(
         if pa.piece_name == pb.piece_name
     ]
     return ShapeAcrossConstraint(forbidden, use_vars)
+
+
+def all_adjacent_different_shape(
+    use_vars: VarMap,
+    placements: list[Placement],
+    board: SquareGrid,
+) -> ShapeAcrossConstraint:
+    """All adjacent pieces must have different shapes.
+
+    For every pair of adjacent cells covered by different placements,
+    those placements must have different piece names.
+    """
+    by_cell = _placements_by_cell(placements)
+    seen: set[tuple[Placement, Placement]] = set()
+    forbidden: list[tuple[Placement, Placement]] = []
+
+    for cell in board.cells:
+        for nbr in board.neighbors(cell):
+            pa_list = by_cell.get(cell, [])
+            pb_list = by_cell.get(nbr, [])
+            for pa in pa_list:
+                for pb in pb_list:
+                    if pa is pb:
+                        continue  # same placement = same piece
+                    if pa.piece_name != pb.piece_name:
+                        continue  # different shape = allowed
+                    pair = (pa, pb) if id(pa) < id(pb) else (pb, pa)
+                    if pair not in seen:
+                        seen.add(pair)
+                        forbidden.append(pair)
+
+    return ShapeAcrossConstraint(forbidden, use_vars)

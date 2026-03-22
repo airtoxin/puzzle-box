@@ -1,6 +1,7 @@
 from puzzle import (
     Cell,
     Puzzle,
+    all_adjacent_different_shape,
     different_shape_across,
     enumerate_placements,
     exactly_one,
@@ -12,7 +13,8 @@ from puzzle.grid import Vertex, _make_edge
 
 
 def _solve_tiling(height, width, pieces, board_cells=None,
-                  same_edges=None, different_edges=None):
+                  same_edges=None, different_edges=None,
+                  adj_different=False):
     p = Puzzle("tiling")
     board = square_grid(height, width)
     target = board_cells if board_cells is not None else set(board.cells)
@@ -41,6 +43,9 @@ def _solve_tiling(height, width, pieces, board_cells=None,
 
     for edge in (different_edges or []):
         p.add(different_shape_across(edge, use, all_placements, board))
+
+    if adj_different:
+        p.add(all_adjacent_different_shape(use, all_placements, board))
 
     solution = p.solve()
     if solution is None:
@@ -139,6 +144,48 @@ def test_different_shape_makes_infeasible():
         2, 4, [domino],
         different_edges=[wall],
     )
+    assert result is None
+
+
+def test_all_adjacent_different_shape():
+    """Custom board shaped so I and L trominoes tile with no same-shape adjacency.
+
+    I I I
+    L .
+    L L
+    """
+    I3 = polyomino("I", [(0, 0), (0, 1), (0, 2)], allow_rotate=True)
+    L3 = polyomino("L", [(0, 0), (1, 0), (1, 1)], allow_rotate=True, allow_reflect=True)
+    board_cells = {
+        Cell(0, 0), Cell(0, 1), Cell(0, 2),
+        Cell(1, 0),
+        Cell(2, 0), Cell(2, 1),
+    }
+    result = _solve_tiling(3, 3, [I3, L3], board_cells=board_cells, adj_different=True)
+    assert result is not None
+    assert len(result) == 2
+    # Verify all adjacent pieces have different names
+    by_cell = {}
+    for pl in result:
+        for cell in pl.cells:
+            by_cell[cell] = pl
+    board = square_grid(3, 3)
+    for cell in board_cells:
+        for nbr in board.neighbors(cell):
+            if nbr not in board_cells:
+                continue
+            pa = by_cell[cell]
+            pb = by_cell[nbr]
+            if pa is not pb:
+                assert pa.piece_name != pb.piece_name, (
+                    f"Adjacent same shape: {cell}({pa.piece_name}) - {nbr}({pb.piece_name})"
+                )
+
+
+def test_all_adjacent_different_infeasible_single_piece():
+    """Only one piece type — impossible if any two pieces are adjacent."""
+    domino = polyomino("D", [(0, 0), (0, 1)], allow_rotate=True)
+    result = _solve_tiling(2, 4, [domino], adj_different=True)
     assert result is None
 
 
