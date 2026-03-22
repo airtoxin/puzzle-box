@@ -28,6 +28,14 @@ from puzzle.polyomino import (
     same_shape_across,
 )
 from puzzle.puzzle import Puzzle, Solution
+from puzzle.regions import (
+    Region,
+    enumerate_connected_regions,
+    enumerate_rectangles,
+    filter_number_equals_area,
+    filter_one_number_per_region,
+    filter_same_number_combination,
+)
 from puzzle.shikaku import ShikakuRect, enumerate_shikaku_rectangles
 
 Constraint = (
@@ -57,6 +65,7 @@ __all__ = [
     "Placement",
     "Polyomino",
     "Puzzle",
+    "Region",
     "SingleCycleConstraint",
     "Solution",
     "SquareGrid",
@@ -73,10 +82,15 @@ __all__ = [
     "different_shape_across",
     "connected",
     "count_eq",
+    "enumerate_connected_regions",
     "enumerate_placements",
+    "enumerate_rectangles",
     "no_boundary_cross",
     "enumerate_shikaku_rectangles",
     "exactly_one",
+    "filter_number_equals_area",
+    "filter_one_number_per_region",
+    "filter_same_number_combination",
     "one_of",
     "polyomino",
     "same_shape_across",
