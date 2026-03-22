@@ -5,6 +5,7 @@ from puzzle import (
     different_shape_across,
     enumerate_placements,
     exactly_one,
+    no_boundary_cross,
     polyomino,
     same_shape_across,
     square_grid,
@@ -14,7 +15,7 @@ from puzzle.grid import Vertex, _make_edge
 
 def _solve_tiling(height, width, pieces, board_cells=None,
                   same_edges=None, different_edges=None,
-                  adj_different=False):
+                  adj_different=False, tatami=False):
     p = Puzzle("tiling")
     p.add_feature("region_partition")
     p.add_feature("shape_class")
@@ -48,6 +49,9 @@ def _solve_tiling(height, width, pieces, board_cells=None,
 
     if adj_different:
         p.add(all_adjacent_different_shape(use, all_placements, board))
+
+    if tatami:
+        p.add(no_boundary_cross(use, all_placements, board, board_cells))
 
     solution = p.solve()
     if solution is None:
@@ -219,6 +223,53 @@ def test_all_adjacent_different_infeasible_2x3():
     I3 = polyomino("I", [(0, 0), (0, 1), (0, 2)], allow_rotate=True)
     result = _solve_tiling(2, 3, [I3], adj_different=True)
     assert result is None
+
+
+def test_no_boundary_cross_2x2():
+    """2x2 with dominoes: tatami forces both dominoes same orientation.
+
+    Horizontal pair:       Vertical pair:
+    1 1                    1 2
+    2 2  ← cross at (1,1) 1 2  ← no cross
+
+    With tatami, only parallel placement works (no cross at center).
+    """
+    domino = polyomino("D", [(0, 0), (0, 1)], allow_rotate=True)
+    result = _solve_tiling(2, 2, [domino], tatami=True)
+    assert result is not None
+    # Verify no cross: at the single interior vertex (1,1),
+    # at least one adjacent pair shares a placement
+    for pl in result:
+        cells = sorted(pl.cells)
+        # Both dominoes must be same orientation (both H or both V)
+        assert cells[0].row == cells[1].row or cells[0].col == cells[1].col
+
+
+def test_no_boundary_cross_rejects_cross():
+    """2x2 with 4 monominoes always creates a cross — infeasible with tatami."""
+    mono = polyomino("M", [(0, 0)])
+    result = _solve_tiling(2, 2, [mono], tatami=True)
+    assert result is None
+
+
+def test_no_boundary_cross_3x3():
+    """3x3 with I-tromino and L-tromino, tatami constraint."""
+    I3 = polyomino("I", [(0, 0), (0, 1), (0, 2)], allow_rotate=True)
+    L3 = polyomino("L", [(0, 0), (1, 0), (1, 1)], allow_rotate=True, allow_reflect=True)
+    result = _solve_tiling(3, 3, [I3, L3], tatami=True)
+    assert result is not None
+
+    # Verify no cross at any interior vertex
+    by_cell = {}
+    for pl in result:
+        for cell in pl.cells:
+            by_cell[cell] = pl
+    for r in range(1, 3):
+        for c in range(1, 3):
+            a, b, cc, d = Cell(r-1,c-1), Cell(r-1,c), Cell(r,c-1), Cell(r,c)
+            pairs = [(a,b), (cc,d), (a,cc), (b,d)]
+            has_internal = any(by_cell[x] is by_cell[y] for x, y in pairs)
+            assert has_internal, f"Cross at vertex ({r},{c})"
 
 
 def test_polyomino_rotation_variants():

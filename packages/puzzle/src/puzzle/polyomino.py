@@ -218,3 +218,68 @@ def all_adjacent_different_shape(
                         forbidden.append(pair)
 
     return ShapeAcrossConstraint(forbidden, use_vars)
+
+
+@dataclass(frozen=True)
+class NoBoundaryCrossConstraint:
+    """At each interior vertex, boundaries must not form a cross (+).
+
+    Stores per-vertex lists of placements that bridge at least one
+    adjacent cell pair around that vertex. At least one must be selected.
+    """
+
+    vertex_bridges: list[list[Placement]]
+    use_vars: VarMap
+
+
+def no_boundary_cross(
+    use_vars: VarMap,
+    placements: list[Placement],
+    board: SquareGrid,
+    board_cells: set[Cell] | None = None,
+) -> NoBoundaryCrossConstraint:
+    """No boundary cross (tatami constraint).
+
+    At every interior vertex, the region boundaries must not form
+    a + shape. Equivalently, at least one adjacent cell pair around
+    each vertex must belong to the same region.
+    """
+    target = board_cells if board_cells is not None else set(board.cells)
+
+    # Index placements by adjacent cell pairs
+    pair_to_pls: dict[tuple[Cell, Cell], list[Placement]] = {}
+    for pl in placements:
+        cells_list = list(pl.cells)
+        for i, c1 in enumerate(cells_list):
+            for c2 in cells_list[i + 1 :]:
+                if abs(c1.row - c2.row) + abs(c1.col - c2.col) == 1:
+                    pair = (min(c1, c2), max(c1, c2))
+                    pair_to_pls.setdefault(pair, []).append(pl)
+
+    vertex_bridges: list[list[Placement]] = []
+
+    for r in range(1, board._rows):
+        for c in range(1, board._cols):
+            a = Cell(r - 1, c - 1)
+            b = Cell(r - 1, c)
+            cc = Cell(r, c - 1)
+            d = Cell(r, c)
+
+            # Only constrain if all 4 cells are on the board
+            if not {a, b, cc, d}.issubset(target):
+                continue
+
+            pairs = [
+                (min(a, b), max(a, b)),
+                (min(cc, d), max(cc, d)),
+                (min(a, cc), max(a, cc)),
+                (min(b, d), max(b, d)),
+            ]
+
+            bridges: set[Placement] = set()
+            for pair in pairs:
+                bridges.update(pair_to_pls.get(pair, []))
+
+            vertex_bridges.append(list(bridges))
+
+    return NoBoundaryCrossConstraint(vertex_bridges, use_vars)

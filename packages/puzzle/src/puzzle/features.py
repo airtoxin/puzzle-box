@@ -24,6 +24,7 @@ CONSTRAINT_REQUIRES: dict[str, frozenset[str]] = {
     "SingleCycleConstraint": frozenset({"edge_vars"}),
     "ConnectedConstraint": frozenset({"cell_vars"}),
     "ShapeAcrossConstraint": frozenset({"region_partition", "shape_class"}),
+    "NoBoundaryCrossConstraint": frozenset({"region_partition"}),
 }
 
 

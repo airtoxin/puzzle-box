@@ -12,7 +12,7 @@ from puzzle.constraints import (
 from puzzle.expr import BoolExpr, LinearConstraint, Var, VarGrid, VarMap
 from puzzle.features import CONSTRAINT_REQUIRES, MissingFeatureError
 from puzzle.grid import Cell, SquareGrid
-from puzzle.polyomino import ShapeAcrossConstraint
+from puzzle.polyomino import NoBoundaryCrossConstraint, ShapeAcrossConstraint
 
 
 class Solution:
@@ -50,6 +50,7 @@ ConstraintType = (
     | SingleCycleConstraint
     | ConnectedConstraint
     | ShapeAcrossConstraint
+    | NoBoundaryCrossConstraint
 )
 
 
@@ -137,6 +138,8 @@ class Puzzle:
             self._add_connected(constraint)
         elif isinstance(constraint, ShapeAcrossConstraint):
             self._add_shape_across(constraint)
+        elif isinstance(constraint, NoBoundaryCrossConstraint):
+            self._add_no_boundary_cross(constraint)
 
     def _add_one_of(self, constraint: OneOfConstraint) -> None:
         indicators: list[cp_model.IntVar] = []
@@ -247,6 +250,18 @@ class Puzzle:
         self._model.add(
             cp_model.LinearExpr.sum(root_list) == 1
         ).only_enforce_if(any_active)
+
+    def _add_no_boundary_cross(self, constraint: NoBoundaryCrossConstraint) -> None:
+        for bridges in constraint.vertex_bridges:
+            if not bridges:
+                # No placement bridges this vertex — infeasible
+                self._model.add(0 >= 1)  # force UNSAT
+                return
+            internals = [
+                cast(cp_model.IntVar, constraint.use_vars[pl]._internal)
+                for pl in bridges
+            ]
+            self._model.add(cp_model.LinearExpr.sum(internals) >= 1)
 
     def _add_shape_across(self, constraint: ShapeAcrossConstraint) -> None:
         for pa, pb in constraint.forbidden_pairs:

@@ -19,9 +19,11 @@ from puzzle.polyomino import (
     Placement,
     Polyomino,
     ShapeAcrossConstraint,
+    NoBoundaryCrossConstraint,
     all_adjacent_different_shape,
     different_shape_across,
     enumerate_placements,
+    no_boundary_cross,
     polyomino,
     same_shape_across,
 )
@@ -37,6 +39,7 @@ Constraint = (
     | SingleCycleConstraint
     | ConnectedConstraint
     | ShapeAcrossConstraint
+    | NoBoundaryCrossConstraint
 )
 
 __all__ = [
@@ -62,6 +65,7 @@ __all__ = [
     "VarGrid",
     "VarMap",
     "Vertex",
+    "NoBoundaryCrossConstraint",
     "ShapeAcrossConstraint",
     "ShikakuRect",
     "all_adjacent_different_shape",
@@ -70,6 +74,7 @@ __all__ = [
     "connected",
     "count_eq",
     "enumerate_placements",
+    "no_boundary_cross",
     "enumerate_shikaku_rectangles",
     "exactly_one",
     "one_of",
