@@ -122,5 +122,18 @@ class SquareGrid:
         return result
 
 
+    def cells_sharing_edge(self, edge: Edge) -> tuple[Cell, Cell]:
+        """Return the two cells separated by a grid edge."""
+        v1, v2 = edge.v1, edge.v2
+        if v1.row == v2.row:
+            # Horizontal edge: separates cells vertically
+            r, c = v1.row, min(v1.col, v2.col)
+            return Cell(r - 1, c), Cell(r, c)
+        else:
+            # Vertical edge: separates cells horizontally
+            r, c = min(v1.row, v2.row), v1.col
+            return Cell(r, c - 1), Cell(r, c)
+
+
 def square_grid(rows: int, cols: int) -> SquareGrid:
     return SquareGrid(rows, cols)

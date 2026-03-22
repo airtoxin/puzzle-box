@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import TYPE_CHECKING, Hashable, Sequence
 
 from puzzle.grid import Cell, Edge, SquareGrid, Vertex, _make_edge
+
+if TYPE_CHECKING:
+    from puzzle.expr import VarMap
 
 
 def _normalize(cells: list[tuple[int, int]]) -> tuple[tuple[int, int], ...]:
@@ -125,3 +128,61 @@ def enumerate_placements(
                     result.append(Placement(piece.name, placed))
 
     return result
+
+
+@dataclass(frozen=True)
+class ShapeAcrossConstraint:
+    """Constraint on piece shapes across a boundary edge."""
+
+    forbidden_pairs: list[tuple[Placement, Placement]]
+    use_vars: VarMap
+
+
+def _placements_by_cell(
+    placements: list[Placement],
+) -> dict[Cell, list[Placement]]:
+    result: dict[Cell, list[Placement]] = {}
+    for pl in placements:
+        for cell in pl.cells:
+            result.setdefault(cell, []).append(pl)
+    return result
+
+
+def same_shape_across(
+    edge: Edge,
+    use_vars: VarMap,
+    placements: list[Placement],
+    board: SquareGrid,
+) -> ShapeAcrossConstraint:
+    """Pieces on both sides of the edge must have the same shape."""
+    a, b = board.cells_sharing_edge(edge)
+    by_cell = _placements_by_cell(placements)
+    pa_list = by_cell.get(a, [])
+    pb_list = by_cell.get(b, [])
+    forbidden = [
+        (pa, pb)
+        for pa in pa_list
+        for pb in pb_list
+        if pa.piece_name != pb.piece_name
+    ]
+    return ShapeAcrossConstraint(forbidden, use_vars)
+
+
+def different_shape_across(
+    edge: Edge,
+    use_vars: VarMap,
+    placements: list[Placement],
+    board: SquareGrid,
+) -> ShapeAcrossConstraint:
+    """Pieces on both sides of the edge must have different shapes."""
+    a, b = board.cells_sharing_edge(edge)
+    by_cell = _placements_by_cell(placements)
+    pa_list = by_cell.get(a, [])
+    pb_list = by_cell.get(b, [])
+    forbidden = [
+        (pa, pb)
+        for pa in pa_list
+        for pb in pb_list
+        if pa.piece_name == pb.piece_name
+    ]
+    return ShapeAcrossConstraint(forbidden, use_vars)

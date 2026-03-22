@@ -11,6 +11,7 @@ from puzzle.constraints import (
 )
 from puzzle.expr import BoolExpr, LinearConstraint, Var, VarGrid, VarMap
 from puzzle.grid import Cell, SquareGrid
+from puzzle.polyomino import ShapeAcrossConstraint
 
 
 class Solution:
@@ -47,6 +48,7 @@ ConstraintType = (
     | OneOfConstraint
     | SingleCycleConstraint
     | ConnectedConstraint
+    | ShapeAcrossConstraint
 )
 
 
@@ -112,6 +114,8 @@ class Puzzle:
             self._add_single_cycle(constraint.edge_vars, constraint.grid)
         elif isinstance(constraint, ConnectedConstraint):
             self._add_connected(constraint)
+        elif isinstance(constraint, ShapeAcrossConstraint):
+            self._add_shape_across(constraint)
 
     def _add_one_of(self, constraint: OneOfConstraint) -> None:
         indicators: list[cp_model.IntVar] = []
@@ -229,6 +233,12 @@ class Puzzle:
         self._model.add(
             cp_model.LinearExpr.sum(root_list) == 1
         ).only_enforce_if(any_active)
+
+    def _add_shape_across(self, constraint: ShapeAcrossConstraint) -> None:
+        for pa, pb in constraint.forbidden_pairs:
+            va = cast(cp_model.IntVar, constraint.use_vars[pa]._internal)
+            vb = cast(cp_model.IntVar, constraint.use_vars[pb]._internal)
+            self._model.add(va + vb <= 1)
 
     def solve(self) -> Solution | None:
         solver = cp_model.CpSolver()
