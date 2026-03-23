@@ -14,7 +14,7 @@ resolution-markers = [
 members = [
     "puzzle",
     "puzzle-box",
-    "puzzle-impls",
+    "puzzle-defs",
     "solvers",
 ]
 
@@ -278,9 +278,9 @@ dev = [
 dev = [{ name = "pyright", specifier = ">=1.1.408" }]
 
 [[package]]
-name = "puzzle-impls"
+name = "puzzle-defs"
 version = "0.1.0"
-source = { editable = "packages/puzzle-impls" }
+source = { editable = "packages/puzzle-defs" }
 dependencies = [
     { name = "puzzle" },
 ]
@@ -361,7 +361,7 @@ version = "0.1.0"
 source = { editable = "packages/solvers" }
 dependencies = [
     { name = "puzzle" },
-    { name = "puzzle-impls" },
+    { name = "puzzle-defs" },
 ]
 
 [package.dev-dependencies]
@@ -372,7 +372,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "puzzle", editable = "packages/puzzle" },
-    { name = "puzzle-impls", editable = "packages/puzzle-impls" },
+    { name = "puzzle-defs", editable = "packages/puzzle-defs" },
 ]
 
 [package.metadata.requires-dev]

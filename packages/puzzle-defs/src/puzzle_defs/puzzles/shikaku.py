@@ -1,5 +1,5 @@
 from puzzle import Puzzle, Solution, exactly_one, square_grid
-from puzzle_impls.shikaku import ShikakuRect, enumerate_shikaku_rectangles
+from puzzle_defs.shikaku import ShikakuRect, enumerate_shikaku_rectangles
 
 Grid = list[list[int | None]]
 

@@ -1,4 +1,4 @@
-from puzzle_impls import TentsPuzzle
+from puzzle_defs import TentsPuzzle
 
 Grid = list[list[str]]
 

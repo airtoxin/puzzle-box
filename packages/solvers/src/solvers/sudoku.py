@@ -1,4 +1,4 @@
-from puzzle_impls import SudokuPuzzle
+from puzzle_defs import SudokuPuzzle
 
 Grid = list[list[int]]
 

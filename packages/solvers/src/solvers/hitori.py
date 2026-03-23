@@ -1,4 +1,4 @@
-from puzzle_impls import HitoriPuzzle
+from puzzle_defs import HitoriPuzzle
 
 Grid = list[list[int]]
 

@@ -1,5 +1,5 @@
 from puzzle.grid import Edge
-from puzzle_impls import SlitherlinkPuzzle
+from puzzle_defs import SlitherlinkPuzzle
 
 Grid = list[list[int | None]]
 

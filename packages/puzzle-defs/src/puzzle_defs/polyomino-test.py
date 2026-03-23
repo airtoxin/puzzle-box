@@ -5,7 +5,7 @@ from puzzle import (
     square_grid,
 )
 from puzzle.grid import Vertex, _make_edge
-from puzzle_impls import (
+from puzzle_defs import (
     all_adjacent_different_shape,
     different_shape_across,
     enumerate_placements,

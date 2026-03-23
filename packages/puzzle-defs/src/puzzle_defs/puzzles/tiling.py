@@ -1,6 +1,6 @@
 from puzzle import Cell, Puzzle, Solution, exactly_one, square_grid, sum_expr
 from puzzle.grid import Edge
-from puzzle_impls.polyomino import Placement, Polyomino, enumerate_placements
+from puzzle_defs.polyomino import Placement, Polyomino, enumerate_placements
 
 
 class TilingPuzzle(Puzzle):

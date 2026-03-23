@@ -1,4 +1,4 @@
-from puzzle_impls.polyomino import (
+from puzzle_defs.polyomino import (
     Placement,
     Polyomino,
     all_adjacent_different_shape,
@@ -8,7 +8,7 @@ from puzzle_impls.polyomino import (
     polyomino,
     same_shape_across,
 )
-from puzzle_impls.puzzles import (
+from puzzle_defs.puzzles import (
     HitoriPuzzle,
     NurikabePuzzle,
     ShikakuPuzzle,
@@ -18,7 +18,7 @@ from puzzle_impls.puzzles import (
     TilingPuzzle,
     YajilinPuzzle,
 )
-from puzzle_impls.regions import (
+from puzzle_defs.regions import (
     Region,
     enumerate_connected_regions,
     enumerate_rectangles,
@@ -26,7 +26,7 @@ from puzzle_impls.regions import (
     filter_one_number_per_region,
     filter_same_number_combination,
 )
-from puzzle_impls.shikaku import ShikakuRect, enumerate_shikaku_rectangles
+from puzzle_defs.shikaku import ShikakuRect, enumerate_shikaku_rectangles
 
 __all__ = [
     "HitoriPuzzle",

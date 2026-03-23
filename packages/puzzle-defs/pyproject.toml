@@ -1,5 +1,5 @@
 [project]
-name = "puzzle-impls"
+name = "puzzle-defs"
 version = "0.1.0"
 description = "Puzzle implementations and utilities built on the puzzle DSL"
 authors = [

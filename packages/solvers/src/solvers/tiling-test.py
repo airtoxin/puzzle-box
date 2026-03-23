@@ -1,5 +1,5 @@
 from puzzle import Cell
-from puzzle_impls import polyomino
+from puzzle_defs import polyomino
 from puzzle.grid import Edge, Vertex, _make_edge
 from solvers.tiling import solve
 

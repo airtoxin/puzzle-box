@@ -1,5 +1,5 @@
 from puzzle import Cell, Puzzle, exactly_one, square_grid
-from puzzle_impls import (
+from puzzle_defs import (
     enumerate_connected_regions,
     enumerate_rectangles,
     filter_number_equals_area,

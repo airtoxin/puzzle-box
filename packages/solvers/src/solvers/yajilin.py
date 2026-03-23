@@ -1,5 +1,5 @@
-from puzzle_impls import YajilinPuzzle
-from puzzle_impls.puzzles.yajilin import DIRECTIONS
+from puzzle_defs import YajilinPuzzle
+from puzzle_defs.puzzles.yajilin import DIRECTIONS
 Clue = tuple[str, int]
 Grid = list[list[Clue | None]]
 

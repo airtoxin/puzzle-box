@@ -1,6 +1,6 @@
 from puzzle import Cell
 from puzzle.grid import Edge
-from puzzle_impls import Placement, Polyomino, TilingPuzzle
+from puzzle_defs import Placement, Polyomino, TilingPuzzle
 
 
 def solve(

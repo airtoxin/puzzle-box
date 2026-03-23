@@ -1,4 +1,4 @@
-from puzzle_impls import NurikabePuzzle
+from puzzle_defs import NurikabePuzzle
 
 Grid = list[list[int | None]]
 

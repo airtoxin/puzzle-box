@@ -8,7 +8,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "puzzle",
-    "puzzle-impls",
+    "puzzle-defs",
 ]
 
 [build-system]
@@ -17,7 +17,7 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 puzzle = { workspace = true }
-puzzle-impls = { workspace = true }
+puzzle-defs = { workspace = true }
 
 [dependency-groups]
 dev = [

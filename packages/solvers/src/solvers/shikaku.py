@@ -1,4 +1,4 @@
-from puzzle_impls import ShikakuPuzzle, ShikakuRect
+from puzzle_defs import ShikakuPuzzle, ShikakuRect
 
 Grid = list[list[int | None]]
 
