@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 from puzzle import Puzzle, Solution, all_different, square_grid
+from puzzle.grid import Cell
 
 Grid = list[list[int]]
+Clue = tuple[Cell, int]
 
 
 class SudokuPuzzle(Puzzle):
@@ -31,5 +35,24 @@ class SudokuPuzzle(Puzzle):
             self.add(all_different(self.cell_value[c] for c in box))
 
     def result(self, solution: Solution) -> Grid:
-        """Format the solution as a 9x9 grid of integers."""
         return solution.grid_values(self.cell_value, 9, 9)
+
+    @classmethod
+    def create_empty(cls) -> SudokuPuzzle:
+        return cls([[0] * 9 for _ in range(9)])
+
+    @classmethod
+    def extract_clues(cls, solution: Solution, puzzle: SudokuPuzzle) -> list[Clue]:
+        board = puzzle.board
+        return [
+            (board.cell(r, c), solution.value(puzzle.cell_value[board.cell(r, c)]))
+            for r in range(9)
+            for c in range(9)
+        ]
+
+    @classmethod
+    def build_from_clues(cls, clues: list[Clue]) -> SudokuPuzzle:
+        grid: Grid = [[0] * 9 for _ in range(9)]
+        for cell, value in clues:
+            grid[cell.row][cell.col] = value
+        return cls(grid)

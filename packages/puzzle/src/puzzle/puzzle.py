@@ -301,8 +301,10 @@ class Puzzle:
             vb = cast(cp_model.IntVar, constraint.use_vars[pb]._internal)
             self._model.add(va + vb <= 1)
 
-    def solve(self) -> Solution | None:
+    def solve(self, seed: int | None = None) -> Solution | None:
         solver = cp_model.CpSolver()
+        if seed is not None:
+            solver.parameters.random_seed = seed
 
         if self._require_unique:
             solver.parameters.enumerate_all_solutions = True
