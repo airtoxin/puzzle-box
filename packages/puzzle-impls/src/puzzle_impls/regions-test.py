@@ -1,13 +1,10 @@
-from puzzle import (
-    Cell,
-    Puzzle,
+from puzzle import Cell, Puzzle, exactly_one, square_grid
+from puzzle_impls import (
     enumerate_connected_regions,
     enumerate_rectangles,
-    exactly_one,
     filter_number_equals_area,
     filter_one_number_per_region,
     filter_same_number_combination,
-    square_grid,
 )
 
 

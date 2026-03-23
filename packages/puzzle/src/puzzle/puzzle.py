@@ -6,7 +6,9 @@ from puzzle.constraints import (
     AllDifferentConstraint,
     CompoundConstraint,
     ConnectedConstraint,
+    NoBoundaryCrossConstraint,
     OneOfConstraint,
+    ShapeAcrossConstraint,
     SingleCycleConstraint,
     UniqueConstraint,
 )
@@ -14,7 +16,6 @@ from puzzle.expr import BoolExpr, LinearConstraint, Var, VarGrid, VarMap
 from puzzle.match import MatchVarMap
 from puzzle.features import CONSTRAINT_REQUIRES, MissingFeatureError
 from puzzle.grid import Cell, SquareGrid
-from puzzle.polyomino import NoBoundaryCrossConstraint, ShapeAcrossConstraint
 
 
 class Solution:

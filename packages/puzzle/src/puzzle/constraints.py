@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Iterable, Sequence
 
+from typing import Hashable
+
 if TYPE_CHECKING:
     from puzzle.expr import BoolExpr, Expr, LinearConstraint, Var, VarMap
-    from puzzle.grid import Cell
     from puzzle.grid import Cell, SquareGrid
 
 
@@ -86,6 +87,22 @@ def at_most_one(exprs: Iterable[Expr]) -> LinearConstraint:
 
     result = sum_expr(exprs)
     return result <= 1  # type: ignore[return-value]
+
+
+@dataclass(frozen=True)
+class ShapeAcrossConstraint:
+    """Constraint on piece shapes across a boundary edge."""
+
+    forbidden_pairs: list[tuple[Hashable, Hashable]]
+    use_vars: VarMap
+
+
+@dataclass(frozen=True)
+class NoBoundaryCrossConstraint:
+    """At each interior vertex, boundaries must not form a cross (+)."""
+
+    vertex_bridges: list[list[Hashable]]
+    use_vars: VarMap
 
 
 @dataclass

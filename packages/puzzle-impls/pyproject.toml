@@ -1,14 +1,13 @@
 [project]
-name = "solvers"
+name = "puzzle-impls"
 version = "0.1.0"
-description = "Puzzle solvers using puzzle DSL"
+description = "Puzzle implementations and utilities built on the puzzle DSL"
 authors = [
     { name = "airtoxin", email = "airtoxin@icloud.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
     "puzzle",
-    "puzzle-impls",
 ]
 
 [build-system]
@@ -17,7 +16,6 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 puzzle = { workspace = true }
-puzzle-impls = { workspace = true }
 
 [dependency-groups]
 dev = [

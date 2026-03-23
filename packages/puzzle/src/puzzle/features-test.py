@@ -5,16 +5,18 @@ from puzzle import (
     Puzzle,
     all_different,
     connected,
-    polyomino,
-    same_shape_across,
-    different_shape_across,
-    all_adjacent_different_shape,
     single_cycle,
     square_grid,
-    enumerate_placements,
     exactly_one,
 )
 from puzzle.grid import Vertex, _make_edge
+from puzzle_impls import (
+    all_adjacent_different_shape,
+    different_shape_across,
+    enumerate_placements,
+    polyomino,
+    same_shape_across,
+)
 
 
 def test_all_different_requires_cell_vars():

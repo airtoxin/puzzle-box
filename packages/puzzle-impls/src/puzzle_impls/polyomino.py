@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Hashable, Sequence
 
 from puzzle.grid import Cell, Edge, SquareGrid, Vertex, _make_edge
 
+from puzzle.constraints import NoBoundaryCrossConstraint, ShapeAcrossConstraint
+
 if TYPE_CHECKING:
     from puzzle.expr import VarMap
 
@@ -130,13 +132,6 @@ def enumerate_placements(
     return result
 
 
-@dataclass(frozen=True)
-class ShapeAcrossConstraint:
-    """Constraint on piece shapes across a boundary edge."""
-
-    forbidden_pairs: list[tuple[Placement, Placement]]
-    use_vars: VarMap
-
 
 def _placements_by_cell(
     placements: list[Placement],
@@ -219,17 +214,6 @@ def all_adjacent_different_shape(
 
     return ShapeAcrossConstraint(forbidden, use_vars)
 
-
-@dataclass(frozen=True)
-class NoBoundaryCrossConstraint:
-    """At each interior vertex, boundaries must not form a cross (+).
-
-    Stores per-vertex lists of placements that bridge at least one
-    adjacent cell pair around that vertex. At least one must be selected.
-    """
-
-    vertex_bridges: list[list[Placement]]
-    use_vars: VarMap
 
 
 def no_boundary_cross(
