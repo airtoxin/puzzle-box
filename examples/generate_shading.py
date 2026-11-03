@@ -17,42 +17,10 @@ from puzzle_defs import (
     ColumnCountClue, RowCountClue, ShadingRecipe,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
+from shading_recipe import RULES, check_demo_size, check_distinct_paths, load_recipe, read_rule, rule_record
 
 FORMAT = "puzzle-box/shading-v1"
 MIXED_FORMAT = "puzzle-box/shading-v2"
-RULES = ("count", "non-touching", "connected-white", "no-white-2x2")
-
-
-def rule_record(rule: ShadingRule) -> dict[str, Any]:
-    if isinstance(rule, BlackCount):
-        return {"type": "count", "count": rule.count}
-    if isinstance(rule, NonTouchingBlack):
-        return {"type": "non-touching", "diagonal": rule.diagonal}
-    if isinstance(rule, ConnectedWhite):
-        return {"type": "connected-white", "nonempty": rule.nonempty}
-    if isinstance(rule, NoWhite2x2):
-        return {"type": "no-white-2x2"}
-    raise ValueError("This file format supports the four built-in shading rules only")
-
-
-def read_rule(data: dict[str, Any]) -> ShadingRule:
-    kind = data["type"]
-    if kind == "count" and set(data) == {"type", "count"}:
-        return BlackCount(data["count"])
-    if kind == "non-touching" and set(data) == {"type", "diagonal"}:
-        if type(data["diagonal"]) is bool:
-            return NonTouchingBlack(data["diagonal"])
-    if kind == "connected-white" and set(data) == {"type", "nonempty"}:
-        if type(data["nonempty"]) is bool:
-            return ConnectedWhite(data["nonempty"])
-    if kind == "no-white-2x2" and set(data) == {"type"}:
-        return NoWhite2x2()
-    raise ValueError("Unknown rule or invalid rule parameters")
-
-
-def check_demo_size(recipe: ShadingRecipe) -> None:
-    if recipe.rows * recipe.cols > 25:
-        raise ValueError("This small-board demo supports at most 25 cells")
 
 
 def clue_record(clue: Clue, *, legacy: bool = False) -> dict[str, Any] | list[int]:
@@ -198,14 +166,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     make = commands.add_parser("generate")
-    make.add_argument("--rows", type=int, default=3)
-    make.add_argument("--cols", type=int, default=3)
-    make.add_argument("--rules", nargs="+", choices=RULES, default=list(RULES))
-    make.add_argument("--hints", nargs="+", choices=CLUE_KINDS, default=["cell"],
+    make.add_argument("--recipe", type=Path, help="Load a shading recipe; do not combine with rule or board options")
+    make.add_argument("--rows", type=int)
+    make.add_argument("--cols", type=int)
+    make.add_argument("--rules", nargs="+", choices=RULES)
+    make.add_argument("--hints", nargs="+", choices=CLUE_KINDS,
                       help="Candidate clue kinds; include cell to disambiguate count clues")
-    make.add_argument("--black-count", type=int, default=3)
-    make.add_argument("--diagonal", action="store_true")
-    make.add_argument("--allow-empty-white", action="store_true")
+    make.add_argument("--black-count", type=int)
+    make.add_argument("--diagonal", action="store_true", default=None)
+    make.add_argument("--allow-empty-white", action="store_true", default=None)
     make.add_argument("--seed", type=int, default=42)
     make.add_argument("--output", type=Path)
     make.add_argument("--quiet", action="store_true", help="Save with --output without printing the answer JSON")
@@ -235,20 +204,30 @@ def main() -> int:
             raise ValueError("Use --output with --quiet to save the generated puzzle")
         if not 0 <= args.seed <= 2**31 - 1:
             raise ValueError("Seed must be between 0 and 2147483647")
-        choices: dict[str, ShadingRule] = {
-            "count": BlackCount(args.black_count),
-            "non-touching": NonTouchingBlack(args.diagonal),
-            "connected-white": ConnectedWhite(nonempty=not args.allow_empty_white),
-            "no-white-2x2": NoWhite2x2(),
-        }
-        recipe = ShadingRecipe(args.rows, args.cols, tuple(choices[name] for name in args.rules),
-                               tuple(args.hints))
+        if args.recipe is not None:
+            options = ("rows", "cols", "rules", "hints", "black_count", "diagonal", "allow_empty_white")
+            if any(getattr(args, name) is not None for name in options):
+                raise ValueError("Do not combine --recipe with board, rule or hint options")
+            if args.output is not None:
+                check_distinct_paths(args.recipe, args.output)
+            recipe = load_recipe(args.recipe)
+        else:
+            choices: dict[str, ShadingRule] = {
+                "count": BlackCount(3 if args.black_count is None else args.black_count),
+                "non-touching": NonTouchingBlack(bool(args.diagonal)),
+                "connected-white": ConnectedWhite(nonempty=not args.allow_empty_white),
+                "no-white-2x2": NoWhite2x2(),
+            }
+            recipe = ShadingRecipe(3 if args.rows is None else args.rows, 3 if args.cols is None else args.cols,
+                                   tuple(choices[name] for name in (args.rules or RULES)),
+                                   tuple(args.hints or ["cell"]))
         check_demo_size(recipe)
         try:
             clues = generate(recipe, seed=args.seed)
         except ValueError as exc:
             if "cell" not in recipe.clue_kinds:
-                raise ValueError(f"{exc}. For ambiguous count clues, include cell in --hints "
+                hint = "the recipe clue_kinds" if args.recipe is not None else "--hints"
+                raise ValueError(f"{exc}. For ambiguous count clues, include cell in {hint} "
                                  "to retain disambiguating clues") from exc
             raise
         puzzle = recipe.build_from_clues(clues)
