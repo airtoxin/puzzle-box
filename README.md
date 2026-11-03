@@ -106,6 +106,17 @@ uv run --no-sync python examples/generate_shading.py verify puzzle.json
 
 設定・問題・探索レポートの区別、入力検証、再現性は [レシピの保存と読込](docs/shading-recipe-files.md) を参照してください。
 
+## 保存した問題でルールを診断する
+
+生成された問題で、実際に残ったヒントに対するルールの必要性を診断できます。
+
+```sh
+uv run --no-sync python examples/diagnose_shading_rules.py puzzle.json --output rule-report.json
+```
+
+[保存ヒントでのルール診断](docs/stored-clue-rule-diagnostics.md)では、全候補ヒントとの違い、
+別解の盤面、個別の冗長性から一括削除できない理由を説明しています。レポートは答えも表示します。
+
 ## 開発と検証
 
 ```sh

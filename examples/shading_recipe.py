@@ -84,18 +84,23 @@ def _constant(value: str) -> Any:
     raise ValueError(f"Non-finite JSON number is not supported: {value}")
 
 
-def load_recipe(path: Path) -> ShadingRecipe:
+def load_json(path: Path, *, label: str = "Recipe") -> Any:
+    """Read bounded JSON without silently accepting duplicate fields or NaN."""
     with path.open("rb") as stream:
         raw = stream.read(MAX_RECIPE_BYTES + 1)
     if len(raw) > MAX_RECIPE_BYTES:
-        raise ValueError("Recipe file must be at most 65536 bytes")
+        raise ValueError(f"{label} file must be at most 65536 bytes")
     try:
         data = json.loads(raw.decode("utf-8"), object_pairs_hook=_object, parse_constant=_constant)
     except RecursionError as exc:
-        raise ValueError("Recipe JSON is nested too deeply") from exc
-    return read_recipe(data)
+        raise ValueError(f"{label} JSON is nested too deeply") from exc
+    return data
+
+
+def load_recipe(path: Path) -> ShadingRecipe:
+    return read_recipe(load_json(path))
 
 
 def check_distinct_paths(first: Path, second: Path) -> None:
     if first.resolve() == second.resolve() or (first.exists() and second.exists() and first.samefile(second)):
-        raise ValueError("Recipe and puzzle/report output must use different files")
+        raise ValueError("Input and output must use different files")
