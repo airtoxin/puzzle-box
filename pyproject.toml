@@ -9,6 +9,8 @@ dependencies = []
 members = ["packages/*"]
 
 [tool.pyright]
+venvPath = "."
+venv = ".venv"
 extraPaths = ["packages/puzzle/src", "packages/puzzle-defs/src", "packages/solvers/src", "packages/generator/src"]
 
 [tool.pytest.ini_options]
