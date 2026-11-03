@@ -1,4 +1,4 @@
-"""Generate and verify small puzzles composed from shared shading rules."""
+"""Generate, display, check and verify small composed shading puzzles."""
 
 from __future__ import annotations
 
@@ -86,7 +86,7 @@ def read_clue(data: Any, *, legacy: bool = False) -> Clue:
     return (Cell(row, col), value)
 
 
-def verify(data: dict[str, Any]) -> dict[str, Any]:
+def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[list[int]]]:
     if data["format"] not in (FORMAT, MIXED_FORMAT):
         raise ValueError("Unsupported puzzle format")
     legacy = data["format"] == FORMAT
@@ -104,6 +104,11 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
             or any(not isinstance(row, list) or len(row) != recipe.cols
                    or any(type(v) is not int or v not in (0, 1) for v in row) for row in answer)):
         raise ValueError("Invalid solution grid")
+    return recipe, clues, answer
+
+
+def verify(data: dict[str, Any]) -> dict[str, Any]:
+    recipe, clues, answer = _read_record(data)
     puzzle = recipe.build_from_clues(clues)
     puzzle.add(unique())
     solution = puzzle.solve()
@@ -119,7 +124,77 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     return {"valid": True, "unique": True, "irreducible": True, "clue_count": len(clues)}
 
 
-def main() -> None:
+def _rule_text(rule: ShadingRule) -> str:
+    if isinstance(rule, BlackCount):
+        subject = "cell is" if rule.count == 1 else "cells are"
+        return f"Exactly {rule.count} {subject} black."
+    if isinstance(rule, NonTouchingBlack):
+        contact = "an edge or a corner" if rule.diagonal else "an edge"
+        return f"Black cells must not share {contact}."
+    if isinstance(rule, ConnectedWhite):
+        empty = "at least one must be white" if rule.nonempty else "zero white cells are allowed"
+        return f"All white cells connect through edges; {empty}."
+    if isinstance(rule, NoWhite2x2):
+        return "Every 2x2 block contains at least one black cell."
+    raise ValueError("Cannot display an unknown rule")
+
+
+def show(data: dict[str, Any], *, reveal: bool = False) -> str:
+    # Verify before displaying a puzzle or revealing a stored answer. Metadata
+    # alone is not evidence that the saved problem is uniquely solvable.
+    verify(data)
+    recipe, clues, answer = _read_record(data)
+    cells = [["?" for _ in range(recipe.cols)] for _ in range(recipe.rows)]
+    row_counts: dict[int, int] = {}
+    col_counts: dict[int, int] = {}
+    for clue in clues:
+        if isinstance(clue, RowCountClue):
+            row_counts[clue.row] = clue.count
+        elif isinstance(clue, ColumnCountClue):
+            col_counts[clue.col] = clue.count
+        else:
+            cell, value = clue
+            cells[cell.row][cell.col] = "#" if value else "."
+    if reveal:
+        cells = [["#" if value else "." for value in row] for row in answer]
+    title = "Solution" if reveal else "Shading puzzle"
+    lines = [f"{title}: {recipe.rows} rows x {recipe.cols} columns", "", "Rules:"]
+    lines.extend(f"- {_rule_text(rule)}" for rule in recipe.rules)
+    if not recipe.rules:
+        lines.append("- No additional rules.")
+    lines.extend([
+        "", f"{'column':>11} " + " ".join(f"{c+1:>2}" for c in range(recipe.cols)),
+        f"{'count':>11} " + " ".join(f"{col_counts.get(c, '-'):>2}" for c in range(recipe.cols)),
+        f"{'row':>3} {'count':>5} |",
+    ])
+    lines.extend(f"{r+1:>3} {row_counts.get(r, '-'):>5} | " + " ".join(f"{v:>2}" for v in row)
+                 for r, row in enumerate(cells))
+    lines.extend(["", "# = black, . = white, ? = unknown; - = no count clue.",
+                  "Displayed row and column numbers start at 1."])
+    if not reveal:
+        lines.extend(["Answer template: " + "/".join("".join(row) for row in cells),
+                      'Replace every ? with . or #, then use check FILE --answer "ROWS".'])
+    return "\n".join(lines)
+
+
+def _parse_answer(text: str, rows: int, cols: int) -> list[list[int]]:
+    parts = ["".join(row.split()) for row in text.strip().split("/")]
+    if len(parts) != rows or any(len(row) != cols for row in parts):
+        raise ValueError(f"Answer must have {rows} rows of {cols} cells, separated by '/'")
+    if any(value not in ".#" for row in parts for value in row):
+        raise ValueError("Fill every cell with '.' (white) or '#' (black); '?' is not a complete answer")
+    return [[int(value == "#") for value in row] for row in parts]
+
+
+def check_answer(data: dict[str, Any], text: str) -> bool:
+    recipe, _, answer = _read_record(data)
+    candidate = _parse_answer(text, recipe.rows, recipe.cols)
+    # Only compare after proving that the saved answer is the unique solution.
+    verify(data)
+    return candidate == answer
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     make = commands.add_parser("generate")
@@ -133,14 +208,31 @@ def main() -> None:
     make.add_argument("--allow-empty-white", action="store_true")
     make.add_argument("--seed", type=int, default=42)
     make.add_argument("--output", type=Path)
-    check = commands.add_parser("verify")
+    make.add_argument("--quiet", action="store_true", help="Save with --output without printing the answer JSON")
+    audit = commands.add_parser("verify", help="Verify a generated puzzle artifact")
+    audit.add_argument("file", type=Path)
+    display = commands.add_parser("show", help="Display a puzzle without revealing its answer")
+    display.add_argument("file", type=Path)
+    display.add_argument("--solution", action="store_true", help="Reveal the verified solution")
+    check = commands.add_parser("check", help="Check a complete answer without revealing the solution")
     check.add_argument("file", type=Path)
+    check.add_argument("--answer", required=True, help="Rows separated by '/', using . for white and # for black")
     args = parser.parse_args()
     try:
         if args.command == "verify":
             result = verify(json.loads(args.file.read_text(encoding="utf-8")))
             print(json.dumps(result, sort_keys=True))
-            return
+            return 0
+        if args.command == "show":
+            print(show(json.loads(args.file.read_text(encoding="utf-8")), reveal=args.solution))
+            return 0
+        if args.command == "check":
+            correct = check_answer(json.loads(args.file.read_text(encoding="utf-8")), args.answer)
+            print("Correct. All rules and clues are satisfied." if correct else
+                  "Not correct. Check the rules and given clues.")
+            return 0 if correct else 1
+        if args.quiet and args.output is None:
+            raise ValueError("Use --output with --quiet to save the generated puzzle")
         if not 0 <= args.seed <= 2**31 - 1:
             raise ValueError("Seed must be between 0 and 2147483647")
         choices: dict[str, ShadingRule] = {
@@ -179,10 +271,12 @@ def main() -> None:
         encoded = json.dumps(record, indent=2, sort_keys=True) + "\n"
         if args.output is not None:
             args.output.write_text(encoded, encoding="utf-8")
-        print(encoded, end="")
+        if not args.quiet:
+            print(encoded, end="")
+        return 0
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
         parser.error(str(exc))
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
