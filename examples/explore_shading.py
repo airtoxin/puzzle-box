@@ -13,6 +13,7 @@ from puzzle_defs import BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ClueKind, ShadingRule
 from analyze_shading import finite_space, full_clues
 from generate_shading import RULES, clue_record, rule_record
+from shading_recipe import check_distinct_paths, recipe_record
 
 
 def explore(rows: int, cols: int, candidates: Sequence[ShadingRule],
@@ -128,10 +129,13 @@ def main() -> int:
     parser.add_argument("--allow-empty-white", action="store_true")
     parser.add_argument("--hints", nargs="*", choices=CLUE_KINDS, default=["row-count", "column-count"])
     parser.add_argument("--explain", nargs="*", type=int, help="Show removal effects for one subset of 1-based rule indices")
+    parser.add_argument("--export-recipe", type=Path, help="Save the subset selected by --explain as a recipe")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--output", type=Path, help="Save the complete JSON report, including witness answers")
     args = parser.parse_args()
     try:
+        if args.export_recipe is not None and args.explain is None:
+            raise ValueError("Use --explain with explicit rule indices (or no indices) to export a recipe")
         if args.json and args.explain is not None:
             raise ValueError("Use --explain for text details or --json for the complete report")
         if args.include_diagonal and "non-touching" not in args.candidates:
@@ -150,7 +154,15 @@ def main() -> int:
                 candidates.append(NoWhite2x2())
         report = explore(args.rows, args.cols, candidates, tuple(args.hints))
         rendered = explain(report, args.explain)  # Validate selection before writing.
+        exported = None
+        if args.export_recipe is not None:
+            if args.output is not None:
+                check_distinct_paths(args.export_recipe, args.output)
+            selected = tuple(candidates[i-1] for i in sorted(args.explain))
+            exported = recipe_record(ShadingRecipe(args.rows, args.cols, selected, tuple(args.hints)))
         encoded = json.dumps(report, indent=2, sort_keys=True) + "\n"
+        if args.export_recipe is not None:
+            args.export_recipe.write_text(json.dumps(exported, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         if args.output is not None:
             args.output.write_text(encoded, encoding="utf-8")
         print(encoded if args.json else rendered, end="" if args.json else "\n")
