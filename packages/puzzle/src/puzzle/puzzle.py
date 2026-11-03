@@ -1,4 +1,4 @@
-from typing import Hashable, Sequence, cast
+from typing import Hashable, Iterable, Sequence, cast
 
 from ortools.sat.python import cp_model
 
@@ -34,18 +34,6 @@ class Solution:
         ]
 
 
-class _SolutionCounter(cp_model.CpSolverSolutionCallback):
-    def __init__(self, limit: int) -> None:
-        super().__init__()
-        self.count = 0
-        self._limit = limit
-
-    def on_solution_callback(self) -> None:
-        self.count += 1
-        if self.count >= self._limit:
-            self.stop_search()
-
-
 ConstraintType = (
     AllDifferentConstraint
     | BoolExpr
@@ -65,6 +53,7 @@ class Puzzle:
         self.name = name
         self._model = cp_model.CpModel()
         self._vars: list[Var] = []
+        self._solution_vars: list[Var] | None = None
         self._features: set[str] = set()
         self._require_unique = False
         self._indicator_count = 0
@@ -75,6 +64,20 @@ class Puzzle:
 
     def add_feature(self, feature: str) -> None:
         self._features.add(feature)
+
+    def set_solution_vars(self, variables: Iterable[Var]) -> None:
+        """Select the variables whose values distinguish puzzle solutions.
+
+        By default, all variables created through this Puzzle's variable factories
+        count. Internal encoding witnesses (loop directions, connectivity trees,
+        etc.) never count. Explicit selection also excludes factory-created
+        witnesses, such as a tree-to-tent matching. An empty selection has one
+        solution exactly when the model is feasible. Later calls replace it.
+        """
+        selected = list(variables)
+        if any(var._model is not self._model for var in selected):
+            raise ValueError("Solution variables must belong to this Puzzle")
+        self._solution_vars = selected
 
     def _check_requires(self, constraint: ConstraintType) -> None:
         cls_name = type(constraint).__name__
@@ -212,6 +215,17 @@ class Puzzle:
                 b = self._model.new_bool_var(f"_one_of_{self._indicator_count}")
                 self._indicator_count += 1
                 self._model.add(c._internal).only_enforce_if(b)
+                # The indicator must be equivalent to the condition, not just
+                # imply it. Complementing the domain also handles != and ranges.
+                if isinstance(c._internal, bool):
+                    self._model.add(b == int(c._internal))
+                else:
+                    expr = cp_model.LinearExpr.weighted_sum(
+                        c._internal.vars, c._internal.coeffs
+                    ) + c._internal.offset
+                    self._model.add_linear_expression_in_domain(
+                        expr, c._internal.bounds.complement()
+                    ).only_enforce_if(b.Not())
                 indicators.append(b)
         self._model.add_exactly_one(indicators)
 
@@ -332,21 +346,32 @@ class Puzzle:
             self._model.add(va + vb <= 1)
 
     def solve(self, seed: int | None = None) -> Solution | None:
+        """Solve, checking uniqueness over solution variables when requested.
+
+        A unique result is returned only after proving that no different projected
+        assignment exists. The original model is never changed by the check.
+        """
         solver = cp_model.CpSolver()
         if seed is not None:
             solver.parameters.random_seed = seed
 
-        if self._require_unique:
-            solver.parameters.enumerate_all_solutions = True
-            counter = _SolutionCounter(limit=2)
-            status = solver.solve(self._model, counter)
-            if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-                return None
-            if counter.count != 1:
-                return None
-            return Solution(solver)
-
         status = solver.solve(self._model)
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             return None
+
+        if self._require_unique:
+            variables = self._vars if self._solution_vars is None else self._solution_vars
+            if variables:
+                alternative = self._model.clone()
+                # The clone retains variable indices. Exclude the whole visible
+                # assignment, thereby excluding all its internal witnesses at once.
+                alternative.add_forbidden_assignments(
+                    [var._internal for var in variables],
+                    [[solver.value(var._internal) for var in variables]],
+                )
+                checker = cp_model.CpSolver()
+                if seed is not None:
+                    checker.parameters.random_seed = seed
+                if checker.solve(alternative) != cp_model.INFEASIBLE:
+                    return None
         return Solution(solver)

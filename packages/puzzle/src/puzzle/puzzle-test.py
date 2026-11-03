@@ -1,4 +1,6 @@
 from puzzle import Puzzle, all_different, square_grid, unique
+from puzzle.expr import VarGrid
+from puzzle.grid import SquareGrid
 
 
 EASY_PUZZLE = [
@@ -14,7 +16,7 @@ EASY_PUZZLE = [
 ]
 
 
-def _define_sudoku(givens: list[list[int]]) -> Puzzle:
+def _define_sudoku(givens: list[list[int]]) -> tuple[Puzzle, SquareGrid, VarGrid]:
     p = Puzzle("sudoku")
 
     board = square_grid(9, 9)

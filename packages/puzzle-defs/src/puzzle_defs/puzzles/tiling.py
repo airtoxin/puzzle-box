@@ -40,6 +40,7 @@ class TilingPuzzle(Puzzle):
         self._infeasible = False
         if not self.all_placements:
             self._infeasible = True
+            self.add(exactly_one([]))
             # Create empty use map; solve() will return None
             self.use = self.bool_var_map("use", [])
             return
@@ -54,10 +55,10 @@ class TilingPuzzle(Puzzle):
 
         for cell in target_cells:
             covering = placements_by_cell.get(cell, [])
+            self.add(exactly_one(self.use[pl] for pl in covering))
             if not covering:
                 self._infeasible = True
                 return
-            self.add(exactly_one(self.use[pl] for pl in covering))
 
         # Per-piece usage limits
         if max_uses:
