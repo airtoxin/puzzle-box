@@ -39,6 +39,15 @@ class NurikabePuzzle(Puzzle):
                 clues[(cell.row, cell.col)],
             ))
 
+        # Different islands cannot touch orthogonally. Adjacent cells must
+        # either have the same owner or include at least one sea cell.
+        for a, b in board.adjacent_cell_pairs():
+            self.add(sum_expr([
+                self.owner[a] == self.owner[b],
+                self.owner[a] == 0,
+                self.owner[b] == 0,
+            ]) >= 1)
+
         # No 2x2 all-black pool
         for window in board.windows(2, 2):
             self.add(sum_expr(self.owner[c] == 0 for c in window) <= 3)

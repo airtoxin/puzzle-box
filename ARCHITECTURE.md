@@ -5,6 +5,11 @@
 パズルのルールを宣言的に記述して解を求めるための Python DSL とソルバー集です。
 内部で CP-SAT (Google OR-Tools) を使いますが、利用者はそれを意識しません。
 
+実行方法は [README](README.md)、実装調査と今後の開発案は
+[プロジェクトレビュー](docs/project-review.md)を参照してください。
+現在のパッケージ構成は `puzzle`（DSL）、`puzzle-defs`（定義・列挙）、
+`solvers`（関数API）、`generator`（ヒント生成・削減）の4層です。
+
 ---
 
 ## 概念の全体像
@@ -157,7 +162,7 @@ owner[c] == 0                                # → BoolExpr を生成
 
 p.add(owner[c] == 0)                         # 制約として: 値を強制
 sum_expr(owner[c] == 0 for c in cells)       # 式として: カウント
-connected(predicate=lambda c: owner[c] == 0) # 述語として: 活性判定
+connected(cells=cells, predicate=lambda c: owner[c] == 0) # 述語として: 活性判定
 ```
 
 この統一的な仕組みにより、ぬりかべの「黒マスの連結性」「島のサイズ」「2×2禁止」をすべて同じ `owner[c] == value` で書けます。
@@ -222,7 +227,7 @@ connected(predicate=lambda c: owner[c] == 0) # 述語として: 活性判定
 
 ```
 all_different        → cell_vars
-connected            → cell_vars
+connected            → 追加の feature 要求なし（BoolExpr の述語を受け取る）
 single_cycle         → edge_vars
 same/different_shape → region_partition + shape_class
 no_boundary_cross    → region_partition
@@ -303,7 +308,8 @@ value = solution.value(cell_value[cell])         # 解の値を取得
 
 ## ソルバー (`packages/solvers`)
 
-各パズルのルールを DSL で記述した具体的なソルバーです。
+ルール本体は `packages/puzzle-defs` の `Puzzle` サブクラスにあります。
+`packages/solvers` はその生成・求解・結果変換をつなぐ薄い関数APIです。
 どのパターンを使い、どの制約を組み合わせているかを示します。
 
 | ソルバー | パターン | 変数 | 制約 |
@@ -314,6 +320,11 @@ value = solution.value(cell_value[cell])         # 解の値を取得
 | **ヤジリン** | E (A+B) | is_black + edge_on | 矢印(`sum_expr`), 黒非隣接, `single_cycle`(双対グリッド) |
 | **タイリング** | D | 配置 use | `exactly_one`, 使用回数, 形状制約, 畳制約 |
 | **四角に切れ** | D | 矩形 use | `exactly_one`(セル+ヒント) |
+| **ひとりにしてくれ** | E | black | 重複排除、非隣接、白の連結 |
+| **Tents** | E | tent + match | 二部マッチング、非接触、行列個数 |
+
+問題生成の3操作と、サイズ・基礎ルールを保持する方法は
+[生成レシピ](docs/generation.md)を参照してください。
 
 ---
 

@@ -62,11 +62,9 @@ class YajilinPuzzle(Puzzle):
                         targets.append(cell)
                     nr += dr
                     nc += dc
-                if targets:
-                    self.add(sum_expr(self.is_black[t] for t in targets) == count)
-                else:
-                    if count != 0:
-                        self._infeasible = True
+                self.add(sum_expr(self.is_black[t] for t in targets) == count)
+                if not targets and count != 0:
+                    self._infeasible = True
 
         # 2. Black cells not adjacent
         non_clue_set = set(non_clue_cells)
