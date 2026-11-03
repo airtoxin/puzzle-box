@@ -144,12 +144,29 @@ class Puzzle:
         right: Sequence[Hashable],
         allowed_pairs: Sequence[tuple[Hashable, Hashable]],
     ) -> MatchVarMap:
-        """Create boolean match variables for a bipartite matching."""
+        """Create match variables for a simple bipartite graph.
+
+        Each side and the allowed pairs must be duplicate-free. Pair endpoints
+        must belong to their declared side. Validate before mutating the model.
+        """
+        left_keys, right_keys = list(left), list(right)
+        pairs = list(allowed_pairs)
+        left_set, right_set = set(left_keys), set(right_keys)
+        if len(left_set) != len(left_keys):
+            raise ValueError("Duplicate keys in left matching vertices")
+        if len(right_set) != len(right_keys):
+            raise ValueError("Duplicate keys in right matching vertices")
+        if len(set(pairs)) != len(pairs):
+            raise ValueError("Matching allowed_pairs must not contain duplicate pairs")
+        for a, b in pairs:
+            if a not in left_set or b not in right_set:
+                raise ValueError("Matching pairs must use declared left and right endpoints")
+
         vars: dict[tuple[Hashable, Hashable], Var] = {}
         pairs_by_left: dict[Hashable, list[tuple[Hashable, Hashable]]] = {}
         pairs_by_right: dict[Hashable, list[tuple[Hashable, Hashable]]] = {}
 
-        for a, b in allowed_pairs:
+        for a, b in pairs:
             pair = (a, b)
             v = Var(
                 self._model.new_bool_var(f"{name}_{a}_{b}"),
@@ -160,7 +177,7 @@ class Puzzle:
             pairs_by_left.setdefault(a, []).append(pair)
             pairs_by_right.setdefault(b, []).append(pair)
 
-        return MatchVarMap(vars, list(left), list(right), pairs_by_left, pairs_by_right)
+        return MatchVarMap(vars, left_keys, right_keys, pairs_by_left, pairs_by_right)
 
     def add(self, constraint: ConstraintType) -> None:
         self._check_requires(constraint)
