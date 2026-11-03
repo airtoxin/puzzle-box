@@ -95,7 +95,7 @@ def at_most_one(exprs: Iterable[Expr]) -> LinearConstraint:
 class ShapeAcrossConstraint:
     """Constraint on piece shapes across a boundary edge."""
 
-    forbidden_pairs: list[tuple[Hashable, Hashable]]
+    forbidden_pairs: Sequence[tuple[Hashable, Hashable]]
     use_vars: VarMap
 
 
@@ -103,7 +103,7 @@ class ShapeAcrossConstraint:
 class NoBoundaryCrossConstraint:
     """At each interior vertex, boundaries must not form a cross (+)."""
 
-    vertex_bridges: list[list[Hashable]]
+    vertex_bridges: Sequence[Sequence[Hashable]]
     use_vars: VarMap
 
 

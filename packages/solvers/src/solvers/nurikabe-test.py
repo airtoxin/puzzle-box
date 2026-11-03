@@ -137,7 +137,7 @@ def test_unsolvable():
 
 def test_solve_minimal():
     """1x1 grid — single island of size 1."""
-    grid = [[1]]
+    grid: list[list[int | None]] = [[1]]
     result = solve(grid)
     assert result is not None
     assert result == [[1]]
