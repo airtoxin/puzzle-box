@@ -14,13 +14,15 @@ Python 3.12 以上と [uv](https://docs.astral.sh/uv/) を使います。
 
 ```sh
 uv sync --all-packages --group dev --locked
-uv run --no-sync python examples/compose_binary.py --width 6 --count 2
-uv run --no-sync python examples/compose_binary.py --width 6 --count 2 --allow-touch
+uv run --no-sync python examples/generate_shading.py generate --seed 17 --output shading.json
+uv run --no-sync python examples/generate_shading.py verify shading.json
 ```
 
-この小さな例は「黒マスは2個」と「黒マス同士が接触しない」を組み合わせ、
-一意になるヒントと解を JSON で出力します。`--allow-touch` で後者だけを外せます。
-盤面サイズ・基礎ルールはレシピに固定され、ヒントを消しても変わりません。
+3×3 の黒白盤面で「黒は3個・黒は辺接触しない・白は連結・白い2×2は禁止」を
+組み合わせ、一意になるヒントと解を JSON で保存します。`--rules` で部品を選べます。
+盤面サイズ・基礎ルールは固定され、ヒントを消しても変わりません。
+実際の盤面、Python API、再現性の範囲は [ルール合成の実例](docs/composable-shading.md)を参照してください。
+最初の1次元の例 [compose_binary.py](examples/compose_binary.py)も残しています。
 
 既存の数独生成は次の通りです。
 
@@ -42,7 +44,7 @@ print(puzzle.result(solution))
 | パッケージ | 役割 | 主な入口 |
 | --- | --- | --- |
 | `puzzle` | グリッド、式、制約、CP-SAT 変換、求解 | `Puzzle`, `square_grid`, `connected`, `single_cycle` |
-| `puzzle-defs` | パズル定義と領域・配置の列挙 | `SudokuPuzzle` など8種類 |
+| `puzzle-defs` | パズル定義と領域・配置の列挙 | 既存8種類と `ShadingRecipe` による合成 |
 | `solvers` | 入力から結果までの薄い関数 API | 各モジュールの `solve` |
 | `generator` | ヒント抽出と一意性を保つ削減 | `generate`, `reduce_clues`, `GeneratablePuzzle` |
 
