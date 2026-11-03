@@ -195,7 +195,7 @@ class Puzzle:
                 self._check_constraint_model(member)
         elif isinstance(constraint, ConnectedConstraint):
             for indicator in constraint.indicators.values():
-                self._check_constraint_model(indicator)
+                _check_same_model(_expression_vars(indicator._internal), self._model)
         elif isinstance(constraint, SingleCycleConstraint):
             self._check_var_map_model(constraint.edge_vars)
         elif isinstance(constraint, (ShapeAcrossConstraint, NoBoundaryCrossConstraint)):
