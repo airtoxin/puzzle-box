@@ -19,11 +19,22 @@ from puzzle.grid import Cell, SquareGrid
 
 
 class Solution:
-    def __init__(self, solver: cp_model.CpSolver) -> None:
-        self._solver = solver
+    """A snapshot of one feasible answer, bound to its source model."""
+
+    def __init__(self, solver: cp_model.CpSolver, model: cp_model.CpModel) -> None:
+        response = solver.response_proto
+        if response.status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            raise ValueError("Solution requires a feasible solver response")
+        self._model = model
+        self._values = tuple(response.solution)
 
     def value(self, var: Var) -> int:
-        return self._solver.value(var._internal)
+        if var._model is not self._model:
+            raise ValueError("Solution variables must belong to the same Puzzle")
+        index = cast(cp_model.IntVar, var._internal).index
+        if not 0 <= index < len(self._values):
+            raise ValueError("Cannot read a variable created after this solution")
+        return self._values[index]
 
     def grid_values(self, var_grid: VarGrid, rows: int, cols: int) -> list[list[int]]:
         return [
@@ -344,4 +355,4 @@ class Puzzle:
                     checker.parameters.random_seed = seed
                 if checker.solve(alternative) != cp_model.INFEASIBLE:
                     return None
-        return Solution(solver)
+        return Solution(solver, self._model)
