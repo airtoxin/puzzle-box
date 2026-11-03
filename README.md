@@ -84,6 +84,16 @@ uv run --no-sync python examples/analyze_shading.py --seed-count 8
 [小盤面の診断](docs/shading-diagnostics.md)に、同じ行列ヒントを持つ2つの答え、
 矛盾するルール集合、seedを変えたときの完成解の多様性をまとめています。
 
+候補ルールの全部分集合を比較する探索例もあります。
+
+```sh
+uv run --no-sync python examples/explore_shading.py
+uv run --no-sync python examples/explore_shading.py --rows 3 --cols 3 --black-counts 3 --candidates count non-touching --explain 1 2
+```
+
+[組合せの探索](docs/shading-exploration.md)では、完成解集合を変えないルールと、
+全候補ヒントがある場合の冗長性を分け、ルールを外すと唯一解を失う反例を表示します。
+
 ## 開発と検証
 
 ```sh
