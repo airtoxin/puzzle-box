@@ -102,3 +102,16 @@ uv run --no-sync python examples/generate_slitherlink.py verify loop.json
 
 数字だけでは2解になる反例、API、合成できる範囲と未対応の接続は
 [ループのレシピ](docs/slitherlink-composition.md)を参照してください。
+
+## 黒マスとループを同時に生成する
+
+ヤジリンの「黒なら辺0本、白なら辺2本」という接続条件を使い、黒白セルとループ辺を
+1つの回答として生成・検証する例もあります。
+
+```sh
+uv run --no-sync python examples/generate_yajilin.py show examples/yajilin-sample.json
+uv run --no-sync python examples/generate_yajilin.py verify examples/yajilin-sample.json
+```
+
+[異種合成の例](docs/yajilin-composition.md)に、生成方法、数字を消しても残す矢印マス、
+黒白が同じでも2種類のループになる反例、合成の限界をまとめています。
