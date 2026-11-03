@@ -19,6 +19,7 @@ from puzzle_defs.puzzles import (
     YajilinPuzzle,
 )
 from puzzle_defs.puzzles.slitherlink_recipe import CellEdgeCountClue, EdgeStateClue, SlitherlinkRecipe
+from puzzle_defs.puzzles.yajilin_recipe import ArrowCountClue, ArrowSite, BlackCellClue, YajilinAnswer, YajilinRecipe
 from puzzle_defs.regions import (
     Region,
     enumerate_connected_regions,
@@ -56,6 +57,11 @@ __all__ = [
     "TentsPuzzle",
     "TilingPuzzle",
     "YajilinPuzzle",
+    "YajilinRecipe",
+    "YajilinAnswer",
+    "ArrowSite",
+    "ArrowCountClue",
+    "BlackCellClue",
     "all_adjacent_different_shape",
     "different_shape_across",
     "enumerate_connected_regions",
