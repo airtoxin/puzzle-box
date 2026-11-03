@@ -41,15 +41,9 @@ class MatchVarMap:
         constraints = []
         for l in self._left:
             pairs = self._pairs_by_left.get(l, [])
-            if pairs:
-                constraints.append(
-                    sum_expr(self._vars[p] for p in pairs) == n  # type: ignore[return-value]
-                )
-            elif n > 0:
-                # No pairs available but n > 0 required — add infeasible constraint
-                from puzzle.expr import LinearConstraint
-                from ortools.sat.python import cp_model
-                constraints.append(LinearConstraint(cp_model.LinearExpr.sum([]) >= n))
+            constraints.append(
+                sum_expr(self._vars[p] for p in pairs) == n  # type: ignore[return-value]
+            )
         return CompoundConstraint(constraints)
 
     def left_degree_le(self, n: int) -> CompoundConstraint:
@@ -60,10 +54,9 @@ class MatchVarMap:
         constraints = []
         for l in self._left:
             pairs = self._pairs_by_left.get(l, [])
-            if pairs:
-                constraints.append(
-                    sum_expr(self._vars[p] for p in pairs) <= n  # type: ignore[return-value]
-                )
+            constraints.append(
+                sum_expr(self._vars[p] for p in pairs) <= n  # type: ignore[return-value]
+            )
         return CompoundConstraint(constraints)
 
     def right_degree_eq(self, n: int) -> CompoundConstraint:
@@ -74,14 +67,9 @@ class MatchVarMap:
         constraints = []
         for r in self._right:
             pairs = self._pairs_by_right.get(r, [])
-            if pairs:
-                constraints.append(
-                    sum_expr(self._vars[p] for p in pairs) == n  # type: ignore[return-value]
-                )
-            elif n > 0:
-                from puzzle.expr import LinearConstraint
-                from ortools.sat.python import cp_model
-                constraints.append(LinearConstraint(cp_model.LinearExpr.sum([]) >= n))
+            constraints.append(
+                sum_expr(self._vars[p] for p in pairs) == n  # type: ignore[return-value]
+            )
         return CompoundConstraint(constraints)
 
     def right_degree_le(self, n: int) -> CompoundConstraint:
@@ -92,10 +80,9 @@ class MatchVarMap:
         constraints = []
         for r in self._right:
             pairs = self._pairs_by_right.get(r, [])
-            if pairs:
-                constraints.append(
-                    sum_expr(self._vars[p] for p in pairs) <= n  # type: ignore[return-value]
-                )
+            constraints.append(
+                sum_expr(self._vars[p] for p in pairs) <= n  # type: ignore[return-value]
+            )
         return CompoundConstraint(constraints)
 
     def right_selected_iff(self, var_map: VarMap) -> CompoundConstraint:
