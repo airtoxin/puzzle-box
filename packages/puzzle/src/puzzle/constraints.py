@@ -42,10 +42,12 @@ def all_different(vars: Iterable[Var]) -> AllDifferentConstraint:
 
 
 def unique() -> UniqueConstraint:
+    """Require one assignment of the Puzzle's selected solution variables."""
     return UniqueConstraint()
 
 
 def one_of(*constraints: LinearConstraint | BoolExpr) -> OneOfConstraint:
+    """Require exactly one condition to hold (including overlapping conditions)."""
     return OneOfConstraint(list(constraints))
 
 

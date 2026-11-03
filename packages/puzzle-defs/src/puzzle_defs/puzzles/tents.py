@@ -32,6 +32,8 @@ class TentsPuzzle(Puzzle):
         tent_cells = [c for c in board.cells if c not in self.tree_cells]
 
         self.tent = self.bool_var_map("tent", tent_cells)
+        # Tree-to-tent pairings prove feasibility; only tent locations are answers.
+        self.set_solution_vars(self.tent[c] for c in tent_cells)
 
         # Bipartite matching: each tree paired to exactly one adjacent tent
         self.match = self.match_var_map(
