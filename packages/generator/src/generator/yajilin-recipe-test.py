@@ -357,3 +357,29 @@ def test_cli_limits_quiet_and_incompatible_layout(tmp_path: Path):
                  ("--rows", "2", "--cols", "2"), ("--arrow", "x", "0", "right")]:
         result = _cli("generate", *args)
         assert result.returncode == 2 and "Traceback" not in result.stderr
+
+
+def test_bounded_arrow_only_search_is_repeatable_and_independently_unique(tmp_path: Path):
+    path = tmp_path / "arrow-only.json"
+    args = ("generate", "--hints", "arrow", "--seed", "6", "--attempts", "3", "--output", str(path))
+    first, second = _cli(*args), _cli(*args, hash_seed="999")
+    assert first.returncode == second.returncode == 0, (first.stderr, second.stderr)
+    assert first.stdout == second.stdout
+    data = json.loads(first.stdout)
+    assert data["clue_kinds"] == ["arrow"]
+    assert data["arrow_sites"] == [{"cell": [1, 0], "direction": "right"}]
+    history = data["generation"]
+    assert history["initial_seed"] == 6 and history["attempt_limit"] == 3
+    assert data["seed"] == 6 + history["attempts_used"] - 1
+    clues: list[YajilinClue] = [ArrowCountClue(Cell(*c["cell"]), c["count"]) for c in data["clues"]]
+    assert all(c["type"] == "arrow" for c in data["clues"])
+    recipe = YajilinRecipe(3, 4, (ArrowSite(Cell(1, 0), "right"),), ("arrow",))
+    assert len(_answers(recipe, clues)) == 1
+    for i in range(len(clues)):
+        assert len(_answers(recipe, clues[:i]+clues[i+1:])) > 1
+    assert _cli("verify", str(path)).returncode == 0
+    replay = _cli("generate", "--hints", "arrow", "--seed", str(data["seed"]))
+    assert replay.returncode == 0
+    direct = json.loads(replay.stdout)
+    assert "generation" not in direct
+    assert direct == {k: v for k, v in data.items() if k != "generation"}
