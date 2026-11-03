@@ -7,6 +7,24 @@ from ortools.sat.python import cp_model
 from puzzle.grid import Cell
 
 
+def _check_same_model(
+    variables: Iterable[cp_model.IntVar], model: cp_model.CpModel | None = None
+) -> None:
+    """Check identity before CP-SAT can combine variables by local index."""
+    expected = model.proto if model is not None else None
+    for var in variables:
+        if expected is None:
+            expected = var.model_proto
+        elif var.model_proto is not expected:
+            raise ValueError("Variables and expressions must belong to the same Puzzle")
+
+
+def _expression_vars(expression: cp_model.LinearExprT) -> list[cp_model.IntVar]:
+    if isinstance(expression, cp_model.LinearExpr):
+        return cp_model.FlatIntExpr(expression).vars
+    return []  # Integer constants are model-independent.
+
+
 class LinearConstraint:
     """Public wrapper around a bounded linear expression."""
 
@@ -20,10 +38,18 @@ class Expr:
     def __init__(self, _internal: cp_model.LinearExprT) -> None:
         self._internal = _internal
 
+    def _check_compatible(self, other: Expr) -> None:
+        _check_same_model(
+            var
+            for expr in (self, other)
+            for var in _expression_vars(expr._internal)
+        )
+
     def __eq__(self, other: object) -> LinearConstraint:  # type: ignore[override]
         if isinstance(other, int):
             return LinearConstraint(self._internal == other)
         if isinstance(other, Expr):
+            self._check_compatible(other)
             return LinearConstraint(self._internal == other._internal)
         return NotImplemented
 
@@ -31,6 +57,7 @@ class Expr:
         if isinstance(other, int):
             return LinearConstraint(self._internal != other)
         if isinstance(other, Expr):
+            self._check_compatible(other)
             return LinearConstraint(self._internal != other._internal)
         return NotImplemented
 
@@ -38,6 +65,7 @@ class Expr:
         if isinstance(other, int):
             return LinearConstraint(self._internal <= other)
         if isinstance(other, Expr):
+            self._check_compatible(other)
             return LinearConstraint(self._internal <= other._internal)
         return NotImplemented
 
@@ -45,6 +73,7 @@ class Expr:
         if isinstance(other, int):
             return LinearConstraint(self._internal >= other)
         if isinstance(other, Expr):
+            self._check_compatible(other)
             return LinearConstraint(self._internal >= other._internal)
         return NotImplemented
 
@@ -52,6 +81,7 @@ class Expr:
         if isinstance(other, int):
             return LinearConstraint(self._internal < other)
         if isinstance(other, Expr):
+            self._check_compatible(other)
             return LinearConstraint(self._internal < other._internal)
         return NotImplemented
 
@@ -59,12 +89,14 @@ class Expr:
         if isinstance(other, int):
             return LinearConstraint(self._internal > other)
         if isinstance(other, Expr):
+            self._check_compatible(other)
             return LinearConstraint(self._internal > other._internal)
         return NotImplemented
 
     def __or__(self, other: Expr) -> LinearConstraint:  # type: ignore[override]
         """At least one is true: self + other >= 1."""
         if isinstance(other, Expr):
+            self._check_compatible(other)
             s = cp_model.LinearExpr.sum([self._internal, other._internal])
             return LinearConstraint(s >= 1)
         return NotImplemented
@@ -112,6 +144,7 @@ class Var(Expr):
         if isinstance(other, int):
             return self._reify(self._internal == other, self._internal != other)
         if isinstance(other, Var):
+            self._check_compatible(other)
             return self._reify(
                 self._internal == other._internal,
                 self._internal != other._internal,
@@ -122,6 +155,7 @@ class Var(Expr):
         if isinstance(other, int):
             return self._reify(self._internal != other, self._internal == other)
         if isinstance(other, Var):
+            self._check_compatible(other)
             return self._reify(
                 self._internal != other._internal,
                 self._internal == other._internal,
@@ -164,4 +198,7 @@ BoolVarMap = VarMap
 
 def sum_expr(exprs: Iterable[Expr]) -> Expr:
     internals = [v._internal for v in exprs]
+    _check_same_model(
+        var for expr in internals for var in _expression_vars(expr)
+    )
     return Expr(cp_model.LinearExpr.sum(internals))

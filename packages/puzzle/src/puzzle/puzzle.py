@@ -12,7 +12,9 @@ from puzzle.constraints import (
     SingleCycleConstraint,
     UniqueConstraint,
 )
-from puzzle.expr import BoolExpr, LinearConstraint, Var, VarGrid, VarMap
+from puzzle.expr import (
+    BoolExpr, LinearConstraint, Var, VarGrid, VarMap, _check_same_model, _expression_vars,
+)
 from puzzle.match import MatchVarMap
 from puzzle.features import CONSTRAINT_REQUIRES, MissingFeatureError
 from puzzle.grid import Cell, SquareGrid
@@ -153,6 +155,7 @@ class Puzzle:
 
     def add(self, constraint: ConstraintType) -> None:
         self._check_requires(constraint)
+        self._check_constraint_model(constraint)
 
         if isinstance(constraint, AllDifferentConstraint):
             self._model.add_all_different([v._internal for v in constraint.vars])
@@ -175,6 +178,33 @@ class Puzzle:
                 self.add(c)
         elif isinstance(constraint, NoBoundaryCrossConstraint):
             self._add_no_boundary_cross(constraint)
+
+    def _check_constraint_model(self, constraint: ConstraintType) -> None:
+        """Preflight every member before compiling a compound constraint."""
+        if isinstance(constraint, BoolExpr):
+            _check_same_model(_expression_vars(constraint._internal), self._model)
+        elif isinstance(constraint, LinearConstraint):
+            if not isinstance(constraint._internal, bool):
+                _check_same_model(constraint._internal.vars, self._model)
+        elif isinstance(constraint, AllDifferentConstraint):
+            _check_same_model(
+                (cast(cp_model.IntVar, var._internal) for var in constraint.vars), self._model
+            )
+        elif isinstance(constraint, (OneOfConstraint, CompoundConstraint)):
+            for member in constraint.constraints:
+                self._check_constraint_model(member)
+        elif isinstance(constraint, ConnectedConstraint):
+            for indicator in constraint.indicators.values():
+                self._check_constraint_model(indicator)
+        elif isinstance(constraint, SingleCycleConstraint):
+            self._check_var_map_model(constraint.edge_vars)
+        elif isinstance(constraint, (ShapeAcrossConstraint, NoBoundaryCrossConstraint)):
+            self._check_var_map_model(constraint.use_vars)
+
+    def _check_var_map_model(self, var_map: VarMap) -> None:
+        _check_same_model(
+            (cast(cp_model.IntVar, var._internal) for var in var_map._vars.values()), self._model
+        )
 
     def _add_one_of(self, constraint: OneOfConstraint) -> None:
         indicators: list[cp_model.IntVar] = []
