@@ -67,3 +67,17 @@ CI は Ubuntu / Windows、Python 3.12 / 3.13 で同じテスト・型検査・�
 生成結果は一意性と1ヒントずつの削除に対する既約性を確認します。
 最少ヒント数、均一なランダム分布、人間にとっての面白さは保証しません。
 現状と修正中の既知の制限はプロジェクトレビューに整理しています。
+
+## 辺に描くループでも試す
+
+黒白とは異なる回答空間の実例として、スリザーリンク形式でも同じ生成器を使えます。
+非空の単一ループに長さ指定・マス周囲の辺数・辺の使用状態を組み合わせます。
+
+```sh
+uv run --no-sync python examples/generate_slitherlink.py generate --loop-length 8 --seed 2 --output loop.json --quiet
+uv run --no-sync python examples/generate_slitherlink.py show loop.json
+uv run --no-sync python examples/generate_slitherlink.py verify loop.json
+```
+
+数字だけでは2解になる反例、API、合成できる範囲と未対応の接続は
+[ループのレシピ](docs/slitherlink-composition.md)を参照してください。

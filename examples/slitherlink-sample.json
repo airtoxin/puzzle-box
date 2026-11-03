@@ -1,0 +1,84 @@
+{
+  "clue_kinds": [
+    "cell-count",
+    "edge"
+  ],
+  "clues": [
+    {
+      "col": 1,
+      "count": 3,
+      "row": 0,
+      "type": "cell-count"
+    },
+    {
+      "edge": [
+        1,
+        2,
+        2,
+        2
+      ],
+      "type": "edge",
+      "used": 1
+    }
+  ],
+  "cols": 2,
+  "environment": {
+    "ortools": "9.15.6755",
+    "python": "3.12.14",
+    "seeded_search_workers": 1
+  },
+  "format": "puzzle-box/slitherlink-v1",
+  "loop_length": 8,
+  "rows": 2,
+  "seed": 2,
+  "solution": [
+    [
+      0,
+      1,
+      0,
+      2
+    ],
+    [
+      1,
+      0,
+      1,
+      1
+    ],
+    [
+      2,
+      0,
+      2,
+      1
+    ],
+    [
+      2,
+      1,
+      2,
+      2
+    ],
+    [
+      0,
+      1,
+      1,
+      1
+    ],
+    [
+      0,
+      2,
+      1,
+      2
+    ],
+    [
+      1,
+      0,
+      2,
+      0
+    ],
+    [
+      1,
+      2,
+      2,
+      2
+    ]
+  ]
+}
