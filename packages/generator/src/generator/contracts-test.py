@@ -3,7 +3,7 @@ from itertools import product
 
 import pytest
 
-from generator import generate, reduce_clues
+from generator import InitialCluesNotUniqueError, generate, reduce_clues
 from puzzle import Puzzle, Solution, non_touching, square_grid, sum_expr
 
 Clue = tuple[int, int]
@@ -58,8 +58,9 @@ def test_configured_recipes_generate_unique_irreducible_clues(width: int, separa
 
 @pytest.mark.parametrize("clues", [[], [(0, 0)], [(0, 0), (0, 1)]])
 def test_reduction_rejects_ambiguous_or_inconsistent_initial_clues(clues: list[Clue]):
-    with pytest.raises(ValueError, match="uniquely solvable"):
+    with pytest.raises(InitialCluesNotUniqueError, match="uniquely solvable") as error:
         reduce_clues(StripRecipe(5), clues)
+    assert isinstance(error.value, ValueError)
 
 
 def test_duplicate_clues_are_removed_one_occurrence_at_a_time():

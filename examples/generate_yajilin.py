@@ -8,7 +8,7 @@ from typing import Any
 
 import ortools
 
-from generator import generate
+from generator import InitialCluesNotUniqueError, generate
 from puzzle import Cell, Edge, Vertex, unique
 from puzzle_defs import ArrowCountClue, ArrowSite, BlackCellClue, EdgeStateClue, YajilinAnswer, YajilinRecipe
 from puzzle_defs.puzzles.yajilin_recipe import YAJILIN_CLUE_KINDS, YajilinClue
@@ -16,6 +16,28 @@ from generate_slitherlink import edge_record, read_edge
 
 FORMAT = "puzzle-box/yajilin-v1"
 ARROWS = {"up": "^", "down": "v", "left": "<", "right": ">"}
+
+
+def check_attempts(seed: int, attempts: int) -> None:
+    if type(attempts) is not int or not 1 <= attempts <= 32:
+        raise ValueError("Attempts must be an integer from 1 to 32")
+    if type(seed) is not int or not 0 <= seed <= 2**31 - attempts:
+        raise ValueError("All attempted seeds must be between 0 and 2147483647")
+
+
+def generate_with_attempts(recipe: YajilinRecipe, seed: int, attempts: int) -> tuple[list[YajilinClue], int, int]:
+    """Try consecutive seeds, preserving topology and requested hint types."""
+    check_attempts(seed, attempts)
+    last_error: InitialCluesNotUniqueError | None = None
+    for offset in range(attempts):
+        try:
+            return generate(recipe, seed=seed + offset), seed + offset, offset + 1
+        except InitialCluesNotUniqueError as exc:
+            last_error = exc
+    raise InitialCluesNotUniqueError(
+        f"No uniquely solvable clues after {attempts} attempt(s), seeds {seed}..{seed + attempts - 1}; "
+        "hint types and arrow sites unchanged"
+    ) from last_error
 
 
 def clue_record(clue: YajilinClue) -> dict[str, Any]:
@@ -52,6 +74,15 @@ def check_size(recipe: YajilinRecipe) -> None:
 def read_record(data: dict[str, Any]) -> tuple[YajilinRecipe, list[YajilinClue], YajilinAnswer]:
     if data["format"] != FORMAT:
         raise ValueError("Unsupported Yajilin puzzle format")
+    if "generation" in data:
+        history = data["generation"]
+        if not isinstance(history, dict) or set(history) != {"initial_seed", "attempt_limit", "attempts_used"}:
+            raise ValueError("Invalid generation metadata fields")
+        check_attempts(history["initial_seed"], history["attempt_limit"])
+        used = history["attempts_used"]
+        if (type(used) is not int or not 1 <= used <= history["attempt_limit"]
+                or type(data["seed"]) is not int or data["seed"] != history["initial_seed"] + used - 1):
+            raise ValueError("Generation metadata must agree with the successful seed")
     sites = []
     for site in data["arrow_sites"]:
         if not isinstance(site, dict) or set(site) != {"cell", "direction"}:
@@ -147,6 +178,8 @@ def main() -> int:
                       help="Repeat for multiple fixed sites; default: 1 0 right")
     make.add_argument("--hints", nargs="+", choices=YAJILIN_CLUE_KINDS, default=["arrow", "edge"])
     make.add_argument("--seed", type=int, default=6)
+    make.add_argument("--attempts", type=int, default=1,
+                      help="Try up to 1..32 consecutive seeds without changing hints or arrow sites (default: 1)")
     make.add_argument("--output", type=Path)
     make.add_argument("--quiet", action="store_true")
     audit = commands.add_parser("verify")
@@ -163,15 +196,14 @@ def main() -> int:
             return 0
         if args.quiet and args.output is None:
             raise ValueError("Use --output with --quiet")
-        if not 0 <= args.seed <= 2**31 - 1:
-            raise ValueError("Seed must be between 0 and 2147483647")
+        check_attempts(args.seed, args.attempts)
         sites = tuple(ArrowSite(Cell(int(r), int(c)), d) for r, c, d in (args.arrow or [(1, 0, "right")]))
         recipe = YajilinRecipe(args.rows, args.cols, sites, tuple(args.hints))
         check_size(recipe)
         try:
-            clues = generate(recipe, seed=args.seed)
-        except ValueError as exc:
-            raise ValueError(f"{exc}. Include edge in --hints to determine both cells and loop") from exc
+            clues, successful_seed, attempts_used = generate_with_attempts(recipe, args.seed, args.attempts)
+        except InitialCluesNotUniqueError as exc:
+            raise ValueError(f"{exc}. Try a larger --attempts or include edge in --hints") from exc
         puzzle = recipe.build_from_clues(clues)
         puzzle.add(unique())
         solution = puzzle.solve()
@@ -181,11 +213,14 @@ def main() -> int:
         data = {"format": FORMAT, "rows": recipe.rows, "cols": recipe.cols,
                 "arrow_sites": [{"cell": list(s.cell), "direction": s.direction} for s in recipe.arrow_sites],
                 "clue_kinds": list(recipe.clue_kinds), "clues": [clue_record(c) for c in clues],
-                "seed": args.seed,
+                "seed": successful_seed,
                 "solution": {"black_cells": [list(c) for c in sorted(answer.black_cells)],
                              "loop_edges": [edge_record(e) for e in puzzle.loop_board.edges if e in answer.loop_edges]},
                 "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
                                 "seeded_search_workers": 1}}
+        if args.attempts > 1:
+            data["generation"] = {"initial_seed": args.seed, "attempt_limit": args.attempts,
+                                  "attempts_used": attempts_used}
         encoded = json.dumps(data, indent=2, sort_keys=True) + "\n"
         if args.output is not None:
             args.output.write_text(encoded, encoding="utf-8")
