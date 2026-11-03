@@ -37,6 +37,7 @@ def test_reduce_clues_removes_some():
 
     empty = SudokuPuzzle.create_empty()
     sol = empty.solve(seed=42)
+    assert sol is not None
     all_clues = SudokuPuzzle.extract_clues(sol, empty)
     assert len(all_clues) == 81
 
