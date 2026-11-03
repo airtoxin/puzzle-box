@@ -27,6 +27,13 @@ def _validate(grid: list[list[int | None]], result: list[list[int]]) -> None:
         size = sum(1 for rr in range(height) for cc in range(width) if result[rr][cc] == iid)
         assert size == clues[(r, c)], f"Island {iid} at ({r},{c}): expected size {clues[(r, c)]}, got {size}"
 
+    # Distinct islands must be separated by sea.
+    for r in range(height):
+        for c in range(width):
+            for nr, nc in [(r + 1, c), (r, c + 1)]:
+                if nr < height and nc < width and result[r][c] and result[nr][nc]:
+                    assert result[r][c] == result[nr][nc], "Different islands touch"
+
     # Check no 2x2 all-black
     for r in range(height - 1):
         for c in range(width - 1):
