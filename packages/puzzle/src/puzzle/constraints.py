@@ -34,7 +34,7 @@ class SingleCycleConstraint:
 @dataclass
 class ConnectedConstraint:
     cells: list[Cell]
-    indicators: dict[Cell, BoolExpr] = field(repr=False)
+    indicators: dict[Cell, BoolExpr | Var] = field(repr=False)
 
 
 def all_different(vars: Iterable[Var]) -> AllDifferentConstraint:
@@ -56,7 +56,7 @@ def single_cycle(edge_vars: VarMap, grid: SquareGrid) -> SingleCycleConstraint:
 
 
 def connected(
-    cells: Sequence[Cell], predicate: Callable[[Cell], BoolExpr]
+    cells: Sequence[Cell], predicate: Callable[[Cell], BoolExpr | Var]
 ) -> ConnectedConstraint:
     cell_list = list(cells)
     indicators = {c: predicate(c) for c in cell_list}
