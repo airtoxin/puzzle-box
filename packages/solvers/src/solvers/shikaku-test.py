@@ -78,7 +78,7 @@ def test_solve_5x5():
 
 
 def test_solve_1x1():
-    grid = [[1]]
+    grid: list[list[int | None]] = [[1]]
     result = solve(grid)
     assert result is not None
     assert len(result) == 1
