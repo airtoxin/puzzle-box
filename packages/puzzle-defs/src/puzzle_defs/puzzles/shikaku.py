@@ -29,6 +29,7 @@ class ShikakuPuzzle(Puzzle):
         self._infeasible = False
         if not self.rects:
             self._infeasible = True
+            self.add(exactly_one([]))
             self.use = self.bool_var_map("use", [])
             return
 
@@ -42,10 +43,10 @@ class ShikakuPuzzle(Puzzle):
 
         for cell in board.cells:
             covering = rects_by_cell.get(cell, [])
+            self.add(exactly_one(self.use[r] for r in covering))
             if not covering:
                 self._infeasible = True
                 return
-            self.add(exactly_one(self.use[r] for r in covering))
 
         # Each clue is used by exactly one rectangle
         for cr, cc in clues:

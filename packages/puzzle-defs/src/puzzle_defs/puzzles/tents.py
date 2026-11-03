@@ -62,15 +62,13 @@ class TentsPuzzle(Puzzle):
         if row_counts is not None:
             for r, row_cells in enumerate(board.rows()):
                 cells_in_row = [c for c in row_cells if c in self.tent]
-                if cells_in_row:
-                    self.add(sum_expr(self.tent[c] for c in cells_in_row) == row_counts[r])
+                self.add(sum_expr(self.tent[c] for c in cells_in_row) == row_counts[r])
 
         # Column counts
         if col_counts is not None:
             for c_idx, col_cells in enumerate(board.cols()):
                 cells_in_col = [cell for cell in col_cells if cell in self.tent]
-                if cells_in_col:
-                    self.add(sum_expr(self.tent[cell] for cell in cells_in_col) == col_counts[c_idx])
+                self.add(sum_expr(self.tent[cell] for cell in cells_in_col) == col_counts[c_idx])
 
     def result(self, solution: Solution) -> list[list[str]]:
         """Return a grid: 'T' = tree, 'A' = tent, '.' = grass."""
