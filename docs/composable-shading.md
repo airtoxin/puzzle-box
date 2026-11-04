@@ -129,7 +129,9 @@ API はサイズ上限を設けておらず、大盤面の性能は未検証で�
 機能上は [回答変数による一意性 (#2)](https://github.com/airtoxin/puzzle-box/pull/2)と
 [生成レシピの契約 (#4)](https://github.com/airtoxin/puzzle-box/pull/4)に依存します。
 白マスの連結を証明する補助変数の違いを、別の回答として数えてはいけないためです。
-レビュー差分を分離するため、この変更の draft PR は #2〜#8 を検証済みの
-`codex/integration-value-matching-verification` (`0d4cde3`) を base にしています。
-これらは main へ未反映です。土台の採否が決まった後に rebase / base の変更が必要で、
-この実例のPRだけを現行 main に適用することはできません。
+#2〜#8 は main に採用済みです。この変更の PR は、採用済み main (`dd7eb32`) を
+通常 merge で取り込み、base も main に変更しました。採用時の所属検証・解の
+スナップショットの修正を保持し、main に元の実例の差分を適用した内容と一致することを確認しています。
+旧検証ブランチ `codex/integration-value-matching-verification` への切替や、
+土台の再適用は不要です。後続の依存順と検証は
+[レビューガイド](https://github.com/airtoxin/puzzle-box/blob/codex/review-roadmap/docs/review-roadmap.md)を参照してください。

@@ -129,7 +129,7 @@ print(puzzle.result(solution))
 CLI の25マス制限は継続し、実行時間の上限や大盤面性能は未対応です。
 異なる回答空間を接続する一般的なルール合成は、この変更の範囲に含みません。
 
-この変更は [PR #9](https://github.com/airtoxin/puzzle-box/pull/9) のルール合成を土台にする stacked draft です。
-base は `codex/composable-shading` (`e014aad`) で、さらに #2〜#8 の統合土台に依存します。
-既存PRは変更せず、今回のヒント拡張だけを差分にしています。土台が未マージのため、
-採否が決まった後に rebase / base変更が必要です。
+この実装は [PR #9](https://github.com/airtoxin/puzzle-box/pull/9) のルール合成を土台に追加しました。
+解の射影・生成契約などの #2〜#8 は main に採用済みです。今回のヒント拡張は独立した差分として
+レビューし、親の採用後には実際の main と base を再確認します。最新の状態は
+[PR #10](https://github.com/airtoxin/puzzle-box/pull/10) とレビューガイドを参照してください。
