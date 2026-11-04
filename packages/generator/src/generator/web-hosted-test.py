@@ -81,7 +81,7 @@ def test_per_instance_lock_is_shared_by_generate_and_check_and_released_on_timeo
     assert call("generate")[1]["status"] == "timeout" and not hosted.JOB_LOCK.locked()
 
 
-@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border"])
+@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border", "island-areas"])
 def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, rule_group):
     output = tmp_path / "artifact"
     payload = prepare.export(output)
@@ -159,6 +159,10 @@ print('artifact generation passed')
         data["rules"] = [{"id": "white-visibility-counts", "parameters": {"counts": [[5,3,5],[0,0,0],[0,0,0]]}},
                          {"id": "connected-white", "parameters": {"nonempty": True}},
                          {"id": "components-touch-border", "parameters": {"black": True}}]
+    elif rule_group == "island-areas":
+        data["rules"] = [{"id": "white-island-areas", "parameters": {"areas": [[1,0,0],[0,0,2]]}},
+                         {"id": "connected-black", "parameters": {"nonempty": False}},
+                         {"id": "no-black-2x2", "parameters": {}}]
     result = subprocess.run([sys.executable, "-c", script], cwd=output, capture_output=True, text=True,
                             env={**os.environ, "PYTHONPATH": "", "PUZZLE_TEST_REQUEST": json.dumps(data),
                                  "PUZZLE_TEST_VENDOR": str(vendor)}, timeout=20)

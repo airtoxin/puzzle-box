@@ -1,0 +1,11 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 2,
+  "cols": 3,
+  "rules": [
+    {"type": "white-island-areas", "areas": [[1, 0, 0], [0, 0, 2]]},
+    {"type": "connected-black", "nonempty": false},
+    {"type": "no-black-2x2"}
+  ],
+  "clue_kinds": ["cell"]
+}
