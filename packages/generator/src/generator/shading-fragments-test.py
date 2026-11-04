@@ -122,6 +122,15 @@ def test_all_three_binary_fragments_act_on_four_by_four_without_expanding_demo_l
         oracle.finite_space(ShadingRecipe(4, 4, rules))
 
 
+@pytest.mark.parametrize("rows,cols", [(2, 4), (4, 2)])
+def test_eight_cell_balance_is_feasible_until_distinct_lines_are_added(rows, cols):
+    recipe = ShadingRecipe(rows, cols, (BalancedLines(), NoThreeConsecutive()))
+    expected = {bits for bits in product((0, 1), repeat=8)
+                if all(oracle.accepts(rule, bits, rows, cols) for rule in recipe.rules)}
+    assert len(expected) == 6 and solver_answers(recipe) == expected
+    assert ShadingRecipe(rows, cols, (*recipe.rules, DistinctLines())).create_empty().solve() is None
+
+
 RECIPES = [
     ShadingRecipe(2, 3, (BlackCount(4), ConnectedBlack(), NoBlack2x2())),
     ShadingRecipe(3, 3, (BlackCount(4), BlackDominoes())),
