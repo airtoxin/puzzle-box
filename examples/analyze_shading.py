@@ -19,6 +19,7 @@ from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWh
 from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
+from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -67,6 +68,16 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
                    for r in range(rows-1) for c in range(cols-1))
     if type(rule) is BlackDominoes:
         return all(len(group) == 2 for group in _components(black))
+    if type(rule) is RoomRotationalSymmetry:
+        for label in {n for row in rule.rooms for n in row}:
+            members = {(r,c) for r in range(rows) for c in range(cols) if rule.rooms[r][c] == label}
+            selected = black & members
+            # Compare sets after rotation, independently of encoded cell equalities.
+            row_sum = min(r for r,c in members) + max(r for r,c in members)
+            col_sum = min(c for r,c in members) + max(c for r,c in members)
+            if {(row_sum-r,col_sum-c) for r,c in selected} != selected:
+                return False
+        return True
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         selected = black if rule.black else {(r, c) for r in range(rows) for c in range(cols)} - black
         # Independent of the DSL's local corners / isolated-rectangle clauses:

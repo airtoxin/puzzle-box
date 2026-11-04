@@ -109,3 +109,32 @@ class NoWhiteAcrossThreeRooms:
             # spanning three segments. A black cell must interrupt that interval.
             for first, second in zip(boundaries, boundaries[1:]):
                 puzzle.add(at_least_one(black[c] for c in line[first:second+2]))
+
+
+@dataclass(frozen=True)
+class RoomRotationalSymmetry:
+    """Black cells in every room have half-turn symmetry about its bounding box.
+
+    Rotation is room-local: a cell whose image leaves its room must be white.
+    Empty black sets are allowed; counts and connectivity remain separate.
+    """
+
+    ui: ClassVar[RuleUi] = RuleUi("room-rotational-symmetry", "各部屋の黒配置を180度対称にする",
+        "各部屋を囲む最小長方形の中心で黒配置を180度回転して一致させます。部屋外に写るマスは白です。",
+        (ROOM_PARAMETER,), ROOM_UI)
+    rooms: RoomMap
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self,"rooms",room_map(self.rooms))
+
+    def apply(self, puzzle: Puzzle, board: SquareGrid, black: VarMap) -> None:
+        for cells in _rooms(board,self.rooms):
+            members = set(cells)
+            row_sum = min(c.row for c in cells) + max(c.row for c in cells)
+            col_sum = min(c.col for c in cells) + max(c.col for c in cells)
+            for cell in cells:
+                rotated = Cell(row_sum-cell.row,col_sum-cell.col)
+                if rotated not in members:
+                    puzzle.add(black[cell] == 0)
+                elif cell < rotated:
+                    puzzle.add(black[cell] == black[rotated])

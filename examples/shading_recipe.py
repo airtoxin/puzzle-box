@@ -10,6 +10,7 @@ from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWh
 from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
+from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs.number_layout import DEFAULT_NUMBERS, NumberGrid, number_grid
 from puzzle_defs.room_layout import DEFAULT_ROOMS, RoomMap, room_map
 from puzzle_defs.puzzles.shading import CLUE_KINDS, ShadingRule
@@ -23,7 +24,8 @@ PARAMETERLESS_RULE_TYPES = (NoWhite2x2, NoBlack2x2, BlackDominoes, NoThreeConsec
 BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
-                      RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers, RunLengthLimit)
+                      RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
+                      RunLengthLimit, RoomRotationalSymmetry)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -39,6 +41,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "no-white-across-three-rooms": NoWhiteAcrossThreeRooms(DEFAULT_ROOMS),
             "distinct-white-numbers": DistinctWhiteNumbers(DEFAULT_NUMBERS),
             "run-length-limit": RunLengthLimit(),
+            "room-rotational-symmetry": RoomRotationalSymmetry(DEFAULT_ROOMS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -58,7 +61,7 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": "room-connected-black", "rooms": [list(row) for row in rule.rooms], "nonempty": rule.nonempty}
     if type(rule) is LineBlackCount:
         return {"type": "line-black-count", "count": rule.count}
-    if type(rule) is NoWhiteAcrossThreeRooms:
+    if type(rule) is NoWhiteAcrossThreeRooms or type(rule) is RoomRotationalSymmetry:
         return {"type": rule.ui.identifier, "rooms": [list(row) for row in rule.rooms]}
     if type(rule) is DistinctWhiteNumbers:
         return {"type": rule.ui.identifier, "numbers": [list(row) for row in rule.numbers]}
@@ -96,11 +99,12 @@ def read_rule(data: Any) -> ShadingRule:
         return LineBlackCount(data["count"])
     if kind == "run-length-limit" and set(data) == {"type", "max_length"}:
         return RunLengthLimit(data["max_length"])
-    if kind == "no-white-across-three-rooms":
+    if kind in ("no-white-across-three-rooms","room-rotational-symmetry"):
         if (set(data) != {"type", "rooms"} or type(data["rooms"]) is not list
                 or any(type(row) is not list for row in data["rooms"])):
             raise ValueError("Invalid room rule parameters; rooms must be an array of arrays")
-        return NoWhiteAcrossThreeRooms(tuple(tuple(row) for row in data["rooms"]))
+        constructor = NoWhiteAcrossThreeRooms if kind == "no-white-across-three-rooms" else RoomRotationalSymmetry
+        return constructor(tuple(tuple(row) for row in data["rooms"]))
     if kind == "distinct-white-numbers":
         if (set(data) != {"type","numbers"} or type(data["numbers"]) is not list
                 or any(type(row) is not list for row in data["numbers"])):
@@ -122,7 +126,8 @@ def check_demo_size(recipe: ShadingRecipe) -> None:
 
 def shared_rooms(recipe: ShadingRecipe) -> RoomMap | None:
     layouts = [rule.rooms for rule in recipe.rules
-               if type(rule) is RoomBlackCount or type(rule) is RoomConnectedBlack or type(rule) is NoWhiteAcrossThreeRooms]
+               if type(rule) is RoomBlackCount or type(rule) is RoomConnectedBlack
+               or type(rule) is NoWhiteAcrossThreeRooms or type(rule) is RoomRotationalSymmetry]
     for layout in layouts:
         room_map(layout, rows=recipe.rows, cols=recipe.cols)
     if layouts and any(layout != layouts[0] for layout in layouts):
