@@ -1,4 +1,4 @@
-"""Generate, verify and display a small Slitherlink recipe."""
+"""Generate, display, check and verify a small Slitherlink recipe."""
 
 import argparse
 import json
@@ -81,6 +81,36 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     return {"valid": True, "unique": True, "irreducible": True, "clue_count": len(clues)}
 
 
+def _answer_edge_rows(rows: int, cols: int) -> list[list[Edge]]:
+    """Horizontal and vertical edge rows in the displayed top-to-bottom order."""
+    result = []
+    for r in range(rows + 1):
+        result.append([Edge(Vertex(r, c), Vertex(r, c + 1)) for c in range(cols)])
+        if r < rows:
+            result.append([Edge(Vertex(r, c), Vertex(r + 1, c)) for c in range(cols + 1)])
+    return result
+
+
+def _parse_answer(text: str, rows: int, cols: int) -> set[Edge]:
+    parts = ["".join(row.split()) for row in text.strip().split("/")]
+    edge_rows = _answer_edge_rows(rows, cols)
+    if len(parts) != len(edge_rows) or any(len(part) != len(edges) for part, edges in zip(parts, edge_rows)):
+        raise ValueError(f"Answer needs {2 * rows + 1} edge rows separated by '/', "
+                         f"alternating {cols} horizontal and {cols + 1} vertical edges")
+    if any(value not in "01" for part in parts for value in part):
+        raise ValueError("Fill every edge with 1 (used) or 0 (unused); '?' is not a complete answer")
+    return {edge for part, edges in zip(parts, edge_rows) for value, edge in zip(part, edges) if value == "1"}
+
+
+def check_answer(data: dict[str, Any], text: str) -> bool:
+    recipe, _, answer = read_record(data)
+    candidate = _parse_answer(text, recipe.rows, recipe.cols)
+    # A stored answer is only authoritative after proving the saved puzzle's
+    # uniqueness, clue irreducibility and agreement with that answer.
+    verify(data)
+    return candidate == answer
+
+
 def show(data: dict[str, Any], *, reveal: bool = False) -> str:
     verify(data)
     recipe, clues, answer = read_record(data)
@@ -111,6 +141,12 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
             lines.append(row)
     lines.extend(["", "Numbers count used sides of a cell; . = no number clue.",
                   "--- / | = used edge; x = unused edge clue; ? = unknown edge; + = vertex."])
+    if not reveal:
+        template = "/".join("".join(str(edge_states.get(e, "?")) for e in row)
+                            for row in _answer_edge_rows(recipe.rows, recipe.cols))
+        lines.extend(["Answer template: " + template,
+                      "Edge rows run top to bottom, alternating horizontal and vertical; omit cell numbers.",
+                      'Replace every ? with 1 (used) or 0 (unused), then use check FILE --answer "ROWS".'])
     return "\n".join(lines)
 
 
@@ -130,10 +166,19 @@ def main() -> int:
     display = commands.add_parser("show")
     display.add_argument("file", type=Path)
     display.add_argument("--solution", action="store_true")
+    check = commands.add_parser("check", help="Check a complete loop answer without revealing the solution")
+    check.add_argument("file", type=Path)
+    check.add_argument("--answer", required=True,
+                       help="Alternating horizontal/vertical edge rows separated by '/', using 1 or 0")
     args = parser.parse_args()
     try:
-        if args.command in ("verify", "show"):
+        if args.command in ("verify", "show", "check"):
             data = json.loads(args.file.read_text(encoding="utf-8"))
+            if args.command == "check":
+                correct = check_answer(data, args.answer)
+                print("Correct. All rules and clues are satisfied." if correct else
+                      "Not correct. Check the rules and given clues.")
+                return 0 if correct else 1
             print(json.dumps(verify(data), sort_keys=True) if args.command == "verify"
                   else show(data, reveal=args.solution))
             return 0
