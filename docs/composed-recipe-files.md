@@ -51,8 +51,11 @@ uv run --no-sync python examples/custom_row_band.py show row-band-puzzle.json
 uv run --no-sync python examples/custom_row_band.py check row-band-puzzle.json --answer ".#./#.."
 ```
 
-標準の個数・連結部品には文章の説明があります。自作部品は登録IDと全設定値を表示しますが、
-その意味を自動で自然言語に翻訳しません。自作部品の説明は信頼済み実装の文書と併せて確認してください。
+標準の個数・連結部品には文章の説明があります。自作部品にも信頼済みPython側で
+[説明関数を明示登録](custom-component-registration.md#人が読むルール説明を付ける)できます。
+`custom_row_band.py` は「各行の黒マス数が指定した上下限内」という説明を表示します。
+登録IDと全設定値も残し、説明がない部品は従来どおり信頼済み実装の文書を参照します。
+部品の意味を自動で自然言語へ翻訳する仕組みではなく、説明と制約の一致は作者が確認します。
 標準CLIは知らないIDを拒否し、ファイルから対応コードを自動importしません。
 毎回求解するため、9セルの制限内でも応答時間の上限や人間の解きやすさは保証しません。
 
