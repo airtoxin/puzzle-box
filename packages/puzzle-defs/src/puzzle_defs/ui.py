@@ -15,6 +15,8 @@ class UiRequirements:
     topology: str = "rectangular-cells"
     channels: tuple[UiChannel, ...] = (UiChannel("answer", "binary-cells"),)
     max_cells: int = 9
+    min_rows: int = 1
+    min_cols: int = 1
 
 
 @dataclass(frozen=True)
@@ -60,15 +62,19 @@ class ClueUi:
     requirements: UiRequirements
 
 
-def merge_requirements(requirements: list[UiRequirements], *, supported: dict[str, str]) -> UiRequirements:
+def merge_requirements(requirements: list[UiRequirements], *, supported: dict[str, str],
+                       supported_topology: str = "rectangular-cells") -> UiRequirements:
     """Unify shared channel types; renderer support is separate from solvability."""
     if not requirements:
         raise ValueError("At least one UI requirement is needed")
     topology = requirements[0].topology
     channels: dict[str, str] = {}
-    if any(type(item.max_cells) is not int or item.max_cells < 1 for item in requirements):
+    if any(type(n) is not int or n < 1 for item in requirements for n in (item.max_cells, item.min_rows, item.min_cols)):
         raise ValueError("UI cell limits must be positive integers")
     limit = min(item.max_cells for item in requirements)
+    min_rows, min_cols = max(r.min_rows for r in requirements), max(r.min_cols for r in requirements)
+    if min_rows * min_cols > limit:
+        raise ValueError("Incompatible UI dimension limits")
     for item in requirements:
         if item.topology != topology:
             raise ValueError("Incompatible board topologies")
@@ -76,9 +82,10 @@ def merge_requirements(requirements: list[UiRequirements], *, supported: dict[st
             if channel.name in channels and channels[channel.name] != channel.kind:
                 raise ValueError(f"Conflicting UI channel: {channel.name}")
             channels[channel.name] = channel.kind
-    if topology != "rectangular-cells":
+    if topology != supported_topology:
         raise ValueError(f"Unsupported board topology: {topology}")
     for name, kind in channels.items():
         if supported.get(name) != kind:
             raise ValueError(f"Unsupported UI channel: {name}/{kind}")
-    return UiRequirements(topology, tuple(UiChannel(name, kind) for name, kind in sorted(channels.items())), limit)
+    return UiRequirements(topology, tuple(UiChannel(name, kind) for name, kind in sorted(channels.items())),
+                          limit, min_rows, min_cols)

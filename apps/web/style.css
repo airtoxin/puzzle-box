@@ -287,6 +287,7 @@ td {
 }
 
 .loop-board {border-spacing:3px; text-align:center;}
+.coupled-board {text-align:center;}
 .vertex {display:block; width:28px; font-size:12px;}
 .loop-clue {display:block; font-size:1.2rem; font-weight:700;}
 .edge {padding:0; border-radius:4px; font-size:1.2rem; color:#213c33; background:#fff;}

@@ -1,11 +1,16 @@
 """Couple cell shading and a loop through cell centers using Yajilin rules."""
 
 from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import ClassVar, Literal, Sequence
 
 from puzzle import Cell, Edge, Solution, at_least_one, sum_expr
 from puzzle_defs.puzzles.slitherlink_recipe import EdgeStateClue
 from puzzle_defs.puzzles.yajilin import DIRECTIONS, YajilinPuzzle
+from puzzle_defs.ui import ClueUi, RuleUi, UiChannel, UiRequirements
+
+COUPLED_UI = UiRequirements("rectangular-cell-centers",
+    (UiChannel("answer-cells", "binary-cells"), UiChannel("answer-edges", "binary-edges")),
+    max_cells=9, min_rows=2, min_cols=2)
 
 
 def _cell(cell: Cell) -> bool:
@@ -34,6 +39,8 @@ class ArrowCountClue:
 
 @dataclass(frozen=True)
 class BlackCellClue:
+    ui: ClassVar[ClueUi] = ClueUi("black", "黒白の固定ヒント",
+        UiRequirements("rectangular-cell-centers", (UiChannel("givens", "cell-givens"),), 9, 2, 2))
     cell: Cell
     black: int
 
@@ -60,6 +67,20 @@ class YajilinRecipe:
     The shared generator can remove these constraints monotonically. Edge
     coordinates refer to cell centers, not the corners used by Slitherlink.
     """
+
+    # The initial Web profile uses no arrow sites; the Python recipe still does.
+    ui: ClassVar[UiRequirements] = COUPLED_UI
+    rule_ui: ClassVar[tuple[RuleUi, ...]] = (
+        RuleUi("non-touching-black", "黒マスを隣り合わせない", "黒マス同士の上下左右の接触を禁止します。必須です。",
+               requirements=UiRequirements("rectangular-cell-centers", (UiChannel("answer-cells", "binary-cells"),), 9, 2, 2), required=True),
+        RuleUi("center-loop", "セル中心の1本ループ", "セルの中心同士を結ぶ、空でない1本の輪です。必須です。",
+               requirements=UiRequirements("rectangular-cell-centers", (UiChannel("answer-edges", "binary-edges"),), 9, 2, 2), required=True),
+        RuleUi("cover-white", "白マスすべてを通る", "白には2本、黒には0本の辺がつながります。必須です。",
+               requirements=COUPLED_UI, required=True),
+    )
+    clue_ui: ClassVar[tuple[ClueUi, ...]] = (BlackCellClue.ui,
+        ClueUi("edge", "セル中心を結ぶ辺の固定ヒント",
+               UiRequirements("rectangular-cell-centers", (UiChannel("edge-givens", "edge-givens"),), 9, 2, 2)))
 
     rows: int
     cols: int

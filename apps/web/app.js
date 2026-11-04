@@ -34,7 +34,7 @@ function clearArtifact() {
 }
 function syncParameters() {
   const area = Number($('rows').value) * Number($('cols').value);
-  const edges = 2 * area + Number($('rows').value) + Number($('cols').value);
+  const edges = 2 * area + (profile.board.topology === 'rectangular-cell-centers' ? -1 : 1) * (Number($('rows').value) + Number($('cols').value));
   for (const rule of profile.rules) {
     const state = selected.get(rule.identifier);
     for (const spec of rule.parameters) {
@@ -59,7 +59,7 @@ async function refresh() {
     }
     plan = result.plan;
     $('shape').textContent = `${plan.rows} × ${plan.cols}`;
-    $('plan-note').textContent = '選択したルールとヒントが要求する盤面を表示しています。UIの適合は、問題の成立を保証しません。';
+    $('plan-note').textContent = isCoupled() ? '線はマスの中心同士を結びます。黒白と辺は別々に入力し、両方の整合を確認します。' : '選択したルールとヒントが要求する盤面を表示しています。UIの適合は、問題の成立を保証しません。';
     $('status').textContent = '生成前のプレビューです。';
     renderBoard(); $('generate').disabled = false;
   } catch {
@@ -70,6 +70,7 @@ function renderBoard(reveal = false) {
   if (!plan) return;
   $('preview-title').textContent = reveal ? '解答' : artifact ? '生成した問題' : '盤面プレビュー';
   const channels = new Set(plan.requirements.channels.map(c => c.name));
+  if (isCoupled()) {renderCoupled(reveal); return;}
   if (plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges') {
     renderLoop(reveal, channels); return;
   }
@@ -95,24 +96,27 @@ function renderBoard(reveal = false) {
     for (let c = 0; c < plan.cols; c++) {
       const index = r * plan.cols + c;
       const value = reveal ? artifact.record.solution[r][c] : artifact ? input[index] : -1;
-      const button = node('button', undefined, 'cell');
-      button.type = 'button'; button.disabled = !artifact || fixed.has(index) || reveal;
-      if (fixed.has(index) && artifact) button.classList.add('fixed');
-      const paint = value => {
-        button.textContent = value === -1 ? '?' : value === 0 ? '○' : '■';
-        button.dataset.value = value;
-        button.setAttribute('aria-label', `${r + 1}行${c + 1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
-      };
-      paint(value);
-      button.addEventListener('click', () => {
-        input[index] = (input[index] + 2) % 3 - 1; $('answer-status').textContent = '';
-        paint(input[index]); // Keep the actual focused button and Tab position.
-      });
-      const td = node('td'); td.append(button); tr.append(td);
+      const td = node('td'); td.append(cellButton(index, r, c, value, reveal)); tr.append(td);
     }
     table.append(tr);
   }
   $('board').replaceChildren(table);
+}
+function cellButton(index, r, c, value, reveal) {
+  const button = node('button', undefined, 'cell');
+  button.type = 'button'; button.dataset.cellIndex = index;
+  button.disabled = !artifact || fixed.has(index) || reveal;
+  if (fixed.has(index) && artifact) button.classList.add('fixed');
+  const paint = value => {
+    button.textContent = value === -1 ? '?' : value === 0 ? '○' : '■';
+    button.dataset.value = value;
+    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
+  };
+  paint(value);
+  button.addEventListener('click', () => {
+    input[index] = (input[index]+2)%3-1; paint(input[index]); $('answer-status').textContent = '';
+  });
+  return button;
 }
 function buildControls() {
   selected.clear(); hints.clear(); $('rules').replaceChildren(); $('hints').replaceChildren();
@@ -137,11 +141,28 @@ function buildControls() {
     $('hints').append(label); hints.set(hint.identifier, toggle);
   }
 }
+function isCoupled() {return plan?.requirements.topology === 'rectangular-cell-centers';}
 function loopEdges() {
   const edges = [];
-  for (let r = 0; r <= plan.rows; r++) for (let c = 0; c < plan.cols; c++) edges.push([r,c,r,c+1]);
-  for (let r = 0; r < plan.rows; r++) for (let c = 0; c <= plan.cols; c++) edges.push([r,c,r+1,c]);
+  const rows = plan.rows - Number(isCoupled()), cols = plan.cols - Number(isCoupled());
+  for (let r = 0; r <= rows; r++) for (let c = 0; c < cols; c++) edges.push([r,c,r,c+1]);
+  for (let r = 0; r < rows; r++) for (let c = 0; c <= cols; c++) edges.push([r,c,r+1,c]);
   return edges;
+}
+function edgeButton(edge, index, value, reveal, offset = 0) {
+  const horizontal = edge[0] === edge[2], target = offset + index;
+  const button = node('button', undefined, `edge ${horizontal ? 'horizontal' : 'vertical'}`);
+  button.type = 'button'; button.dataset.edgeIndex = index;
+  button.disabled = !artifact || fixed.has(target) || reveal;
+  if (artifact && fixed.has(target)) button.classList.add('fixed');
+  const paint = value => {
+    button.dataset.value = value;
+    button.textContent = value === -1 ? '?' : value === 0 ? '×' : horizontal ? '━' : '┃';
+    button.setAttribute('aria-label', `${horizontal ? '横辺' : '縦辺'} ${edge[0]+1}行${edge[1]+1}列: ${value === -1 ? '未入力' : value === 0 ? '線なし' : '線あり'}${artifact && fixed.has(target) ? '（固定ヒント）' : ''}`);
+  };
+  paint(value);
+  button.addEventListener('click', () => {input[target] = (input[target]+2)%3-1; paint(input[target]); $('answer-status').textContent = '';});
+  return button;
 }
 function renderLoop(reveal, channels) {
   const edges = loopEdges(), indices = new Map(edges.map((e, i) => [e.join(','), i]));
@@ -161,18 +182,30 @@ function renderLoop(reveal, channels) {
         const horizontal = r % 2 === 0;
         const edge = horizontal ? [r/2,(c-1)/2,r/2,(c+1)/2] : [(r-1)/2,c/2,(r+1)/2,c/2];
         const index = indices.get(edge.join(','));
-        const button = node('button', undefined, `edge ${horizontal ? 'horizontal' : 'vertical'}`);
-        button.type = 'button'; button.dataset.edgeIndex = index;
-        button.disabled = !artifact || fixed.has(index) || reveal;
-        if (artifact && fixed.has(index)) button.classList.add('fixed');
-        const paint = value => {
-          button.dataset.value = value;
-          button.textContent = value === -1 ? '?' : value === 0 ? '×' : horizontal ? '━' : '┃';
-          button.setAttribute('aria-label', `${horizontal ? '横辺' : '縦辺'} ${edge[0]+1}行${edge[1]+1}列: ${value === -1 ? '未入力' : value === 0 ? '線なし' : '線あり'}${artifact && fixed.has(index) ? '（固定ヒント）' : ''}`);
-        };
-        paint(reveal ? Number(solution.has(edge.join(','))) : artifact ? input[index] : -1);
-        button.addEventListener('click', () => {input[index] = (input[index]+2)%3-1; paint(input[index]); $('answer-status').textContent = '';});
-        td.append(button);
+        td.append(edgeButton(edge, index, reveal ? Number(solution.has(edge.join(','))) : artifact ? input[index] : -1, reveal));
+      }
+      tr.append(td);
+    }
+    table.append(tr);
+  }
+  $('board').replaceChildren(table);
+}
+function renderCoupled(reveal) {
+  const area = plan.rows * plan.cols, edges = loopEdges(), indices = new Map(edges.map((e, i) => [e.join(','), i]));
+  const black = new Set(artifact?.record.solution.black_cells.map(c => c.join(',')) || []);
+  const used = new Set(artifact?.record.solution.loop_edges.map(e => e.join(',')) || []);
+  const table = node('table', undefined, 'coupled-board'); table.setAttribute('aria-label', '黒白とセル中心のループ盤面');
+  for (let r = 0; r < 2*plan.rows-1; r++) {
+    const tr = node('tr');
+    for (let c = 0; c < 2*plan.cols-1; c++) {
+      const td = node('td');
+      if (r%2 === 0 && c%2 === 0) {
+        const index = r/2*plan.cols+c/2;
+        td.append(cellButton(index, r/2, c/2, reveal ? Number(black.has(`${r/2},${c/2}`)) : artifact ? input[index] : -1, reveal));
+      } else if (r%2 !== c%2) {
+        const edge = r%2 === 0 ? [r/2,(c-1)/2,r/2,(c+1)/2] : [(r-1)/2,c/2,(r+1)/2,c/2];
+        const index = indices.get(edge.join(','));
+        td.append(edgeButton(edge, index, reveal ? Number(used.has(edge.join(','))) : artifact ? input[area+index] : -1, reveal, area));
       }
       tr.append(td);
     }
@@ -185,6 +218,7 @@ function chooseProfile() {
   profile = catalog.profiles.find(p => p.id === $('family').value);
   $('rows').value = profile.defaults.rows; $('cols').value = profile.defaults.cols;
   $('rows').max = $('cols').max = profile.board.max_cells;
+  $('rows').min = profile.board.min_rows; $('cols').min = profile.board.min_cols;
   $('size-note').textContent = `最大${profile.board.max_cells}セル。Seedが同じでも、環境の変更をまたぐ一致は保証しません。`;
   buildControls(); refresh();
 }
@@ -201,12 +235,18 @@ form.addEventListener('submit', async event => {
     if (result.status === 'ok') {
       artifact = result; plan = result.plan; fixed = new Set();
       const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
-      input = Array(isLoop ? loopEdges().length : plan.rows * plan.cols).fill(-1);
-      for (const clue of result.clues.filter(c => c.type === (isLoop ? 'edge' : 'cell'))) {
-        const index = isLoop ? loopEdges().findIndex(e => e.join(',') === clue.edge.join(',')) : clue.row * plan.cols + clue.col;
-        input[index] = isLoop ? clue.used : clue.value; fixed.add(index);
+      const area = plan.rows * plan.cols;
+      input = Array(isCoupled() ? area + loopEdges().length : isLoop ? loopEdges().length : area).fill(-1);
+      for (const clue of result.clues) {
+        let index, value;
+        if (clue.type === 'edge' && (isLoop || isCoupled())) {
+          index = (isCoupled() ? area : 0) + loopEdges().findIndex(e => e.join(',') === clue.edge.join(',')); value = clue.used;
+        } else if (isCoupled() && clue.type === 'black') {index = clue.cell[0]*plan.cols+clue.cell[1]; value = clue.black;}
+        else if (!isCoupled() && !isLoop && clue.type === 'cell') {index = clue.row*plan.cols+clue.col; value = clue.value;}
+        else continue;
+        input[index] = value; fixed.add(index);
       }
-      $('entry-note').textContent = isLoop ? '辺を押すと、未入力 → 線なし（×）→ 線ありの順に切り替わります。固定ヒントは変更できません。' : '未知のマスを押すと、未入力 → 白 → 黒の順に切り替わります。固定ヒントは変更できません。';
+      $('entry-note').textContent = isCoupled() ? 'セルは未入力 → 白 → 黒、辺は未入力 → 線なし（×）→ 線あり。両方を入力してください。固定ヒントは変更できません。' : isLoop ? '辺を押すと、未入力 → 線なし（×）→ 線ありの順に切り替わります。固定ヒントは変更できません。' : '未知のマスを押すと、未入力 → 白 → 黒の順に切り替わります。固定ヒントは変更できません。';
       renderBoard(); $('actions').hidden = false;
       $('status').textContent = `生成しました。唯一解・ヒント既約性を検証済み。\n${result.clues.length}個のヒント / ${result.evidence.enumerated_boards}盤面を独立列挙して照合。`;
     } else $('status').textContent = messages[result.status] || `設定を確認してください。${result.message || ''}`;
@@ -219,7 +259,8 @@ $('check').addEventListener('click', async () => {
   form.inert = $('board').inert = $('answer-buttons').inert = true;
   $('answer-status').textContent = 'サーバーでルールとヒントを確認中…';
   try {
-    const result = await post('/api/check', {format: 'puzzle-box/web-answer-v1', request: artifact.request, clues: artifact.clues, answer: [...input]});
+    const answer = isCoupled() ? {cells: input.slice(0, plan.rows*plan.cols), edges: input.slice(plan.rows*plan.cols)} : [...input];
+    const result = await post('/api/check', {format: isCoupled() ? 'puzzle-box/web-answer-v2' : 'puzzle-box/web-answer-v1', request: artifact.request, clues: artifact.clues, answer});
     $('answer-status').textContent = result.status === 'ok' ? (result.correct ? '正解です。すべてのルールとヒントを満たしています。' : 'まだ正解ではありません。ルールとヒントを確認してください。') : messages[result.status] || '解答を検証できませんでした。';
   } catch {$('answer-status').textContent = '通信が途切れました。解答の正しさは未確認です。';}
   finally {form.inert = $('board').inert = $('answer-buttons').inert = false; $('check').focus();}

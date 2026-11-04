@@ -1,5 +1,74 @@
 import {test, expect} from '@playwright/test';
 
+test('coupled cells and center edges require a complete joint answer', async ({page}) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/'); await page.locator('#family').selectOption('coupled');
+  await expect(page.locator('#rules input:checked:disabled')).toHaveCount(3);
+  await expect(page.locator('#rows')).toHaveAttribute('min', '2');
+  await expect(page.locator('.cell')).toHaveCount(9); await expect(page.locator('.edge')).toHaveCount(12);
+  await expect(page.locator('#generate')).toBeEnabled();
+  const response = page.waitForResponse('**/api/generate'); await page.locator('#generate').click();
+  const artifact = await (await response).json(); expect(artifact.status).toBe('ok');
+  await expect(page.locator('#status')).toContainText('生成しました');
+  expect(artifact.record.format).toBe('puzzle-box/yajilin-v1');
+  expect(artifact.record.arrow_sites).toEqual([]);
+  await expect(page.locator('.cell.fixed')).toHaveCount(artifact.clues.filter(c => c.type === 'black').length);
+  expect(artifact.clues.some(c => c.type === 'black')).toBe(true);
+  const firstCell = page.locator('.cell:enabled').first();
+  await firstCell.focus(); await page.keyboard.press('Space'); await expect(firstCell).toBeFocused();
+  const black = new Set(artifact.record.solution.black_cells.map(c => c.join(',')));
+  for (let i = 0; i < artifact.cells.length; i++) {
+    const cell = page.locator(`[data-cell-index="${i}"]`);
+    if (await cell.isEnabled())
+      while (await cell.getAttribute('data-value') !== String(Number(black.has(artifact.cells[i].join(','))))) await cell.click();
+  }
+  await page.locator('#check').click(); await expect(page.locator('#answer-status')).toContainText('未入力');
+  const firstEdge = page.locator('.edge:enabled').first();
+  await firstEdge.focus(); await page.keyboard.press('Space'); await expect(firstEdge).toBeFocused();
+  await page.keyboard.press('Enter'); await expect(firstEdge).toBeFocused();
+  for (const edge of await page.locator('.edge:enabled').all())
+    while (await edge.getAttribute('data-value') !== '0') await edge.click();
+  await page.locator('#check').click(); await expect(page.locator('#answer-status')).toContainText('まだ正解ではありません');
+  const used = new Set(artifact.record.solution.loop_edges.map(e => e.join(',')));
+  for (let i = 0; i < artifact.edges.length; i++) {
+    const edge = page.locator(`[data-edge-index="${i}"]`);
+    if (await edge.isEnabled() && used.has(artifact.edges[i].join(','))) await edge.click();
+  }
+  const checked = page.waitForResponse('**/api/check'); await page.locator('#check').click();
+  const reply = await checked;
+  const payload = reply.request().postDataJSON();
+  expect(payload.format).toBe('puzzle-box/web-answer-v2');
+  expect(Object.keys(payload.answer).sort()).toEqual(['cells', 'edges']);
+  expect(await reply.json()).toEqual({status: 'ok', correct: true});
+  await expect(page.locator('#answer-status')).toContainText('正解です');
+  await page.locator('#reveal').click();
+  await expect(page.locator('.cell:enabled,.edge:enabled')).toHaveCount(0);
+  const download = page.waitForEvent('download'); await page.locator('#download').click();
+  const stream = await (await download).createReadStream(); const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  expect(JSON.parse(Buffer.concat(chunks).toString('utf8'))).toEqual(artifact.record);
+  await page.setViewportSize({width: 390, height: 844});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({path: test.info().outputPath('coupled-mobile.png'), fullPage: true});
+  await page.locator('#family').selectOption('slitherlink');
+  await expect(page.locator('#rows')).toHaveAttribute('min', '1');
+  await expect(page.locator('.cell')).toHaveCount(0); await expect(page.locator('.edge')).toHaveCount(12);
+  await expect(page.locator('#actions')).toBeHidden(); expect(errors).toEqual([]);
+});
+
+test('coupled edge hints and insufficient hints use the same joint board', async ({page}) => {
+  await page.goto('/'); await page.locator('#family').selectOption('coupled');
+  await page.locator('#hints input').first().uncheck();
+  await expect(page.locator('#generate')).toBeEnabled(); await page.locator('#generate').click();
+  await expect(page.locator('#status')).toContainText('生成しました');
+  expect(await page.locator('.edge.fixed:disabled').count()).toBeGreaterThan(0);
+  await expect(page.locator('.cell.fixed')).toHaveCount(0);
+  await page.locator('#hints input').last().uncheck();
+  await expect(page.locator('#generate')).toBeEnabled(); await page.locator('#generate').click();
+  await expect(page.locator('#status')).toContainText('どの完成盤面も一意に決まりません');
+  await expect(page.locator('#actions')).toBeHidden();
+});
+
 async function textContrast(locator, property = 'color') {
   const colors = await locator.evaluate((el, property) => {
     const foreground = getComputedStyle(el)[property];

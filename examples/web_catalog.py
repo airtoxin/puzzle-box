@@ -4,9 +4,10 @@ from dataclasses import asdict, dataclass
 from typing import Any, cast
 
 from puzzle_defs import (BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2, ShadingRecipe,
-                         SlitherlinkRecipe, CellEdgeCountClue, EdgeStateClue)
+                         SlitherlinkRecipe, CellEdgeCountClue, EdgeStateClue, YajilinRecipe)
 from puzzle_defs.puzzles.shading import CLUE_UI, ClueKind
 from puzzle_defs.puzzles.slitherlink_recipe import LoopClueKind
+from puzzle_defs.puzzles.yajilin_recipe import YajilinClueKind
 from puzzle_defs.ui import merge_requirements
 
 FORMAT = "puzzle-box/web-request-v1"
@@ -17,6 +18,8 @@ RENDERERS = {"answer": "binary-cells", "givens": "cell-givens",
              "row-counts": "row-counts", "column-counts": "column-counts"}
 LOOP_RENDERERS = {"answer": "binary-edges", "cell-counts": "cell-edge-counts", "edge-givens": "edge-givens"}
 LOOP_CLUES = (CellEdgeCountClue.ui, EdgeStateClue.ui)
+COUPLED_RENDERERS = {"answer-cells": "binary-cells", "answer-edges": "binary-edges",
+                     "givens": "cell-givens", "edge-givens": "edge-givens"}
 
 
 def catalog() -> dict[str, Any]:
@@ -36,6 +39,9 @@ def profiles() -> list[dict[str, Any]]:
         {"id": "slitherlink", "label": "スリザーリンクの辺", "rules": [r.record() for r in SlitherlinkRecipe.rule_ui],
          "clues": [asdict(c) for c in LOOP_CLUES], "board": asdict(SlitherlinkRecipe.ui),
          "defaults": {"rows": 2, "cols": 2, "rules": ["single-loop", "loop-length"]}},
+        {"id": "coupled", "label": "黒白とセル中心ループ", "rules": [r.record() for r in YajilinRecipe.rule_ui],
+         "clues": [asdict(c) for c in YajilinRecipe.clue_ui], "board": asdict(YajilinRecipe.ui),
+         "defaults": {"rows": 3, "cols": 3, "rules": [r.identifier for r in YajilinRecipe.rule_ui]}},
     ]
 
 
@@ -47,7 +53,7 @@ def _integer(value: Any, name: str, low: int, high: int) -> int:
 
 @dataclass(frozen=True)
 class Request:
-    recipe: ShadingRecipe | SlitherlinkRecipe
+    recipe: ShadingRecipe | SlitherlinkRecipe | YajilinRecipe
     seed: int
     budget: int
     plan: dict[str, Any]
@@ -55,11 +61,13 @@ class Request:
 
 def read_request(data: Any) -> Request:
     if type(data) is dict and data.get("format") == PROFILE_FORMAT:
-        if data.get("family") not in ("shading", "slitherlink"):
+        if data.get("family") not in ("shading", "slitherlink", "coupled"):
             raise ValueError("Unsupported puzzle family; mixed families are not supported")
         legacy = {k: v for k, v in data.items() if k != "family"}
         legacy["format"] = FORMAT
-        request = _read_shading(legacy) if data["family"] == "shading" else _read_loop(legacy)
+        if data["family"] == "shading": request = _read_shading(legacy)
+        elif data["family"] == "slitherlink": request = _read_loop(legacy)
+        else: request = _read_coupled(legacy)
         return Request(request.recipe, request.seed, request.budget,
                        {**request.plan, "format": "puzzle-box/web-plan-v2", "family": data["family"]})
     return _read_shading(data)
@@ -146,3 +154,36 @@ def _read_loop(data: Any) -> Request:
     recipe = SlitherlinkRecipe(rows, cols, length, tuple(cast(LoopClueKind, h) for h in hints))
     return Request(recipe, seed, budget, {"rows": rows, "cols": cols, "requirements": asdict(merged),
                                          "rules": raw, "clue_kinds": hints})
+
+
+def _read_coupled(data: Any) -> Request:
+    fields = {"format", "rows", "cols", "rules", "clue_kinds", "seed", "budget_seconds"}
+    if type(data) is not dict or set(data) != fields or data["format"] != FORMAT:
+        raise ValueError("Unsupported request format or missing/unknown fields")
+    rows, cols = _integer(data["rows"], "rows", 2, 9), _integer(data["cols"], "cols", 2, 9)
+    seed, budget = _integer(data["seed"], "seed", 0, 2**31-1), _integer(data["budget_seconds"], "budget_seconds", 1, 30)
+    declarations = {r.identifier: r for r in YajilinRecipe.rule_ui}
+    raw, seen = data["rules"], set()
+    requirements = [YajilinRecipe.ui]
+    if type(raw) is not list or len(raw) != len(declarations):
+        raise ValueError("This coupled profile requires all three declared rules")
+    for item in raw:
+        if type(item) is not dict or set(item) != {"id", "parameters"}:
+            raise ValueError("Each rule requires exactly id and parameters")
+        identifier, params = item["id"], item["parameters"]
+        if type(identifier) is not str or identifier not in declarations or identifier in seen:
+            raise ValueError("Unknown or duplicate coupled rule")
+        if type(params) is not dict or params:
+            raise ValueError("Coupled rules have no configurable parameters in this profile")
+        seen.add(identifier); requirements.append(declarations[identifier].requirements)
+    hints, hint_ui = data["clue_kinds"], {c.identifier: c for c in YajilinRecipe.clue_ui}
+    if (type(hints) is not list or len(hints) > 2
+            or any(type(h) is not str or h not in hint_ui for h in hints) or len(set(hints)) != len(hints)):
+        raise ValueError("This coupled profile supports distinct black and edge hints only")
+    requirements.extend(hint_ui[h].requirements for h in hints)
+    merged = merge_requirements(requirements, supported=COUPLED_RENDERERS, supported_topology=YajilinRecipe.ui.topology)
+    if rows*cols > merged.max_cells or rows < merged.min_rows or cols < merged.min_cols:
+        raise ValueError("The coupled UI needs both dimensions >=2 and at most 9 cells")
+    recipe = YajilinRecipe(rows, cols, clue_kinds=tuple(cast(YajilinClueKind, h) for h in hints))
+    return Request(recipe, seed, budget, {"rows": rows, "cols": cols, "requirements": asdict(merged),
+                                        "rules": raw, "clue_kinds": hints})
