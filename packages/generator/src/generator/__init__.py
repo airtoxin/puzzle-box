@@ -42,6 +42,13 @@ class GeneratablePuzzle[P: Puzzle, C](Protocol):
 type ConstraintBuilder[P: Puzzle] = Callable[[P], Iterable[Constraint]]
 
 
+def _answer_projection(puzzle: Puzzle) -> frozenset[int] | None:
+    variables = puzzle.solution_vars
+    # Variable equality builds DSL constraints; use identity, ignoring harmless
+    # ordering/duplicates. Keep default mode distinct from an empty projection.
+    return None if variables is None else frozenset(map(id, variables))
+
+
 @dataclass(frozen=True)
 class ConstrainedRecipe[P: Puzzle, C]:
     """Add fixed base constraints to every model built by an existing recipe.
@@ -64,6 +71,7 @@ class ConstrainedRecipe[P: Puzzle, C]:
         object.__setattr__(self, "builders", builders)
 
     def _apply(self, puzzle: P) -> P:
+        answer_projection = _answer_projection(puzzle)
         for builder in self.builders:
             for constraint in builder(puzzle):
                 if not isinstance(constraint, Constraint):
@@ -71,6 +79,8 @@ class ConstrainedRecipe[P: Puzzle, C]:
                 if isinstance(constraint, UniqueConstraint):
                     raise ValueError("unique() is a solve query, not an additional base rule")
                 puzzle.add(constraint)
+            if _answer_projection(puzzle) != answer_projection:
+                raise ValueError("Constraint builders must preserve the base recipe's answer projection")
         return puzzle
 
     def create_empty(self) -> P:
