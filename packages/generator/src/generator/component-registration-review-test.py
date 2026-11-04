@@ -158,3 +158,18 @@ def test_keyword_capture_does_not_allow_an_extra_named_constructor_parameter():
             return []
     with pytest.raises(ValueError, match="fields"):
         codec.BUILTIN_COMPONENTS.with_component("review/extra-parameter/v1", ExtraParameter, value=api.IntParam(0, 1))
+
+
+@pytest.mark.parametrize("kind", ["keyword-only", "keyword-capture"])
+def test_positional_capture_names_do_not_reject_keyword_compatible_constructors(kind):
+    def keyword_only(self, *args, value):
+        object.__setattr__(self, "value", value)
+    def keyword_capture(self, *args, **kwargs):
+        object.__setattr__(self, "value", kwargs["value"])
+    initialize = keyword_only if kind == "keyword-only" else keyword_capture
+    cls = dataclass(frozen=True, init=False)(type("CompatibleCaptures", (), {
+        "__annotations__": {"value": int}, "__init__": initialize, "__call__": lambda self, puzzle: [],
+    }))
+    registry = codec.BUILTIN_COMPONENTS.with_component("review/captures/v1", cls, value=api.IntParam(0, 1))
+    record = {"id": "review/captures/v1", "value": 1}
+    assert registry.encode(registry.decode(record)) == record
