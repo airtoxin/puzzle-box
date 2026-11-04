@@ -31,7 +31,7 @@ from puzzle_defs.regions import (
 from puzzle_defs.shikaku import ShikakuRect, enumerate_shikaku_rectangles
 from puzzle_defs.puzzles.shading import (
     BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2,
-    ShadingPuzzle, ShadingRecipe, ShadingRule,
+    ColumnCountClue, RowCountClue, ShadingPuzzle, ShadingRecipe, ShadingRule,
 )
 
 __all__ = [
@@ -39,6 +39,8 @@ __all__ = [
     "ConnectedWhite",
     "NonTouchingBlack",
     "NoWhite2x2",
+    "ColumnCountClue",
+    "RowCountClue",
     "ShadingPuzzle",
     "ShadingRecipe",
     "ShadingRule",

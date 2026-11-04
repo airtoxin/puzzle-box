@@ -14,7 +14,17 @@ Python 3.12 以上と [uv](https://docs.astral.sh/uv/) を使います。
 
 ```sh
 uv sync --all-packages --group dev --locked
-uv run --no-sync python examples/generate_shading.py generate --seed 17 --output shading.json
+uv run --no-sync python examples/generate_shading.py show examples/shading-mixed-sample.json
+```
+
+保存済みの例題を、ルール・盤面・ヒント付きで表示します。通常は解を表示しません。
+表示されたテンプレートを埋めて `check` で確認できます。手順は [端末で解いてみる](docs/play-shading.md)を参照してください。
+
+新しく生成する場合は、`--quiet` を付けると答えを含む JSON を画面へ出さずに保存できます。
+
+```sh
+uv run --no-sync python examples/generate_shading.py generate --seed 17 --output shading.json --quiet
+uv run --no-sync python examples/generate_shading.py show shading.json
 uv run --no-sync python examples/generate_shading.py verify shading.json
 ```
 
@@ -23,6 +33,17 @@ uv run --no-sync python examples/generate_shading.py verify shading.json
 盤面サイズ・基礎ルールは固定され、ヒントを消しても変わりません。
 実際の盤面、Python API、再現性の範囲は [ルール合成の実例](docs/composable-shading.md)を参照してください。
 最初の1次元の例 [compose_binary.py](examples/compose_binary.py)も残しています。
+
+セルの色に行・列の黒マス数ヒントを混ぜることもできます。
+
+```sh
+uv run --no-sync python examples/generate_shading.py generate --rows 3 --cols 4 --rules count non-touching --black-count 3 --hints cell row-count column-count --seed 0 --output mixed.json --quiet
+uv run --no-sync python examples/generate_shading.py show mixed.json
+uv run --no-sync python examples/generate_shading.py verify mixed.json
+```
+
+個数だけでは曖昧な場合も、必要なセルヒントを残します。
+例題と成立条件は [複数のヒント形式](docs/mixed-shading-clues.md)にまとめています。
 
 既存の数独生成は次の通りです。
 
@@ -51,6 +72,50 @@ print(puzzle.result(solution))
 構造の詳細は [ARCHITECTURE.md](ARCHITECTURE.md)、
 実装調査・課題・発展案は [プロジェクトレビュー](docs/project-review.md)、
 生成器の契約と使い方は [生成レシピ](docs/generation.md)を参照してください。
+
+## ルールとヒントの組合せを診断する
+
+9マス以下の黒白レシピでは、全配置を調べてルールの矛盾とヒント形式の不足を区別できます。
+
+```sh
+uv run --no-sync python examples/analyze_shading.py --seed-count 8
+```
+
+[小盤面の診断](docs/shading-diagnostics.md)に、同じ行列ヒントを持つ2つの答え、
+矛盾するルール集合、seedを変えたときの完成解の多様性をまとめています。
+
+候補ルールの全部分集合を比較する探索例もあります。
+
+```sh
+uv run --no-sync python examples/explore_shading.py
+uv run --no-sync python examples/explore_shading.py --rows 3 --cols 3 --black-counts 3 --candidates count non-touching --explain 1 2
+```
+
+[組合せの探索](docs/shading-exploration.md)では、完成解集合を変えないルールと、
+全候補ヒントがある場合の冗長性を分け、ルールを外すと唯一解を失う反例を表示します。
+
+## レシピを保存して生成する
+
+探索で選んだ設定を保存し、同じレシピから生成できます。
+
+```sh
+uv run --no-sync python examples/explore_shading.py --rows 3 --cols 3 --black-counts 3 --candidates count non-touching --hints cell row-count column-count --explain 1 2 --export-recipe chosen.json
+uv run --no-sync python examples/generate_shading.py generate --recipe chosen.json --seed 6 --output puzzle.json
+uv run --no-sync python examples/generate_shading.py verify puzzle.json
+```
+
+設定・問題・探索レポートの区別、入力検証、再現性は [レシピの保存と読込](docs/shading-recipe-files.md) を参照してください。
+
+## 保存した問題でルールを診断する
+
+生成された問題で、実際に残ったヒントに対するルールの必要性を診断できます。
+
+```sh
+uv run --no-sync python examples/diagnose_shading_rules.py puzzle.json --output rule-report.json
+```
+
+[保存ヒントでのルール診断](docs/stored-clue-rule-diagnostics.md)では、全候補ヒントとの違い、
+別解の盤面、個別の冗長性から一括削除できない理由を説明しています。レポートは答えも表示します。
 
 ## 開発と検証
 
