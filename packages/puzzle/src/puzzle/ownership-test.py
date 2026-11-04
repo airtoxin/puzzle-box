@@ -111,6 +111,29 @@ def test_matching_rejects_foreign_selected_variables():
     assert (str(local._model.proto), str(foreign._model.proto)) == before
 
 
+def test_connected_rejects_foreign_boolean_variables_before_model_mutation():
+    local, foreign = Puzzle("local"), Puzzle("foreign")
+    board = square_grid(1, 3)
+    local.bool_var_map("local", board.cells)
+    selected = foreign.bool_var_map("selected", board.cells)
+    constraint = connected(board.cells, lambda c: selected[c])
+    before = (str(local._model.proto), str(foreign._model.proto))
+    with pytest.raises(ValueError, match="same Puzzle"):
+        local.add(constraint)
+    assert (str(local._model.proto), str(foreign._model.proto)) == before
+
+
+@pytest.mark.parametrize("values, feasible", [([1, 1, 0], True), ([1, 0, 1], False)])
+def test_connected_accepts_local_boolean_variable_predicate(values: list[int], feasible: bool):
+    p = Puzzle("local connectivity")
+    board = square_grid(1, 3)
+    selected = p.bool_var_map("selected", board.cells)
+    p.add(connected(board.cells, lambda c: selected[c]))
+    for cell, value in zip(board.cells, values):
+        p.add(selected[cell] == value)
+    assert (p.solve() is not None) == feasible
+
+
 def test_local_expressions_and_neutral_empty_sums_still_work():
     p = Puzzle("local")
     values = p.int_var_map("v", [0, 1], 0, 1)
