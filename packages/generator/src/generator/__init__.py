@@ -9,9 +9,11 @@ Works with puzzle classes or configured recipe objects that implement:
 from __future__ import annotations
 
 import random
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 from typing import Protocol
 
-from puzzle import Puzzle, Solution
+from puzzle import Constraint, Puzzle, Solution
 from puzzle.constraints import UniqueConstraint
 
 
@@ -35,6 +37,72 @@ class GeneratablePuzzle[P: Puzzle, C](Protocol):
     def extract_clues(self, solution: Solution, puzzle: P) -> list[C]: ...
 
     def build_from_clues(self, clues: list[C]) -> P: ...
+
+
+type ConstraintBuilder[P: Puzzle] = Callable[[P], Iterable[Constraint]]
+
+
+def _answer_projection(puzzle: Puzzle) -> frozenset[int] | None:
+    variables = puzzle.solution_vars
+    # Variable equality builds DSL constraints; use identity, ignoring harmless
+    # ordering/duplicates. Keep default mode distinct from an empty projection.
+    return None if variables is None else frozenset(map(id, variables))
+
+
+@dataclass(frozen=True)
+class ConstrainedRecipe[P: Puzzle, C]:
+    """Add fixed base constraints to every model built by an existing recipe.
+
+    Builders receive the fresh, concrete puzzle, never cached variables. They
+    must depend only on fixed topology/configuration, not hints, solver state or
+    invocation count. They may not change the base's answer meaning or clue
+    extraction. The base's answer projection is preserved. This wrapper has no
+    portable encoding: serializing only its base would omit the added rules.
+    Returned items must be DSL constraints; unique() is a solve query, not a rule.
+    """
+
+    base: GeneratablePuzzle[P, C]
+    builders: tuple[ConstraintBuilder[P], ...]
+
+    def __post_init__(self) -> None:
+        builders = tuple(self.builders)
+        if any(not callable(builder) for builder in builders):
+            raise ValueError("Constraint builders must be callable")
+        object.__setattr__(self, "builders", builders)
+
+    def _apply(self, puzzle: P) -> P:
+        answer_projection = _answer_projection(puzzle)
+        for builder in self.builders:
+            for constraint in builder(puzzle):
+                if not isinstance(constraint, Constraint):
+                    raise TypeError("Builders must yield DSL constraint objects")
+                if isinstance(constraint, UniqueConstraint):
+                    raise ValueError("unique() is a solve query, not an additional base rule")
+                puzzle.add(constraint)
+            if _answer_projection(puzzle) != answer_projection:
+                raise ValueError("Constraint builders must preserve the base recipe's answer projection")
+        return puzzle
+
+    def create_empty(self) -> P:
+        return self._apply(self.base.create_empty())
+
+    def build_from_clues(self, clues: Sequence[C]) -> P:
+        return self._apply(self.base.build_from_clues(list(clues)))
+
+    def extract_clues(self, solution: Solution, puzzle: P) -> list[C]:
+        return self.base.extract_clues(solution, puzzle)
+
+
+def with_constraints[P: Puzzle, C](
+    recipe: GeneratablePuzzle[P, C], *builders: ConstraintBuilder[P],
+) -> ConstrainedRecipe[P, C]:
+    """Compose additional DSL constraints without replacing the recipe's rules.
+
+    The same builders run, in order, for the initial answer and all clue-reduction
+    trials. Builders must return constraints using the supplied model's variables.
+    They cannot remove base constraints or automatically connect different grids.
+    """
+    return ConstrainedRecipe(recipe, builders)
 
 
 def generate[P: Puzzle, C](
@@ -96,4 +164,5 @@ def reduce_clues[P: Puzzle, C](
     return [clues[i] for i in remaining]
 
 
-__all__ = ["GeneratablePuzzle", "InitialCluesNotUniqueError", "generate", "reduce_clues"]
+__all__ = ["ConstrainedRecipe", "ConstraintBuilder", "GeneratablePuzzle", "InitialCluesNotUniqueError",
+           "generate", "reduce_clues", "with_constraints"]

@@ -76,6 +76,15 @@ class Puzzle:
     def add_feature(self, feature: str) -> None:
         self._features.add(feature)
 
+    @property
+    def solution_vars(self) -> tuple[Var, ...] | None:
+        """Snapshot of explicit answer variables, or None for factory defaults.
+
+        None keeps including future factory variables. An explicit empty tuple
+        selects no answer variables; it is distinct from the default mode.
+        """
+        return None if self._solution_vars is None else tuple(self._solution_vars)
+
     def set_solution_vars(self, variables: Iterable[Var]) -> None:
         """Select the variables whose values distinguish puzzle solutions.
 
