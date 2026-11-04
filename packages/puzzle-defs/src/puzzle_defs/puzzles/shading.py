@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Protocol, Sequence
+from typing import ClassVar, Literal, Protocol, Sequence
+
+from puzzle_defs.ui import ClueUi, RuleUi, UiChannel, UiParameter, UiRequirements
 
 from puzzle import (
     Cell, Puzzle, Solution, SquareGrid, VarMap, at_least_one,
@@ -20,6 +22,8 @@ def _check_nonnegative(value: int, name: str) -> None:
 
 @dataclass(frozen=True)
 class RowCountClue:
+    ui: ClassVar[ClueUi] = ClueUi("row-count", "各行の黒マス数", UiRequirements(
+        channels=(UiChannel("row-counts", "row-counts"),)))
     row: int
     count: int
 
@@ -30,6 +34,8 @@ class RowCountClue:
 
 @dataclass(frozen=True)
 class ColumnCountClue:
+    ui: ClassVar[ClueUi] = ClueUi("column-count", "各列の黒マス数", UiRequirements(
+        channels=(UiChannel("column-counts", "column-counts"),)))
     col: int
     count: int
 
@@ -41,6 +47,8 @@ class ColumnCountClue:
 Clue = CellClue | RowCountClue | ColumnCountClue
 ClueKind = Literal["cell", "row-count", "column-count"]
 CLUE_KINDS: tuple[ClueKind, ...] = ("cell", "row-count", "column-count")
+CLUE_UI = (ClueUi("cell", "黒・白のセルヒント", UiRequirements(
+    channels=(UiChannel("givens", "cell-givens"),))), RowCountClue.ui, ColumnCountClue.ui)
 
 
 class ShadingRule(Protocol):
@@ -51,6 +59,8 @@ class ShadingRule(Protocol):
 
 @dataclass(frozen=True)
 class BlackCount:
+    ui: ClassVar[RuleUi] = RuleUi("count", "黒マスの個数", "盤面全体の黒マス数を指定します。", (
+        UiParameter("count", "黒マス数", "integer", 2),))
     count: int
 
     def __post_init__(self) -> None:
@@ -67,6 +77,9 @@ class BlackCount:
 class NonTouchingBlack:
     """Black cells cannot share an edge (or a corner if diagonal=True)."""
 
+    ui: ClassVar[RuleUi] = RuleUi("non-touching", "黒マスを離す", "黒マス同士が辺で接しないようにします。", (
+        UiParameter("diagonal", "斜めに接することも禁止", "boolean", False),))
+
     diagonal: bool = False
 
     def __post_init__(self) -> None:
@@ -81,6 +94,9 @@ class NonTouchingBlack:
 @dataclass(frozen=True)
 class ConnectedWhite:
     """White cells are orthogonally connected and, by default, nonempty."""
+
+    ui: ClassVar[RuleUi] = RuleUi("connected-white", "白マスをつなぐ", "すべての白マスを上下左右でつなぎます。", (
+        UiParameter("nonempty", "白マスを1つ以上にする", "boolean", True),))
 
     nonempty: bool = True
 
@@ -97,6 +113,8 @@ class ConnectedWhite:
 @dataclass(frozen=True)
 class NoWhite2x2:
     """Every 2x2 window must contain a black cell."""
+
+    ui: ClassVar[RuleUi] = RuleUi("no-white-2x2", "白の2×2を禁止", "すべての2×2領域に黒マスを含めます。")
 
     def apply(self, puzzle: Puzzle, board: SquareGrid, black: VarMap) -> None:
         for window in board.windows(2, 2):
@@ -154,6 +172,8 @@ class ShadingRecipe:
     clue_kinds selects candidate hints, not base rules. Include "cell" to ensure
     the initial candidate pool fixes the shading; counts alone can be ambiguous.
     """
+
+    ui: ClassVar[UiRequirements] = UiRequirements()
 
     rows: int
     cols: int

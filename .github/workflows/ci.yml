@@ -40,3 +40,29 @@ jobs:
         run: uv run --no-sync pyright
       - name: Build distributions
         run: uv build --all-packages --no-sources
+
+  web:
+    name: Web / Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.12.10'
+          python-version: '3.12'
+          enable-cache: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: uv sync --all-packages --group dev --locked
+      - run: npm ci --ignore-scripts
+        working-directory: apps/web
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm test
+        working-directory: apps/web
