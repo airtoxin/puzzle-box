@@ -15,7 +15,9 @@ uv run --no-sync python examples/generate_shading.py verify shading.json
 uv run --no-sync python examples/generate_shading.py verify examples/shading-sample.json
 ```
 
-既定は 3×3、黒3個、4ルールすべて有効です。生成結果の JSON は標準出力にも出ます。
+既定は 3×3、黒3個、4ルールすべて有効です。生成結果の JSON は既定では標準出力にも出ます。
+解を見ずに遊ぶときは `generate --output FILE --quiet` で保存し、`show FILE` を使ってください。
+盤面の入力と解答確認は [端末で解いてみる](play-shading.md)にまとめています。
 検証は保存データからモデルを作り直し、解が一意であること、保存した解と一致すること、
 残る各ヒントを1つずつ消すと一意でなくなることを確認します。
 成功時は `valid`, `unique`, `irreducible` が `true` の JSON を返します。

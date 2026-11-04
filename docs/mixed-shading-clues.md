@@ -15,6 +15,9 @@ uv run --no-sync python examples/generate_shading.py verify mixed.json
 uv run --no-sync python examples/generate_shading.py verify examples/shading-mixed-sample.json
 ```
 
+解を表示せずに試す場合は生成時に `--quiet` を加え、`show mixed.json` で問題を表示できます。
+解答の入力と確認は [端末で解いてみる](play-shading.md)を参照してください。
+
 [保存例](../examples/shading-mixed-sample.json)は3×4で、ルールは黒3個と黒の辺接触禁止です。
 左端の数字はその行、上端の数字はその列の黒マス数です。`?` は未確定、`.` は白、`#` は黒です。
 

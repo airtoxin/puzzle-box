@@ -14,7 +14,17 @@ Python 3.12 以上と [uv](https://docs.astral.sh/uv/) を使います。
 
 ```sh
 uv sync --all-packages --group dev --locked
-uv run --no-sync python examples/generate_shading.py generate --seed 17 --output shading.json
+uv run --no-sync python examples/generate_shading.py show examples/shading-mixed-sample.json
+```
+
+保存済みの例題を、ルール・盤面・ヒント付きで表示します。通常は解を表示しません。
+表示されたテンプレートを埋めて `check` で確認できます。手順は [端末で解いてみる](docs/play-shading.md)を参照してください。
+
+新しく生成する場合は、`--quiet` を付けると答えを含む JSON を画面へ出さずに保存できます。
+
+```sh
+uv run --no-sync python examples/generate_shading.py generate --seed 17 --output shading.json --quiet
+uv run --no-sync python examples/generate_shading.py show shading.json
 uv run --no-sync python examples/generate_shading.py verify shading.json
 ```
 
@@ -27,7 +37,8 @@ uv run --no-sync python examples/generate_shading.py verify shading.json
 セルの色に行・列の黒マス数ヒントを混ぜることもできます。
 
 ```sh
-uv run --no-sync python examples/generate_shading.py generate --rows 3 --cols 4 --rules count non-touching --black-count 3 --hints cell row-count column-count --seed 0 --output mixed.json
+uv run --no-sync python examples/generate_shading.py generate --rows 3 --cols 4 --rules count non-touching --black-count 3 --hints cell row-count column-count --seed 0 --output mixed.json --quiet
+uv run --no-sync python examples/generate_shading.py show mixed.json
 uv run --no-sync python examples/generate_shading.py verify mixed.json
 ```
 
