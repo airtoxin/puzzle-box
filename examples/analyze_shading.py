@@ -29,6 +29,7 @@ from puzzle_defs import AdjacentBlackCounts
 from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
+from puzzle_defs import NoColorAcrossRooms, AdjacentRoomCountsDiffer
 from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
@@ -58,6 +59,19 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is NoColorAcrossRooms:
+        selected = [(r,c) for r in range(rows) for c in range(cols) if ((r,c) in black) == rule.black]
+        return not any(abs(r-s)+abs(c-t) == 1 and rule.rooms[r][c] != rule.rooms[s][t]
+                       for r,c in selected for s,t in selected)
+    if type(rule) is AdjacentRoomCountsDiffer:
+        members = {}
+        for r in range(rows):
+            for c in range(cols):
+                members.setdefault(rule.rooms[r][c],set()).add((r,c))
+        sizes = {label:sum((p in black) == rule.black for p in cells) for label,cells in members.items()}
+        return not any(sizes[a] == sizes[b] and any(abs(r-s)+abs(c-t) == 1
+                       for r,c in members[a] for s,t in members[b])
+                       for a in members for b in members if a < b)
     if type(rule) is RoomFillLevels:
         # Every selected cell requires all same-room cells at its height or
         # lower, without relying on the encoder's row representatives/chain.
