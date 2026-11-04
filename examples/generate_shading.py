@@ -29,7 +29,7 @@ from puzzle_defs import (
     WhiteIslandAreas, WhiteAreaClues, WhiteEndpointMarkers, AdjacentBlackRuns,
     AdjacentBlackCounts,
     ColorDegreeRange, ColorEndpointCount,
-    AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor,
+    AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, RoomFillLevels,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -243,6 +243,9 @@ def _rule_text(rule: ShadingRule) -> str:
         color = "black" if rule.black else "white"
         empty = "at least one is required" if rule.nonempty else "absence is allowed"
         return f"All {color} cells connect through edges or corners (eight neighbors); {empty}. Other rules still use their own adjacency definitions."
+    if type(rule) is RoomFillLevels:
+        color = "black" if rule.black else "white"
+        return f"Each fixed room fills bottom-up in whole horizontal levels of {color}; empty/full rooms are allowed. Row/column clues still count black cells."
     if type(rule) is UniformRooms:
         return "Every fixed room is entirely black or entirely white; either color is allowed."
     if type(rule) is AcyclicColor:

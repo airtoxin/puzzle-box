@@ -1,0 +1,9 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 3,
+  "cols": 3,
+  "rules": [
+    {"type": "room-fill-levels", "rooms": [[0,1,0],[0,1,0],[0,0,0]], "black": true}
+  ],
+  "clue_kinds": ["row-count", "column-count"]
+}

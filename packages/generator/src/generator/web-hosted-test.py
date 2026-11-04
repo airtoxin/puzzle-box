@@ -81,7 +81,7 @@ def test_per_instance_lock_is_shared_by_generate_and_check_and_released_on_timeo
     assert call("generate")[1]["status"] == "timeout" and not hosted.JOB_LOCK.locked()
 
 
-@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border", "island-areas", "neighbor-counts", "cell-path", "component-sum", "room-forest", "corner-connected", "white-area-clues", "white-endpoints", "numbered-endpoints", "black-runs"])
+@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border", "island-areas", "neighbor-counts", "cell-path", "component-sum", "room-forest", "corner-connected", "white-area-clues", "white-endpoints", "numbered-endpoints", "black-runs", "room-fill-levels"])
 def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, rule_group):
     output = tmp_path / "artifact"
     payload = prepare.export(output)
@@ -195,6 +195,10 @@ print('artifact generation passed')
         data["rules"] = [{"id": "uniform-rooms", "parameters": {"rooms": [[0,0,1],[0,1,1]]}},
                          {"id": "acyclic-color", "parameters": {"black": False}},
                          {"id": "connected-white", "parameters": {"nonempty": True}}]
+    elif rule_group == "room-fill-levels":
+        data["rows"], data["cols"] = 3,3
+        data["rules"] = [{"id":"room-fill-levels","parameters":{"rooms":[[0,1,0],[0,1,0],[0,0,0]],"black":True}}]
+        data["clue_kinds"] = ["row-count","column-count"]
     elif rule_group == "component-sum":
         data["rules"] = [{"id": "adjacent-black-component-sum", "parameters": {"component_counts": [[5,None,None],[None,None,None]]}}]
     result = subprocess.run([sys.executable, "-c", script], cwd=output, capture_output=True, text=True,

@@ -23,6 +23,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 白の端点の場所を丸で指定する | [ぬりみさきの端点](white-endpoint-markers.md) |
 | 端点と可視数で数字付きの丸を構成する | [数字付きぬりみさきの組合せ](numbered-white-endpoints.md) |
 | 部屋の単色と同色の輪なしを組み合わせる | [部屋の単色と森](room-uniform-forest.md) |
+| 部屋を下から水平に満たし、行列の黒数を付ける | [Aquarium 型の水位](room-fill-levels.md) |
 | 長方形成分などを辺・角でつなぐ | [8近傍の連結](corner-connected-color.md) |
 | 同色の連続する長さを制限する | [連続長の上限](run-length.md) |
 | 黒・白の各連結成分を同じサイズにする | [固定成分サイズ](component-size.md) |
