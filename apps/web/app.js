@@ -159,6 +159,7 @@ function renderBoard(reveal = false) {
   }
   const table = node('table'); table.setAttribute('aria-label', artifact ? '生成した問題' : '盤面プレビュー');
   if (channels.has('rooms')) table.classList.add('room-board');
+  if (channels.has('endpoint-markers')) table.classList.add('endpoint-marker-board');
   if (channels.has('neighbor-counts') && ['numbers','sight-counts','island-areas'].some(c => channels.has(c))) table.classList.add('multi-numeric-board');
   if (channels.has('component-counts') && ['numbers','sight-counts','island-areas','neighbor-counts'].some(c => channels.has(c))) table.classList.add('dense-numeric-board');
   const values = artifact?.clues || [];

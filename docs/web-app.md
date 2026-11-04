@@ -1,6 +1,6 @@
 # ルールの UI 要求から構成する Web アプリ
 
-このアプリは、[黒白セルの組み込み32ルール](composable-shading.md)から最大8種類（9セル以下）、スリザーリンク（4セル以下）、黒白とセル中心ループの固定3条件（9セル以下）から問題を生成するローカルの実験です。
+このアプリは、[黒白セルの組み込み33ルール](composable-shading.md)から最大8種類（9セル以下）、スリザーリンク（4セル以下）、黒白とセル中心ループの固定3条件（9セル以下）から問題を生成するローカルの実験です。
 ルール定義が宣言するパラメータ・盤面チャンネルをサーバーで統合し、ブラウザがその計画から描画します。
 任意の Python ルールや異なる盤面型が、そのまま使える仕組みではありません。
 Vercelで利用する場合は、ローカルHTTPサーバーとは別の[配信手順と計算制限](deploy-vercel.md)に従います。
@@ -70,7 +70,7 @@ uv run --no-sync python examples/web_server.py
 | 宣言 | 内容と責任 |
 | --- | --- |
 | `RuleUi` | 固定 ID、表示名、説明、パラメータ、必要な UI、選択必須かどうか。説明は制約の証明には使わない |
-| `UiParameter` | 名前、表示名、整数／真偽値／部屋配置（`region-map`）／数格子（`number-grid`: 固定数字・可視数・島の面積）／数字なしを表せる数格子（`clue-grid`: 0と数字なしを区別）、初期値、整数の上下限。上限 `area` はセル数、`edges` は格子辺数に解決 |
+| `UiParameter` | 名前、表示名、整数／真偽値／部屋配置（`region-map`）／数格子（`number-grid`: 固定数字・可視数・島の面積）／数字なしを表せる数格子（`clue-grid`: 0と数字なしを区別）／0か1のマーカー格子（`marker-grid`）、初期値、整数の上下限。上限 `area` はセル数、`edges` は格子辺数に解決 |
 | `UiRequirements` | トポロジー、名前付きチャンネル、UIのセル数上限、行・列の下限（既定1） |
 | `UiChannel` | 共有チャンネル名と型。黒白の `answer/binary-cells`、ループの `answer/binary-edges` など |
 | `ClueUi` | ヒント候補の ID と表示名、必要な表示チャンネル |
@@ -93,6 +93,7 @@ uv run --no-sync python examples/web_server.py
 [黒成分の面積合計](black-component-sum.md)は `component_counts/clue-grid` と `component-counts/cell-component-counts` です。
 「塊0」等の丸数字で、接する同一成分を1回だけ数えます。0は白い数字マス、`null` は丸なしです。数字のない白丸は未対応です。
 ブラウザは数字についても送信した値との完全一致を検査します。数字・部屋の共有欄は必要なルールを選択したときに表示します。
+[白の端点の丸](white-endpoint-markers.md)は `markers/marker-grid` と `endpoint-markers/cell-endpoint-markers` を要求します。0は丸なし、1は白の端点の丸で、数字ヒントではありません。大きな丸で表示し、白として固定します。
 同じルールの重複選択はこの Web API では拒否します。Python DSL の複数出現の仕様は変えません。
 
 要求の統合は、同一トポロジー、同名チャンネルの型一致、チャンネルの和集合、セル数上限の最小値、行・列下限の最大値で行います。
