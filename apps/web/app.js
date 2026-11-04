@@ -3,6 +3,40 @@ const form = $('recipe-form');
 let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, timer;
 const selected = new Map();
 const hints = new Map();
+// Capabilities of these renderers, independent of what a newer server declares.
+const renderers = {
+  shading: {topology: 'rectangular-cells', maxCells: 9, minSide: 1, required: ['answer'],
+    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts'}},
+  slitherlink: {topology: 'rectangular-cells', maxCells: 4, minSide: 1, required: ['answer'],
+    channels: {answer: 'binary-edges', 'cell-counts': 'cell-edge-counts', 'edge-givens': 'edge-givens'}},
+  coupled: {topology: 'rectangular-cell-centers', maxCells: 9, minSide: 2, required: ['answer-cells', 'answer-edges'],
+    channels: {'answer-cells': 'binary-cells', 'answer-edges': 'binary-edges', givens: 'cell-givens', 'edge-givens': 'edge-givens'}},
+};
+class UnsupportedUiError extends Error {}
+function assertRenderablePlan(candidate, request) {
+  const renderer = Object.hasOwn(renderers, request.family) && renderers[request.family];
+  const requirements = candidate?.requirements;
+  if (!renderer || candidate?.format !== 'puzzle-box/web-plan-v2' || candidate.family !== request.family
+      || candidate.rows !== request.rows || candidate.cols !== request.cols
+      || !requirements || requirements.topology !== renderer.topology
+      || !Array.isArray(requirements.channels)
+      || ![requirements.max_cells, requirements.min_rows, requirements.min_cols].every(n => Number.isInteger(n) && n > 0)
+      || ![candidate.rows, candidate.cols].every(n => Number.isInteger(n) && n >= renderer.minSide)
+      || candidate.rows < requirements.min_rows || candidate.cols < requirements.min_cols
+      || candidate.rows * candidate.cols > Math.min(requirements.max_cells, renderer.maxCells)) throw new UnsupportedUiError();
+  const seen = new Set();
+  for (const channel of requirements.channels) {
+    if (!channel || typeof channel.name !== 'string' || typeof channel.kind !== 'string'
+        || !Object.hasOwn(renderer.channels, channel.name) || renderer.channels[channel.name] !== channel.kind
+        || seen.has(channel.name)) throw new UnsupportedUiError();
+    seen.add(channel.name);
+  }
+  if (renderer.required.some(name => !seen.has(name))) throw new UnsupportedUiError();
+}
+function rejectUnsupportedUi() {
+  plan = undefined; clearArtifact(); $('board').replaceChildren(); $('generate').disabled = true;
+  $('status').textContent = 'このUI定義には対応していません。画面を更新するか、対応済みの設定を選び直してください。';
+}
 const messages = {
   unsatisfiable: 'この組合せを満たす盤面はありません。ルールや設定を変更してください。',
   insufficient_hints: '選んだヒントだけでは、どの完成盤面も一意に決まりません。セルや辺の固定ヒントなどを追加してください。',
@@ -51,19 +85,22 @@ async function refresh() {
     $('status').textContent = '入力値を確認してください。'; $('board').replaceChildren(); return;
   }
   try {
-    const result = await post('/api/plan', readRequest());
+    const request = readRequest(), result = await post('/api/plan', request);
     if (current !== revision) return;
     if (result.status !== 'ok') {
       $('status').textContent = `設定を組み合わせられません。${result.message || ''}`;
       $('board').replaceChildren(); return;
     }
-    plan = result.plan;
+    assertRenderablePlan(result.plan, request); plan = result.plan;
     $('shape').textContent = `${plan.rows} × ${plan.cols}`;
     $('plan-note').textContent = isCoupled() ? '線はマスの中心同士を結びます。黒白と辺は別々に入力し、両方の整合を確認します。' : '選択したルールとヒントが要求する盤面を表示しています。UIの適合は、問題の成立を保証しません。';
     $('status').textContent = '生成前のプレビューです。';
     renderBoard(); $('generate').disabled = false;
-  } catch {
-    if (current === revision) $('status').textContent = 'ローカルサーバーに接続できません。起動状態を確認してください。';
+  } catch (error) {
+    if (current === revision) {
+      if (error instanceof UnsupportedUiError) rejectUnsupportedUi();
+      else $('status').textContent = 'ローカルサーバーに接続できません。起動状態を確認してください。';
+    }
   }
 }
 function renderBoard(reveal = false) {
@@ -231,8 +268,9 @@ form.addEventListener('submit', async event => {
   ++revision; clearArtifact(); renderBoard(); form.inert = true; $('generate').disabled = true;
   $('status').textContent = '生成・唯一解検証中…';
   try {
-    const result = await post('/api/generate', readRequest());
+    const request = readRequest(), result = await post('/api/generate', request);
     if (result.status === 'ok') {
+      assertRenderablePlan(result.plan, request);
       artifact = result; plan = result.plan; fixed = new Set();
       const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
       const area = plan.rows * plan.cols;
@@ -250,8 +288,11 @@ form.addEventListener('submit', async event => {
       renderBoard(); $('actions').hidden = false;
       $('status').textContent = `生成しました。唯一解・ヒント既約性を検証済み。\n${result.clues.length}個のヒント / ${result.evidence.enumerated_boards}盤面を独立列挙して照合。`;
     } else $('status').textContent = messages[result.status] || `設定を確認してください。${result.message || ''}`;
-  } catch { $('status').textContent = '通信が途切れました。生成の成否は未確認です。予算内でサーバーの処理が終了するまでお待ちください。'; }
-  finally { form.inert = false; $('generate').disabled = false; }
+  } catch (error) {
+    if (error instanceof UnsupportedUiError) rejectUnsupportedUi();
+    else $('status').textContent = '通信が途切れました。生成の成否は未確認です。予算内でサーバーの処理が終了するまでお待ちください。';
+  }
+  finally { form.inert = false; $('generate').disabled = !plan; }
 });
 $('check').addEventListener('click', async () => {
   if (!artifact) return;
