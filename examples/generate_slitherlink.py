@@ -12,6 +12,7 @@ from generator import generate
 from puzzle import Cell, Edge, Vertex, unique
 from puzzle_defs import CellEdgeCountClue, EdgeStateClue, SlitherlinkRecipe
 from puzzle_defs.puzzles.slitherlink_recipe import LOOP_CLUE_KINDS, LoopClue
+from edge_answers import edge_template, parse_edge_answer
 
 FORMAT = "puzzle-box/slitherlink-v1"
 
@@ -81,25 +82,9 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     return {"valid": True, "unique": True, "irreducible": True, "clue_count": len(clues)}
 
 
-def _answer_edge_rows(rows: int, cols: int) -> list[list[Edge]]:
-    """Horizontal and vertical edge rows in the displayed top-to-bottom order."""
-    result = []
-    for r in range(rows + 1):
-        result.append([Edge(Vertex(r, c), Vertex(r, c + 1)) for c in range(cols)])
-        if r < rows:
-            result.append([Edge(Vertex(r, c), Vertex(r + 1, c)) for c in range(cols + 1)])
-    return result
-
-
 def _parse_answer(text: str, rows: int, cols: int) -> set[Edge]:
-    parts = ["".join(row.split()) for row in text.strip().split("/")]
-    edge_rows = _answer_edge_rows(rows, cols)
-    if len(parts) != len(edge_rows) or any(len(part) != len(edges) for part, edges in zip(parts, edge_rows)):
-        raise ValueError(f"Answer needs {2 * rows + 1} edge rows separated by '/', "
-                         f"alternating {cols} horizontal and {cols + 1} vertical edges")
-    if any(value not in "01" for part in parts for value in part):
-        raise ValueError("Fill every edge with 1 (used) or 0 (unused); '?' is not a complete answer")
-    return {edge for part, edges in zip(parts, edge_rows) for value, edge in zip(part, edges) if value == "1"}
+    # Slitherlink vertices are cell corners, so each dimension has one extra point.
+    return parse_edge_answer(text, rows + 1, cols + 1)
 
 
 def check_answer(data: dict[str, Any], text: str) -> bool:
@@ -142,8 +127,7 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
     lines.extend(["", "Numbers count used sides of a cell; . = no number clue.",
                   "--- / | = used edge; x = unused edge clue; ? = unknown edge; + = vertex."])
     if not reveal:
-        template = "/".join("".join(str(edge_states.get(e, "?")) for e in row)
-                            for row in _answer_edge_rows(recipe.rows, recipe.cols))
+        template = edge_template(recipe.rows + 1, recipe.cols + 1, edge_states)
         lines.extend(["Answer template: " + template,
                       "Edge rows run top to bottom, alternating horizontal and vertical; omit cell numbers.",
                       'Replace every ? with 1 (used) or 0 (unused), then use check FILE --answer "ROWS".'])

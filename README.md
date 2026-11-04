@@ -160,3 +160,4 @@ uv run --no-sync python examples/generate_yajilin.py verify examples/yajilin-sam
 
 [異種合成の例](docs/yajilin-composition.md)に、生成方法、数字を消しても残す矢印マス、
 黒白が同じでも2種類のループになる反例、合成の限界をまとめています。
+生成した問題はヒントだけを表示し、[黒マスと線を入力して正誤確認](docs/play-yajilin.md)できます。

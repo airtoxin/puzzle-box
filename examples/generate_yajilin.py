@@ -1,4 +1,4 @@
-"""Generate and inspect a small coupled black-cell / loop puzzle."""
+"""Generate, display, check and verify a coupled black-cell / loop puzzle."""
 
 import argparse
 import json
@@ -13,6 +13,7 @@ from puzzle import Cell, Edge, Vertex, unique
 from puzzle_defs import ArrowCountClue, ArrowSite, BlackCellClue, EdgeStateClue, YajilinAnswer, YajilinRecipe
 from puzzle_defs.puzzles.yajilin_recipe import YAJILIN_CLUE_KINDS, YajilinClue
 from generate_slitherlink import edge_record, read_edge
+from edge_answers import edge_rows, edge_template, parse_edge_answer
 
 FORMAT = "puzzle-box/yajilin-v1"
 ARROWS = {"up": "^", "down": "v", "left": "<", "right": ">"}
@@ -127,6 +128,28 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     return {"valid": True, "unique": True, "irreducible": True, "clue_count": len(clues)}
 
 
+def _parse_cells(text: str, recipe: YajilinRecipe) -> frozenset[Cell]:
+    parts = ["".join(row.split()) for row in text.strip().split("/")]
+    if len(parts) != recipe.rows or any(len(row) != recipe.cols for row in parts):
+        raise ValueError(f"Cells need {recipe.rows} rows of {recipe.cols} cells, separated by '/'")
+    if any(value not in ".#@" for row in parts for value in row):
+        raise ValueError("Fill every ordinary cell with '.' (white) or '#' (black); use '@' for fixed arrows")
+    blocked = {s.cell for s in recipe.arrow_sites}
+    if any((value == "@") != (Cell(r, c) in blocked)
+           for r, row in enumerate(parts) for c, value in enumerate(row)):
+        raise ValueError("Use '@' exactly at the fixed arrow cells")
+    return frozenset(Cell(r, c) for r, row in enumerate(parts) for c, value in enumerate(row) if value == "#")
+
+
+def check_answer(data: dict[str, Any], cells: str, edges: str) -> bool:
+    recipe, _, answer = read_record(data)
+    candidate = YajilinAnswer(_parse_cells(cells, recipe),
+                             frozenset(parse_edge_answer(edges, recipe.rows, recipe.cols)))
+    # Validate the joint saved answer, not just its black-cell projection.
+    verify(data)
+    return candidate == answer
+
+
 def show(data: dict[str, Any], *, reveal: bool = False) -> str:
     verify(data)
     recipe, clues, answer = read_record(data)
@@ -139,7 +162,7 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
         if cell in sites:
             return ARROWS[sites[cell].direction] + str(counts.get(cell, "?"))
         state = int(cell in answer.black_cells) if reveal else black.get(cell)
-        return "#" if state == 1 else "o" if state == 0 else "."
+        return "#" if state == 1 else "." if state == 0 else "[?]"
 
     def edge_text(a: Vertex, b: Vertex, horizontal: bool) -> str:
         edge = Edge(a, b)
@@ -162,9 +185,25 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
         if r < recipe.rows - 1:
             lines.append("   ".join(edge_text(Vertex(r, c), Vertex(r+1, c), False)
                                     for c in range(recipe.cols)).rstrip())
-    lines.extend(["", "# = black; o = on loop; . = unknown cell. Arrows with ? remain blocked (no count).",
+    lines.extend(["", "# = black; . = on loop (white); [?] = unknown cell. Arrows with ? remain blocked (no count).",
                   "--- / | = used edge; x = unused edge clue; ? between cells = unknown edge.",
                   "Edges join cell centers, not cell corners. Coordinates in JSON are zero-based."])
+    if not reveal:
+        cell_rows = ["".join("@" if Cell(r, c) in sites else
+                             "#" if black.get(Cell(r, c)) == 1 else
+                             "." if black.get(Cell(r, c)) == 0 else "?" for c in range(recipe.cols))
+                     for r in range(recipe.rows)]
+        # Arrow-adjacent edges are fixed by the board structure, even without a clue.
+        edge_states = dict(edges)
+        for row in edge_rows(recipe.rows, recipe.cols):
+            for edge in row:
+                if any(Cell(*v) in sites for v in edge):
+                    edge_states[edge] = 0
+        lines.extend(["Cells template: " + "/".join(cell_rows),
+                      "Edges template: " + edge_template(recipe.rows, recipe.cols, edge_states),
+                      "Cells: replace ? with . or #; keep @ at fixed arrows.",
+                      "Edges: replace ? with 1 (used) or 0 (unused); horizontal/vertical rows alternate top to bottom.",
+                      'Use check FILE --cells "CELL_ROWS" --edges "EDGE_ROWS"; both completed inputs are required.'])
     return "\n".join(lines)
 
 
@@ -187,10 +226,19 @@ def main() -> int:
     display = commands.add_parser("show")
     display.add_argument("file", type=Path)
     display.add_argument("--solution", action="store_true")
+    check = commands.add_parser("check", help="Check complete black cells and loop edges without revealing the answer")
+    check.add_argument("file", type=Path)
+    check.add_argument("--cells", required=True, help="Cell rows separated by '/', using #, . and @ for fixed arrows")
+    check.add_argument("--edges", required=True, help="Alternating horizontal/vertical edge rows, using 1 or 0")
     args = parser.parse_args()
     try:
-        if args.command in ("verify", "show"):
+        if args.command in ("verify", "show", "check"):
             data = json.loads(args.file.read_text(encoding="utf-8"))
+            if args.command == "check":
+                correct = check_answer(data, args.cells, args.edges)
+                print("Correct. All rules and clues are satisfied." if correct else
+                      "Not correct. Check the rules and given clues.")
+                return 0 if correct else 1
             print(json.dumps(verify(data), sort_keys=True) if args.command == "verify"
                   else show(data, reveal=args.solution))
             return 0
