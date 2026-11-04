@@ -24,7 +24,7 @@ from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs import WhiteVisibilityCounts
 from puzzle_defs import ComponentsTouchBorder
-from puzzle_defs import WhiteIslandAreas
+from puzzle_defs import WhiteIslandAreas, WhiteAreaClues
 from puzzle_defs import AdjacentBlackCounts
 from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
@@ -106,14 +106,14 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
                 if (r,c) in black or adjacent != count:
                     return False
         return True
-    if type(rule) is WhiteIslandAreas:
+    if type(rule) is WhiteIslandAreas or type(rule) is WhiteAreaClues:
         numbers = {(r,c): rule.areas[r][c] for r in range(rows) for c in range(cols) if rule.areas[r][c] > 0}
         if black.intersection(numbers):
             return False
         white = {(r,c) for r in range(rows) for c in range(cols)} - black
         for group in _components(white):
             labels = [numbers[c] for c in group if c in numbers]
-            if len(labels) != 1 or labels[0] != len(group):
+            if len(labels) > 1 or labels and labels[0] != len(group) or not labels and type(rule) is WhiteIslandAreas:
                 return False
         return True
     if type(rule) is ComponentsTouchBorder:

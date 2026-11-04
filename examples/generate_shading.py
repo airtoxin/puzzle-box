@@ -26,7 +26,7 @@ from puzzle_defs import (
     NoTouchingEqualTetrominoes,
     WhiteVisibilityCounts,
     ComponentsTouchBorder,
-    WhiteIslandAreas,
+    WhiteIslandAreas, WhiteAreaClues,
     AdjacentBlackCounts,
     ColorDegreeRange, ColorEndpointCount,
     AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor,
@@ -217,6 +217,8 @@ def _rule_text(rule: ShadingRule) -> str:
         return "No row or column contains equal fixed numbers on two white cells."
     if type(rule) is WhiteVisibilityCounts:
         return "Positive sight counts require white cells and count visible white cells in four straight directions, including themselves once, stopping before black cells or the border; zero is no requirement."
+    if type(rule) is WhiteAreaClues:
+        return "Numbered cells are white. Each white component has zero or one number; if present it equals the area. Unnumbered components are allowed; zero means no number."
     if type(rule) is WhiteIslandAreas:
         return "Every white island contains exactly one positive area number and that many cells; numbered cells are white, and zero means no number."
     if type(rule) is AdjacentBlackCounts:
@@ -328,7 +330,7 @@ def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[in
         lines.extend(["", "Fixed white sight counts (. = no requirement; origin is counted once):"])
         lines.extend(" ".join(str(n) if n else "." for n in row) for row in sight_counts)
     if island_areas is not None:
-        lines.extend(["", "Fixed white island areas (. = no number; exactly one number per island):"])
+        lines.extend(["", "Fixed white island areas (. = no number):"])
         lines.extend(" ".join(str(n) if n else "." for n in row) for row in island_areas)
     if neighbor_counts is not None:
         lines.extend(["", "Fixed adjacent black counts (. = no clue; 0 is a clue):"])
