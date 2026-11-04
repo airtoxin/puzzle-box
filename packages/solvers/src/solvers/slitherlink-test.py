@@ -46,7 +46,7 @@ N = None
 
 
 def test_solve_2x2():
-    grid = [
+    grid: list[list[int | None]] = [
         [2, 2],
         [2, 2],
     ]
@@ -56,7 +56,7 @@ def test_solve_2x2():
 
 
 def test_solve_3x3():
-    grid = [
+    grid: list[list[int | None]] = [
         [2, 1, 2],
         [1, 0, 1],
         [2, 1, 2],
@@ -101,7 +101,7 @@ def test_solve_5x5():
 
 def test_unsolvable():
     """Contradictory clues — no valid loop exists."""
-    grid = [
+    grid: list[list[int | None]] = [
         [4, 4],
         [4, 4],
     ]
@@ -110,7 +110,7 @@ def test_unsolvable():
 
 
 def test_all_zeros():
-    grid = [
+    grid: list[list[int | None]] = [
         [0, 0],
         [0, 0],
     ]

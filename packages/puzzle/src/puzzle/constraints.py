@@ -34,7 +34,7 @@ class SingleCycleConstraint:
 @dataclass
 class ConnectedConstraint:
     cells: list[Cell]
-    indicators: dict[Cell, BoolExpr] = field(repr=False)
+    indicators: dict[Cell, BoolExpr | Var] = field(repr=False)
 
 
 def all_different(vars: Iterable[Var]) -> AllDifferentConstraint:
@@ -42,10 +42,12 @@ def all_different(vars: Iterable[Var]) -> AllDifferentConstraint:
 
 
 def unique() -> UniqueConstraint:
+    """Require one assignment of the Puzzle's selected solution variables."""
     return UniqueConstraint()
 
 
 def one_of(*constraints: LinearConstraint | BoolExpr) -> OneOfConstraint:
+    """Require exactly one condition to hold (including overlapping conditions)."""
     return OneOfConstraint(list(constraints))
 
 
@@ -54,7 +56,7 @@ def single_cycle(edge_vars: VarMap, grid: SquareGrid) -> SingleCycleConstraint:
 
 
 def connected(
-    cells: Sequence[Cell], predicate: Callable[[Cell], BoolExpr]
+    cells: Sequence[Cell], predicate: Callable[[Cell], BoolExpr | Var]
 ) -> ConnectedConstraint:
     cell_list = list(cells)
     indicators = {c: predicate(c) for c in cell_list}
@@ -93,7 +95,7 @@ def at_most_one(exprs: Iterable[Expr]) -> LinearConstraint:
 class ShapeAcrossConstraint:
     """Constraint on piece shapes across a boundary edge."""
 
-    forbidden_pairs: list[tuple[Hashable, Hashable]]
+    forbidden_pairs: Sequence[tuple[Hashable, Hashable]]
     use_vars: VarMap
 
 
@@ -101,7 +103,7 @@ class ShapeAcrossConstraint:
 class NoBoundaryCrossConstraint:
     """At each interior vertex, boundaries must not form a cross (+)."""
 
-    vertex_bridges: list[list[Hashable]]
+    vertex_bridges: Sequence[Sequence[Hashable]]
     use_vars: VarMap
 
 
