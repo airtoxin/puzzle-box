@@ -92,9 +92,16 @@ def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environ
         name, version = line.split("=="); assert versions[name] == version
     with pytest.raises(FileExistsError): prepare.export(output)
     assert (output/"api/index.py").read_bytes() == payload["api/index.py"]
+    # Simulate a platform-provided dependency directory added only to the parent
+    # interpreter. The child must inherit it, as it does on Vercel's runtime.
+    vendor = tmp_path / "platform-libs"; vendor.mkdir()
+    (vendor/"_deployment_dependency_probe.py").write_text("READY = True\n")
+    worker_path = output / "examples/web_worker.py"
+    worker_path.write_text("import _deployment_dependency_probe\n" + worker_path.read_text(encoding="utf-8"), encoding="utf-8")
     # Fresh process: imports the artifact, not the developer's editable workspace.
     script = """
-import importlib.util, io, json, os, pathlib
+import importlib.util, io, json, os, pathlib, sys
+sys.path.insert(0, os.environ['PUZZLE_TEST_VENDOR'])
 spec = importlib.util.spec_from_file_location('entry', 'api/index.py')
 entry = importlib.util.module_from_spec(spec); spec.loader.exec_module(entry)
 import puzzle
@@ -110,5 +117,6 @@ assert reply == ['200 OK'] and json.loads(body)['status'] == 'ok', body
 print('artifact generation passed')
 """
     result = subprocess.run([sys.executable, "-c", script], cwd=output, capture_output=True, text=True,
-                            env={**os.environ, "PYTHONPATH": "", "PUZZLE_TEST_REQUEST": json.dumps(request())}, timeout=20)
+                            env={**os.environ, "PYTHONPATH": "", "PUZZLE_TEST_REQUEST": json.dumps(request()),
+                                 "PUZZLE_TEST_VENDOR": str(vendor)}, timeout=20)
     assert result.returncode == 0, result.stdout + result.stderr
