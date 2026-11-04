@@ -37,8 +37,7 @@ class SlitherlinkRecipe:
         return SlitherlinkPuzzle.build_from_clues(clues, self.rows, self.cols)
 ```
 
-Slitherlink の非空ループを一意性判定するには、別PRの
-[回答変数に基づく一意性修正 (#2)](https://github.com/airtoxin/puzzle-box/pull/2)が必要です。
+Slitherlink の一意性は、ループの向きを表す補助変数を除き、[使用する辺に射影](solver-semantics.md)して判定します。
 全ヒントを抽出しても必ず一意になるとは限らないため、生成の失敗も正常な結果として扱います。
 空のループを禁止したい場合は、レシピが毎回作る基礎モデルに非空制約を入れてください。
 
@@ -56,7 +55,7 @@ Slitherlink の非空ループを一意性判定するには、別PRの
 ## 失敗と重複
 
 最初のヒント集合が解なし・複数解・一意性未証明の場合、`reduce_clues()` は
-`ValueError` を返します。空リストも検証します。
+`InitialCluesNotUniqueError`（`ValueError` のサブクラス）を送出します。空リストも検証します。
 `generate()` は基礎モデルが解けない場合 `RuntimeError`、抽出ヒントが一意でない場合
 `ValueError` を返します。これは不正な問題を成功として返さないための契約です。
 
