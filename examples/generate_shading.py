@@ -23,6 +23,60 @@ FORMAT = "puzzle-box/shading-v1"
 MIXED_FORMAT = "puzzle-box/shading-v2"
 
 
+def _check_clue_kinds(recipe: ShadingRecipe, clues: list[Clue]) -> None:
+    for clue in clues:
+        kind = "row-count" if isinstance(clue, RowCountClue) else (
+            "column-count" if isinstance(clue, ColumnCountClue) else "cell")
+        if kind not in recipe.clue_kinds:
+            raise ValueError("Stored clue type is not enabled by clue_kinds")
+
+
+def _check_irreducible(recipe: ShadingRecipe, clues: list[Clue]) -> None:
+    for idx in range(len(clues)):
+        trial = recipe.build_from_clues(clues[:idx] + clues[idx + 1:])
+        trial.add(unique())
+        if trial.solve() is not None:
+            raise ValueError("Stored clues are not irreducible: a clue can still be removed")
+
+
+def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
+                  selection: str = "solver") -> dict[str, Any]:
+    """Serialize a unique, irreducible puzzle accepted by the built-in reader."""
+    if type(recipe) is not ShadingRecipe:
+        raise ValueError("This format requires an exact ShadingRecipe; composed recipes and subclasses need their own codec")
+    check_demo_size(recipe)
+    if selection not in ("solver", "finite"):
+        raise ValueError("Unknown completion selection")
+    rules = [rule_record(rule) for rule in recipe.rules]
+    _check_clue_kinds(recipe, clues)
+    legacy = recipe.clue_kinds == ("cell",)
+    encoded_clues = [clue_record(clue, legacy=legacy) for clue in clues]
+    # Validate the exact saved representation before solving. Python considers
+    # bool/float coordinates equal to ints, but the file format rejects them.
+    clues = [read_clue(clue, legacy=legacy) for clue in encoded_clues]
+    puzzle = recipe.build_from_clues(clues)
+    puzzle.add(unique())
+    solution = puzzle.solve()
+    if solution is None:
+        raise ValueError("Generated clues did not determine a unique answer")
+    _check_irreducible(recipe, clues)
+    record = {
+        "format": FORMAT if legacy else MIXED_FORMAT,
+        "rows": recipe.rows, "cols": recipe.cols,
+        "rules": rules, "seed": seed,
+        "clues": encoded_clues,
+        "solution": puzzle.result(solution),
+        "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
+                        "seeded_search_workers": 1},
+    }
+    if not legacy:
+        record["clue_kinds"] = list(recipe.clue_kinds)
+    if selection == "finite":
+        from finite_shading import SELECTION
+        record["environment"]["completion_selection"] = SELECTION
+    return record
+
+
 def clue_record(clue: Clue, *, legacy: bool = False) -> dict[str, Any] | list[int]:
     if isinstance(clue, tuple):
         cell, value = clue
@@ -62,11 +116,7 @@ def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[
                            ("cell",) if legacy else tuple(data["clue_kinds"]))
     check_demo_size(recipe)
     clues = [read_clue(clue, legacy=legacy) for clue in data["clues"]]
-    for clue in clues:
-        kind = "row-count" if isinstance(clue, RowCountClue) else (
-            "column-count" if isinstance(clue, ColumnCountClue) else "cell")
-        if kind not in recipe.clue_kinds:
-            raise ValueError("Stored clue type is not enabled by clue_kinds")
+    _check_clue_kinds(recipe, clues)
     answer = data["solution"]
     if (not isinstance(answer, list) or len(answer) != recipe.rows
             or any(not isinstance(row, list) or len(row) != recipe.cols
@@ -84,11 +134,7 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Stored clues are not uniquely solvable")
     if puzzle.result(solution) != answer:
         raise ValueError("Stored solution does not match the uniquely determined answer")
-    for idx in range(len(clues)):
-        trial = recipe.build_from_clues(clues[:idx] + clues[idx + 1:])
-        trial.add(unique())
-        if trial.solve() is not None:
-            raise ValueError("Stored clues are not irreducible: a clue can still be removed")
+    _check_irreducible(recipe, clues)
     return {"valid": True, "unique": True, "irreducible": True, "clue_count": len(clues)}
 
 
@@ -238,26 +284,7 @@ def main() -> int:
                 raise ValueError(f"{exc}. For ambiguous count clues, include cell in {hint} "
                                  "to retain disambiguating clues") from exc
             raise
-        puzzle = recipe.build_from_clues(clues)
-        puzzle.add(unique())
-        solution = puzzle.solve()
-        if solution is None:
-            raise ValueError("Generated clues did not determine a unique answer")
-        legacy = recipe.clue_kinds == ("cell",)
-        record = {
-            "format": FORMAT if legacy else MIXED_FORMAT,
-            "rows": recipe.rows, "cols": recipe.cols,
-            "rules": [rule_record(rule) for rule in recipe.rules], "seed": args.seed,
-            "clues": [clue_record(clue, legacy=legacy) for clue in clues],
-            "solution": puzzle.result(solution),
-            "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
-                            "seeded_search_workers": 1},
-        }
-        if not legacy:
-            record["clue_kinds"] = list(recipe.clue_kinds)
-        if args.selection == "finite":
-            from finite_shading import SELECTION
-            record["environment"]["completion_selection"] = SELECTION
+        record = puzzle_record(recipe, clues, seed=args.seed, selection=args.selection)
         encoded = json.dumps(record, indent=2, sort_keys=True) + "\n"
         if args.output is not None:
             args.output.write_text(encoded, encoding="utf-8")
