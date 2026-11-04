@@ -52,9 +52,11 @@ from puzzle_defs.puzzles.corner_connected_color import CornerConnectedColor
 from puzzle_defs.puzzles.white_endpoint_markers import WhiteEndpointMarkers
 from puzzle_defs.puzzles.numbered_white_endpoints import numbered_white_endpoints
 from puzzle_defs.puzzles.adjacent_black_runs import AdjacentBlackRuns
+from puzzle_defs.puzzles.room_fill_levels import RoomFillLevels
 
 __all__ = [
     "AdjacentBlackRuns",
+    "RoomFillLevels",
     "numbered_white_endpoints",
     "WhiteEndpointMarkers",
     "WhiteAreaClues",
