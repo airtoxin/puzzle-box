@@ -29,6 +29,7 @@ from puzzle_defs import AdjacentBlackCounts
 from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor
+from puzzle_defs import CornerConnectedColor
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -57,6 +58,18 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is CornerConnectedColor:
+        selected = black if rule.black else {(r,c) for r in range(rows) for c in range(cols)} - black
+        if not selected:
+            return not rule.nonempty
+        reached, todo = set(), [min(selected)]
+        while todo:
+            p = todo.pop()
+            if p in reached:
+                continue
+            reached.add(p)
+            todo.extend(q for q in selected - reached if max(abs(p[0]-q[0]),abs(p[1]-q[1])) == 1)
+        return reached == selected
     if type(rule) is UniformRooms:
         return all(len({bits[r*cols+c] for r in range(rows) for c in range(cols) if rule.rooms[r][c] == label}) == 1
                    for label in {n for row in rule.rooms for n in row})

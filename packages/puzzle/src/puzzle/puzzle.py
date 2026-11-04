@@ -301,6 +301,9 @@ class Puzzle:
         indicators = constraint.indicators
         n = len(cells)
         cell_set = set(cells)
+        offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        if constraint.diagonal:
+            offsets += [(-1, -1), (-1, 1), (1, -1), (1, 1)]
 
         active: dict[Cell, cp_model.IntVar] = {
             c: cast(cp_model.IntVar, indicators[c]._internal) for c in cells
@@ -318,7 +321,7 @@ class Puzzle:
         for c in cells:
             nbrs = [
                 Cell(c.row + dr, c.col + dc)
-                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]
+                for dr, dc in offsets
                 if Cell(c.row + dr, c.col + dc) in cell_set
             ]
 

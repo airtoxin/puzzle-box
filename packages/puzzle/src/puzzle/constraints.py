@@ -36,6 +36,11 @@ class SingleCycleConstraint(Symbolic):
 class ConnectedConstraint(Symbolic):
     cells: list[Cell]
     indicators: dict[Cell, BoolExpr | Var] = field(repr=False)
+    diagonal: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.diagonal) is not bool:
+            raise ValueError("diagonal must be a boolean")
 
 
 def all_different(vars: Iterable[Var]) -> AllDifferentConstraint:
@@ -57,11 +62,15 @@ def single_cycle(edge_vars: VarMap, grid: SquareGrid) -> SingleCycleConstraint:
 
 
 def connected(
-    cells: Sequence[Cell], predicate: Callable[[Cell], BoolExpr | Var]
+    cells: Sequence[Cell], predicate: Callable[[Cell], BoolExpr | Var], *, diagonal: bool = False
 ) -> ConnectedConstraint:
+    """Connect selected cells by edges, or edges and corners if diagonal=True.
+
+    Only supplied cells are available; an empty selection remains allowed.
+    """
     cell_list = list(cells)
     indicators = {c: predicate(c) for c in cell_list}
-    return ConnectedConstraint(cell_list, indicators)
+    return ConnectedConstraint(cell_list, indicators, diagonal)
 
 
 def count_eq(exprs: Iterable[BoolExpr], n: int) -> LinearConstraint:

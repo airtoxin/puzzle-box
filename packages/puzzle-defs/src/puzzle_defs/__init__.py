@@ -48,8 +48,10 @@ from puzzle_defs.puzzles.adjacent_black_counts import AdjacentBlackCounts
 from puzzle_defs.puzzles.cell_path_fragments import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs.puzzles.adjacent_black_component_sum import AdjacentBlackComponentSum
 from puzzle_defs.puzzles.room_uniform_forest import UniformRooms, AcyclicColor
+from puzzle_defs.puzzles.corner_connected_color import CornerConnectedColor
 
 __all__ = [
+    "CornerConnectedColor",
     "UniformRooms",
     "AcyclicColor",
     "AdjacentBlackComponentSum",
