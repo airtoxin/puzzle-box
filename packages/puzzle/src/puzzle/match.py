@@ -101,7 +101,7 @@ class MatchVarMap:
             if pairs:
                 match_sum = sum_expr(self._vars[p] for p in pairs)
                 constraints.append(
-                    LinearConstraint(match_sum._internal == var_map[r]._internal)
+                    match_sum == sum_expr([var_map[r]])
                 )
             else:
                 # No matches possible → var must be 0
