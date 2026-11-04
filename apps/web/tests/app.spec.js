@@ -1,5 +1,14 @@
 import {test, expect} from '@playwright/test';
 
+test('catalog controls the computation budget and hosting description', async ({page}) => {
+  const response = page.waitForResponse('**/api/catalog'); await page.goto('/');
+  const catalog = await (await response).json();
+  await expect(page.locator('#generate')).toBeEnabled();
+  await expect(page.locator('#budget')).toHaveAttribute('max', String(catalog.limits.max_budget_seconds));
+  await expect(page.locator('#hosting-label')).toContainText(catalog.hosting?.label || 'LOCAL LAB');
+  if (catalog.hosting) await expect(page.locator('#hosting-note')).toContainText(`${catalog.hosting.budget_seconds}秒`);
+});
+
 test('coupled cells and center edges require a complete joint answer', async ({page}) => {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('/'); await page.locator('#family').selectOption('coupled');

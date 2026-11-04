@@ -278,6 +278,12 @@ $('download').addEventListener('click', () => {
 try {
   const response = await fetch('/api/catalog'); catalog = await response.json();
   if (catalog.format !== 'puzzle-box/web-catalog-v1') throw new Error('Unsupported catalog');
+  $('budget').max = catalog.limits.max_budget_seconds;
+  if (Number($('budget').value) > catalog.limits.max_budget_seconds) $('budget').value = catalog.limits.max_budget_seconds;
+  if (catalog.hosting) {
+    $('hosting-label').textContent = catalog.hosting.label + ' · セルと辺';
+    $('hosting-note').textContent = `小盤面のWeb実験。計算は1回${catalog.hosting.budget_seconds}秒まで。混雑時や利用枠の上限では使えない場合があります。`;
+  }
   for (const p of catalog.profiles) {const option = node('option', p.label); option.value = p.id; $('family').append(option);}
   chooseProfile();
 } catch { $('status').textContent = 'UI定義を読み込めません。対応するローカルサーバーの起動状態を確認してください。'; }
