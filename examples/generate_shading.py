@@ -16,9 +16,11 @@ from puzzle import Cell, unique
 from puzzle_defs import (
     BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2,
     ColumnCountClue, RowCountClue, ShadingRecipe,
+    BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines, NoBlack2x2, NoThreeConsecutive,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
-from shading_recipe import RULES, check_demo_size, check_distinct_paths, load_recipe, read_rule, rule_record
+from shading_recipe import (RULES, DEFAULT_RULES, rule_choices, check_demo_size, check_distinct_paths,
+                            load_recipe, read_rule, rule_record)
 from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/shading-v1"
@@ -160,6 +162,19 @@ def _rule_text(rule: ShadingRule) -> str:
         return f"All white cells connect through edges; {empty}."
     if isinstance(rule, NoWhite2x2):
         return "Every 2x2 block contains at least one black cell."
+    if type(rule) is ConnectedBlack:
+        empty = "at least one must be black" if rule.nonempty else "zero black cells are allowed"
+        return f"All black cells connect through edges; {empty}."
+    if type(rule) is NoBlack2x2:
+        return "Every 2x2 block contains at least one white cell."
+    if type(rule) is BlackDominoes:
+        return "Every edge-connected black component has exactly two cells; zero components and diagonal contact are allowed."
+    if type(rule) is NoThreeConsecutive:
+        return "No row or column contains three consecutive cells of the same color."
+    if type(rule) is BalancedLines:
+        return "Every row and column contains equal numbers of black and white cells."
+    if type(rule) is DistinctLines:
+        return "Rows differ from other rows, and columns from other columns; a row may equal a column."
     raise ValueError("Cannot display an unknown rule")
 
 
@@ -277,14 +292,10 @@ def main() -> int:
                 check_distinct_paths(args.recipe, args.output)
             recipe = load_recipe(args.recipe)
         else:
-            choices: dict[str, ShadingRule] = {
-                "count": BlackCount(3 if args.black_count is None else args.black_count),
-                "non-touching": NonTouchingBlack(bool(args.diagonal)),
-                "connected-white": ConnectedWhite(nonempty=not args.allow_empty_white),
-                "no-white-2x2": NoWhite2x2(),
-            }
+            choices = rule_choices(count=3 if args.black_count is None else args.black_count,
+                                   diagonal=bool(args.diagonal), allow_empty_white=bool(args.allow_empty_white))
             recipe = ShadingRecipe(3 if args.rows is None else args.rows, 3 if args.cols is None else args.cols,
-                                   tuple(choices[name] for name in (args.rules or RULES)),
+                                   tuple(choices[name] for name in (args.rules or DEFAULT_RULES)),
                                    tuple(args.hints or ["cell"]))
         check_demo_size(recipe)
         try:

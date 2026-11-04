@@ -1,4 +1,4 @@
-"""Exhaustively diagnose small recipes using the four built-in shading rules."""
+"""Exhaustively diagnose small recipes using built-in shading rules."""
 
 import argparse
 from collections.abc import Iterable
@@ -12,12 +12,30 @@ import ortools
 
 from puzzle import Cell
 from puzzle_defs import (BlackCount, ColumnCountClue, ConnectedWhite, NonTouchingBlack,
-                         NoWhite2x2, RowCountClue, ShadingPuzzle, ShadingRecipe)
+                         NoWhite2x2, RowCountClue, ShadingPuzzle, ShadingRecipe,
+                         BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines,
+                         NoBlack2x2, NoThreeConsecutive)
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
+from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
 
-BUILT_INS = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2)
+BUILT_INS = BUILT_IN_RULE_TYPES
 Bits = tuple[int, ...]
+
+
+def _components(cells: set[tuple[int, int]]) -> list[set[tuple[int, int]]]:
+    remaining, groups = set(cells), []
+    while remaining:
+        group: set[tuple[int, int]] = set()
+        todo = [min(remaining)]
+        while todo:
+            r, c = todo.pop()
+            if (r, c) in remaining:
+                remaining.remove((r, c))
+                group.add((r, c))
+                todo.extend(v for v in ((r-1, c), (r+1, c), (r, c-1), (r, c+1)) if v in remaining)
+        groups.append(group)
+    return groups
 
 
 def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
@@ -28,19 +46,25 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     if type(rule) is NonTouchingBlack:
         return not any((max(abs(r-s), abs(c-t)) if rule.diagonal else abs(r-s)+abs(c-t)) == 1
                        for (r, c), (s, t) in combinations(black, 2))
-    if type(rule) is ConnectedWhite:
-        white = {(r, c) for r in range(rows) for c in range(cols)} - black
-        seen: set[tuple[int, int]] = set()
-        todo: list[tuple[int, int]] = [min(white)] if white else []
-        while todo:
-            r, c = todo.pop()
-            if (r, c) not in seen:
-                seen.add((r, c))
-                todo.extend(v for v in [(r-1, c), (r+1, c), (r, c-1), (r, c+1)] if v in white)
-        return seen == white and (bool(white) or not rule.nonempty)
+    if type(rule) is ConnectedWhite or type(rule) is ConnectedBlack:
+        cells = black if type(rule) is ConnectedBlack else {(r, c) for r in range(rows) for c in range(cols)} - black
+        return len(_components(cells)) <= 1 and (bool(cells) or not rule.nonempty)
     if type(rule) is NoWhite2x2:
         return all(any((r+dr, c+dc) in black for dr in (0, 1) for dc in (0, 1))
                    for r in range(rows-1) for c in range(cols-1))
+    if type(rule) is NoBlack2x2:
+        return all(any((r+dr, c+dc) not in black for dr in (0, 1) for dc in (0, 1))
+                   for r in range(rows-1) for c in range(cols-1))
+    if type(rule) is BlackDominoes:
+        return all(len(group) == 2 for group in _components(black))
+    row_lines = [bits[r*cols:(r+1)*cols] for r in range(rows)]
+    col_lines = [bits[c::cols] for c in range(cols)]
+    if type(rule) is NoThreeConsecutive:
+        return all(len(set(line[i:i+3])) > 1 for line in row_lines + col_lines for i in range(len(line)-2))
+    if type(rule) is BalancedLines:
+        return all(line.count(0) == line.count(1) for line in row_lines + col_lines)
+    if type(rule) is DistinctLines:
+        return len(set(row_lines)) == rows and len(set(col_lines)) == cols
     raise ValueError("Diagnostics support exact built-in rule types only, not custom rules or subclasses")
 
 
@@ -188,9 +212,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, help="Save the JSON report (includes witness answers)")
     args = parser.parse_args()
     try:
-        choices: dict[str, ShadingRule] = {"count": BlackCount(args.black_count),
-            "non-touching": NonTouchingBlack(args.diagonal),
-            "connected-white": ConnectedWhite(not args.allow_empty_white), "no-white-2x2": NoWhite2x2()}
+        choices = rule_choices(count=args.black_count, diagonal=args.diagonal, allow_empty_white=args.allow_empty_white)
         recipe = ShadingRecipe(args.rows, args.cols, tuple(choices[r] for r in args.rules), tuple(args.hints))
         report = analyze(recipe, seed_start=args.seed_start, seed_count=args.seed_count)
         encoded = json.dumps(report, indent=2, sort_keys=True) + "\n"

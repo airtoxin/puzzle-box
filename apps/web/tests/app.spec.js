@@ -1,5 +1,38 @@
 import {test, expect} from '@playwright/test';
 
+test('new shading fragments share declared controls and generate without renderer changes', async ({page}) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await expect(page.locator('#rules .rule-card')).toHaveCount(10);
+  await page.getByLabel('白マスをつなぐ', {exact: true}).uncheck();
+  await page.getByLabel('黒マス数', {exact: true}).fill('3');
+  await page.getByLabel('黒マスをつなぐ', {exact: true}).check();
+  await page.getByLabel('黒い2×2を禁止', {exact: true}).check();
+  await expect(page.getByLabel('黒マスを1つ以上にする', {exact: true})).toBeEnabled();
+  await expect(page.locator('#generate')).toBeEnabled();
+  const response = page.waitForResponse('**/api/generate'); await page.locator('#generate').click();
+  const result = await (await response).json();
+  expect(result.status).toBe('ok');
+  expect(result.record.rules.map(r => r.type)).toEqual(['count', 'connected-black', 'no-black-2x2']);
+  expect(result.evidence.unique).toBe(true); expect(result.evidence.irreducible).toBe(true);
+  await expect(page.locator('.cell')).toHaveCount(6);
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) {
+    const cell = page.getByRole('button', {name: new RegExp(`^${r+1}行${c+1}列:`)});
+    if (await cell.isEnabled())
+      while (await cell.getAttribute('data-value') !== String(result.record.solution[r][c])) await cell.click();
+  }
+  const checked = page.waitForResponse('**/api/check'); await page.locator('#check').click();
+  expect(await (await checked).json()).toEqual({status: 'ok', correct: true});
+  await page.getByLabel('各行・列の白黒を同数にする', {exact: true}).check();
+  await expect(page.locator('#generate')).toBeEnabled();
+  const conflict = page.waitForResponse('**/api/generate'); await page.locator('#generate').click();
+  expect((await (await conflict).json()).status).toBe('unsatisfiable');
+  await expect(page.locator('#actions')).toBeHidden();
+  await page.setViewportSize({width: 390, height: 844});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('catalog controls the computation budget and hosting description', async ({page}) => {
   const response = page.waitForResponse('**/api/catalog'); await page.goto('/');
   const catalog = await (await response).json();

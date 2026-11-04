@@ -33,8 +33,17 @@ from puzzle_defs.puzzles.shading import (
     BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2,
     ColumnCountClue, RowCountClue, ShadingPuzzle, ShadingRecipe, ShadingRule,
 )
+from puzzle_defs.puzzles.shading_fragments import (
+    BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines, NoBlack2x2, NoThreeConsecutive,
+)
 
 __all__ = [
+    "BalancedLines",
+    "BlackDominoes",
+    "ConnectedBlack",
+    "DistinctLines",
+    "NoBlack2x2",
+    "NoThreeConsecutive",
     "BlackCount",
     "ConnectedWhite",
     "NonTouchingBlack",

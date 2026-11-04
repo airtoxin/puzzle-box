@@ -3,13 +3,29 @@
 from pathlib import Path
 from typing import Any
 
-from puzzle_defs import BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2, ShadingRecipe
+from puzzle_defs import (BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2, ShadingRecipe,
+                         BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines,
+                         NoBlack2x2, NoThreeConsecutive)
 from puzzle_defs.puzzles.shading import CLUE_KINDS, ShadingRule
 from json_records import MAX_BYTES as MAX_RECIPE_BYTES, load_json as _load_json
 
 RECIPE_FORMAT = "puzzle-box/shading-recipe-v1"
 MAX_RECIPE_RULES = 8
-RULES = ("count", "non-touching", "connected-white", "no-white-2x2")
+DEFAULT_RULES = ("count", "non-touching", "connected-white", "no-white-2x2")
+PARAMETERLESS_RULE_TYPES = (NoWhite2x2, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
+                           BalancedLines, DistinctLines)
+BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
+                      ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
+                      BalancedLines, DistinctLines)
+RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
+
+
+def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: bool = False) -> dict[str, ShadingRule]:
+    """CLI defaults, kept separate from the subset enabled by default."""
+    return {"count": BlackCount(count), "non-touching": NonTouchingBlack(diagonal),
+            "connected-white": ConnectedWhite(not allow_empty_white),
+            "connected-black": ConnectedBlack(),
+            **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
 def rule_record(rule: ShadingRule) -> dict[str, Any]:
@@ -20,8 +36,11 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": "non-touching", "diagonal": rule.diagonal}
     if type(rule) is ConnectedWhite:
         return {"type": "connected-white", "nonempty": rule.nonempty}
-    if type(rule) is NoWhite2x2:
-        return {"type": "no-white-2x2"}
+    if type(rule) is ConnectedBlack:
+        return {"type": "connected-black", "nonempty": rule.nonempty}
+    for kind in PARAMETERLESS_RULE_TYPES:
+        if type(rule) is kind:
+            return {"type": kind.ui.identifier}
     raise ValueError("This file format supports exact built-in shading rules only, not subclasses")
 
 
@@ -35,8 +54,11 @@ def read_rule(data: Any) -> ShadingRule:
         return NonTouchingBlack(data["diagonal"])
     if kind == "connected-white" and set(data) == {"type", "nonempty"}:
         return ConnectedWhite(data["nonempty"])
-    if kind == "no-white-2x2" and set(data) == {"type"}:
-        return NoWhite2x2()
+    if kind == "connected-black" and set(data) == {"type", "nonempty"}:
+        return ConnectedBlack(data["nonempty"])
+    for rule_type in PARAMETERLESS_RULE_TYPES:
+        if kind == rule_type.ui.identifier and set(data) == {"type"}:
+            return rule_type()
     raise ValueError("Unknown rule or invalid rule parameters")
 
 
