@@ -111,6 +111,9 @@ uv run --no-sync python examples/generate_shading.py verify puzzle.json
 黒白4ルール・9セル以下なら `generate --selection finite` で、一意に出題できる候補を先に列挙して選べます。
 [選定から生成・表示・検証までの実例](docs/finite-shading-generation.md)に、行ヒントだけで出題する手順と限界をまとめています。
 
+[複数の生成結果を比較する](docs/compare-shading-seeds.md)では、３つの保存済みレシピを使い、
+残ったヒントで各ルールが必要かを比べて、選んだ問題を保存できます。
+
 ## 保存した問題でルールを診断する
 
 生成された問題で、実際に残ったヒントに対するルールの必要性を診断できます。

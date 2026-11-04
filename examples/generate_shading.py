@@ -23,6 +23,34 @@ FORMAT = "puzzle-box/shading-v1"
 MIXED_FORMAT = "puzzle-box/shading-v2"
 
 
+def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
+                  selection: str = "solver") -> dict[str, Any]:
+    """Serialize generated clues only after proving their unique visible answer."""
+    if selection not in ("solver", "finite"):
+        raise ValueError("Unknown completion selection")
+    puzzle = recipe.build_from_clues(clues)
+    puzzle.add(unique())
+    solution = puzzle.solve()
+    if solution is None:
+        raise ValueError("Generated clues did not determine a unique answer")
+    legacy = recipe.clue_kinds == ("cell",)
+    record = {
+        "format": FORMAT if legacy else MIXED_FORMAT,
+        "rows": recipe.rows, "cols": recipe.cols,
+        "rules": [rule_record(rule) for rule in recipe.rules], "seed": seed,
+        "clues": [clue_record(clue, legacy=legacy) for clue in clues],
+        "solution": puzzle.result(solution),
+        "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
+                        "seeded_search_workers": 1},
+    }
+    if not legacy:
+        record["clue_kinds"] = list(recipe.clue_kinds)
+    if selection == "finite":
+        from finite_shading import SELECTION
+        record["environment"]["completion_selection"] = SELECTION
+    return record
+
+
 def clue_record(clue: Clue, *, legacy: bool = False) -> dict[str, Any] | list[int]:
     if isinstance(clue, tuple):
         cell, value = clue
@@ -238,26 +266,7 @@ def main() -> int:
                 raise ValueError(f"{exc}. For ambiguous count clues, include cell in {hint} "
                                  "to retain disambiguating clues") from exc
             raise
-        puzzle = recipe.build_from_clues(clues)
-        puzzle.add(unique())
-        solution = puzzle.solve()
-        if solution is None:
-            raise ValueError("Generated clues did not determine a unique answer")
-        legacy = recipe.clue_kinds == ("cell",)
-        record = {
-            "format": FORMAT if legacy else MIXED_FORMAT,
-            "rows": recipe.rows, "cols": recipe.cols,
-            "rules": [rule_record(rule) for rule in recipe.rules], "seed": args.seed,
-            "clues": [clue_record(clue, legacy=legacy) for clue in clues],
-            "solution": puzzle.result(solution),
-            "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
-                            "seeded_search_workers": 1},
-        }
-        if not legacy:
-            record["clue_kinds"] = list(recipe.clue_kinds)
-        if args.selection == "finite":
-            from finite_shading import SELECTION
-            record["environment"]["completion_selection"] = SELECTION
+        record = puzzle_record(recipe, clues, seed=args.seed, selection=args.selection)
         encoded = json.dumps(record, indent=2, sort_keys=True) + "\n"
         if args.output is not None:
             args.output.write_text(encoded, encoding="utf-8")
