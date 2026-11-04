@@ -27,8 +27,21 @@ from puzzle_defs.regions import (
     filter_same_number_combination,
 )
 from puzzle_defs.shikaku import ShikakuRect, enumerate_shikaku_rectangles
+from puzzle_defs.puzzles.shading import (
+    BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2,
+    ColumnCountClue, RowCountClue, ShadingPuzzle, ShadingRecipe, ShadingRule,
+)
 
 __all__ = [
+    "BlackCount",
+    "ConnectedWhite",
+    "NonTouchingBlack",
+    "NoWhite2x2",
+    "ColumnCountClue",
+    "RowCountClue",
+    "ShadingPuzzle",
+    "ShadingRecipe",
+    "ShadingRule",
     "HitoriPuzzle",
     "NurikabePuzzle",
     "Placement",
