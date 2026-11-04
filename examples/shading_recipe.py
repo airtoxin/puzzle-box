@@ -15,7 +15,7 @@ from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs import WhiteVisibilityCounts
 from puzzle_defs import ComponentsTouchBorder
-from puzzle_defs import WhiteIslandAreas
+from puzzle_defs import WhiteIslandAreas, WhiteAreaClues
 from puzzle_defs import AdjacentBlackCounts
 from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
@@ -43,7 +43,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
-                      AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor)
+                      AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -64,6 +64,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "no-touching-equal-tetrominoes": NoTouchingEqualTetrominoes(DEFAULT_ROOMS),
             "white-visibility-counts": WhiteVisibilityCounts(DEFAULT_SIGHT_COUNTS),
             "components-touch-border": ComponentsTouchBorder(),
+            "white-area-clues": WhiteAreaClues(DEFAULT_ISLAND_AREAS),
             "white-island-areas": WhiteIslandAreas(DEFAULT_ISLAND_AREAS),
             "adjacent-black-counts": AdjacentBlackCounts(DEFAULT_NEIGHBOR_COUNTS),
             "color-degree-range": ColorDegreeRange(), "color-endpoint-count": ColorEndpointCount(),
@@ -95,7 +96,7 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "numbers": [list(row) for row in rule.numbers]}
     if type(rule) is WhiteVisibilityCounts:
         return {"type": rule.ui.identifier, "counts": [list(row) for row in rule.counts]}
-    if type(rule) is WhiteIslandAreas:
+    if type(rule) is WhiteIslandAreas or type(rule) is WhiteAreaClues:
         return {"type": rule.ui.identifier, "areas": [list(row) for row in rule.areas]}
     if type(rule) is AdjacentBlackCounts:
         return {"type": rule.ui.identifier, "neighbor_counts": [list(row) for row in rule.neighbor_counts], "diagonal": rule.diagonal}
@@ -178,11 +179,12 @@ def read_rule(data: Any) -> ShadingRule:
                 or any(type(row) is not list for row in data["counts"])):
             raise ValueError("Sight counts must be an array of arrays")
         return WhiteVisibilityCounts(tuple(tuple(row) for row in data["counts"]))
-    if kind == "white-island-areas":
+    if kind in ("white-island-areas", "white-area-clues"):
         if (set(data) != {"type", "areas"} or type(data["areas"]) is not list
                 or any(type(row) is not list for row in data["areas"])):
             raise ValueError("Island areas must be an array of arrays")
-        return WhiteIslandAreas(tuple(tuple(row) for row in data["areas"]))
+        constructor = WhiteIslandAreas if kind == "white-island-areas" else WhiteAreaClues
+        return constructor(tuple(tuple(row) for row in data["areas"]))
     if kind == "adjacent-black-counts":
         if (set(data) != {"type", "neighbor_counts", "diagonal"} or type(data["neighbor_counts"]) is not list
                 or any(type(row) is not list for row in data["neighbor_counts"])):
@@ -280,7 +282,7 @@ def shared_sight_counts(recipe: ShadingRecipe) -> NumberGrid | None:
 
 
 def shared_island_areas(recipe: ShadingRecipe) -> NumberGrid | None:
-    grids = [rule.areas for rule in recipe.rules if type(rule) is WhiteIslandAreas]
+    grids = [rule.areas for rule in recipe.rules if type(rule) is WhiteIslandAreas or type(rule) is WhiteAreaClues]
     for grid in grids:
         number_grid(grid, rows=recipe.rows, cols=recipe.cols)
     if grids and any(grid != grids[0] for grid in grids):

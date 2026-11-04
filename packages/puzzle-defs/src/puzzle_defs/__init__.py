@@ -43,7 +43,7 @@ from puzzle_defs.puzzles.component_size import ColorComponentSize
 from puzzle_defs.puzzles.room_shapes import NoTouchingEqualTetrominoes
 from puzzle_defs.puzzles.white_visibility import WhiteVisibilityCounts
 from puzzle_defs.puzzles.component_border import ComponentsTouchBorder
-from puzzle_defs.puzzles.white_island_areas import WhiteIslandAreas
+from puzzle_defs.puzzles.white_island_areas import WhiteIslandAreas, WhiteAreaClues
 from puzzle_defs.puzzles.adjacent_black_counts import AdjacentBlackCounts
 from puzzle_defs.puzzles.cell_path_fragments import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs.puzzles.adjacent_black_component_sum import AdjacentBlackComponentSum
@@ -51,6 +51,7 @@ from puzzle_defs.puzzles.room_uniform_forest import UniformRooms, AcyclicColor
 from puzzle_defs.puzzles.corner_connected_color import CornerConnectedColor
 
 __all__ = [
+    "WhiteAreaClues",
     "CornerConnectedColor",
     "UniformRooms",
     "AcyclicColor",

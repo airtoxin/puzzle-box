@@ -1,6 +1,6 @@
 # ルールの UI 要求から構成する Web アプリ
 
-このアプリは、[黒白セルの組み込み31ルール](composable-shading.md)から最大8種類（9セル以下）、スリザーリンク（4セル以下）、黒白とセル中心ループの固定3条件（9セル以下）から問題を生成するローカルの実験です。
+このアプリは、[黒白セルの組み込み32ルール](composable-shading.md)から最大8種類（9セル以下）、スリザーリンク（4セル以下）、黒白とセル中心ループの固定3条件（9セル以下）から問題を生成するローカルの実験です。
 ルール定義が宣言するパラメータ・盤面チャンネルをサーバーで統合し、ブラウザがその計画から描画します。
 任意の Python ルールや異なる盤面型が、そのまま使える仕組みではありません。
 Vercelで利用する場合は、ローカルHTTPサーバーとは別の[配信手順と計算制限](deploy-vercel.md)に従います。
@@ -86,6 +86,7 @@ uv run --no-sync python examples/web_server.py
 黒どこ型の[可視数](white-visibility.md)は `counts/number-grid` と `sight-counts/cell-sight-counts` を使います。
 正の数だけ丸数字で表示し、0は指定なしです。既存の固定数字と同じ入力構文でも別の格子を保持し、部屋とも重ねられます。
 [白い島の面積](white-island-areas.md)は `areas/number-grid` と `island-areas/cell-island-areas` です。
+[数字なし白成分を許す面積](white-area-clues.md)も同じチャンネルと入力を共有し、違いは数字なしの成分を許すかどうかです。
 正の面積を四角で囲み、数字マスを白として固定します。通常ラベル・可視数・面積は別のデータとして同時に扱い、要求した値との一致も検査します。
 [隣接黒数](adjacent-black-counts.md)は `neighbor_counts/clue-grid` と `neighbor-counts/cell-neighbor-counts` です。
 数字なしは `null`（入力欄では `.`）、0は実際のヒントです。「隣0」等を表示し、0も白として固定します。既存の数格子の0や `null` の扱いは変えません。

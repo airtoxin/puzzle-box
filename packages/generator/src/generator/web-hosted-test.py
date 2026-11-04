@@ -81,7 +81,7 @@ def test_per_instance_lock_is_shared_by_generate_and_check_and_released_on_timeo
     assert call("generate")[1]["status"] == "timeout" and not hosted.JOB_LOCK.locked()
 
 
-@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border", "island-areas", "neighbor-counts", "cell-path", "component-sum", "room-forest", "corner-connected"])
+@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border", "island-areas", "neighbor-counts", "cell-path", "component-sum", "room-forest", "corner-connected", "white-area-clues"])
 def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, rule_group):
     output = tmp_path / "artifact"
     payload = prepare.export(output)
@@ -169,6 +169,11 @@ print('artifact generation passed')
         data["rules"] = [{"id": "connected-black", "parameters": {"nonempty": True}},
                          {"id": "color-degree-range", "parameters": {"minimum": 1, "maximum": 2, "black": True}},
                          {"id": "color-endpoint-count", "parameters": {"count": 2, "black": True}}]
+    elif rule_group == "white-area-clues":
+        data["rules"] = [{"id": "white-area-clues", "parameters": {"areas": [[1,0,0],[0,0,0]]}},
+                         {"id": "rectangular-components", "parameters": {"black": False}},
+                         {"id": "corner-connected-color", "parameters": {"black": False, "nonempty": True}},
+                         {"id": "count", "parameters": {"count": 3}}]
     elif rule_group == "corner-connected":
         data["rules"] = [{"id": "corner-connected-color", "parameters": {"black": False, "nonempty": True}},
                          {"id": "rectangular-components", "parameters": {"black": False}},
