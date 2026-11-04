@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import platform
+import sys
 from typing import Any
 
 import ortools
@@ -13,7 +14,7 @@ from puzzle import Cell, Edge, Vertex, unique
 from puzzle_defs import CellEdgeCountClue, EdgeStateClue, SlitherlinkRecipe
 from puzzle_defs.puzzles.slitherlink_recipe import LOOP_CLUE_KINDS, LoopClue
 from edge_answers import edge_template, parse_edge_answer
-from json_records import load_json, read_array
+from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/slitherlink-v1"
 
@@ -190,11 +191,11 @@ def main() -> int:
                 "solution": [edge_record(e) for e in p.board.edges if e in answer],
                 "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
                                 "seeded_search_workers": 1}}
-        encoded = json.dumps(data, indent=2, sort_keys=True) + "\n"
+        encoded = encode_json(data)
         if args.output is not None:
-            args.output.write_text(encoded, encoding="utf-8")
+            args.output.write_bytes(encoded)
         if not args.quiet:
-            print(encoded, end="")
+            sys.stdout.buffer.write(encoded)
         return 0
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
         parser.error(str(exc))

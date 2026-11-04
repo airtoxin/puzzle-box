@@ -1,4 +1,4 @@
-"""Bounded UTF-8 JSON loading shared by saved recipe and puzzle examples."""
+"""Bounded UTF-8 JSON encoding and loading for saved puzzle examples."""
 
 import json
 from math import isfinite
@@ -6,6 +6,14 @@ from pathlib import Path
 from typing import Any
 
 MAX_BYTES = 65536
+
+
+def encode_json(data: Any, *, label: str = "Puzzle") -> bytes:
+    """Return checked bytes so writing cannot change the validated size."""
+    raw = (json.dumps(data, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8")
+    if len(raw) > MAX_BYTES:
+        raise ValueError(f"{label} file must be at most {MAX_BYTES} bytes")
+    return raw
 
 
 def read_array(value: Any, name: str) -> list[Any]:
