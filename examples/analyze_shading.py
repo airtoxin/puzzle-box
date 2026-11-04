@@ -61,6 +61,8 @@ def full_clues(recipe: ShadingRecipe, bits: Bits) -> tuple[Clue, ...]:
 
 def finite_space(recipe: ShadingRecipe) -> tuple[ShadingPuzzle, list[Bits], list[set[int]]]:
     """Validate once and cache which finite boards satisfy each rule occurrence."""
+    if type(recipe) is not ShadingRecipe:
+        raise ValueError("Finite diagnostics require an exact ShadingRecipe; composed recipes and subclasses are unsupported")
     if recipe.rows * recipe.cols > 9 or len(recipe.rules) > 8:
         raise ValueError("Diagnostics support at most 9 cells and 8 rule occurrences")
     if any(type(rule) not in BUILT_INS for rule in recipe.rules):

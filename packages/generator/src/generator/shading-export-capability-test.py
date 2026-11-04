@@ -13,6 +13,9 @@ with pytest.MonkeyPatch.context() as patch:
     patch.syspath_prepend(str(EXAMPLES))
     display = importlib.import_module("generate_shading")
     importlib.import_module("finite_shading")  # puzzle_record imports selection metadata lazily.
+    comparison = importlib.import_module("compare_shading_seeds")
+    analysis = importlib.import_module("analyze_shading")
+    recipes = importlib.import_module("shading_recipe")
 
 
 class ExtraBlack(ShadingRecipe):
@@ -94,3 +97,17 @@ def test_export_uses_reader_coordinate_types_before_building(row, col, kinds, mo
                         lambda *a, **k: pytest.fail("Reject invalid serialized clues before building"))
     with pytest.raises(ValueError, match="coordinates must be integers"):
         display.puzzle_record(recipe, [(Cell(row, col), 1)], seed=0)
+
+
+@pytest.mark.parametrize("operation", ["compare", "analyze", "export"])
+def test_subclass_is_rejected_even_when_analysis_would_skip_generation(operation, monkeypatch):
+    recipe = ExtraBlack(1, 1, (), ())
+    monkeypatch.setattr(ExtraBlack, "build_from_clues",
+                        lambda *a, **k: pytest.fail("Reject unknown semantics before building"))
+    with pytest.raises(ValueError, match="exact ShadingRecipe"):
+        if operation == "compare":
+            comparison.compare(recipe, [0])
+        elif operation == "analyze":
+            analysis.analyze(recipe)
+        else:
+            recipes.recipe_record(recipe)
