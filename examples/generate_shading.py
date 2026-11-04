@@ -55,9 +55,14 @@ def read_clue(data: Any, *, legacy: bool = False) -> Clue:
 
 
 def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[list[int]]]:
-    if data["format"] not in (FORMAT, MIXED_FORMAT):
-        raise ValueError("Unsupported puzzle format")
+    if not isinstance(data, dict) or data.get("format") not in (FORMAT, MIXED_FORMAT):
+        raise ValueError(f"Unsupported puzzle format; expected an object with format {FORMAT} or {MIXED_FORMAT}")
     legacy = data["format"] == FORMAT
+    required = {"format", "rows", "cols", "rules", "clues", "solution"}
+    if not legacy:
+        required.add("clue_kinds")
+    if not required <= set(data) or set(data) - required - {"seed", "environment"}:
+        raise ValueError("Missing or unknown puzzle fields; additional rules need a supported composed format")
     recipe = ShadingRecipe(data["rows"], data["cols"], tuple(read_rule(r) for r in data["rules"]),
                            ("cell",) if legacy else tuple(data["clue_kinds"]))
     check_demo_size(recipe)
