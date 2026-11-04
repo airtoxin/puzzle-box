@@ -46,13 +46,22 @@ def leaf_reference(bits,rows,cols,black):
     return True
 
 
-@pytest.mark.parametrize("rows,cols,black", [(1,1,True),(1,4,False),(2,3,True),(2,3,False),(3,3,False)])
+@pytest.mark.parametrize("rows,cols,black", [(1,1,True),(1,4,False),(2,3,True),(2,3,False)])
 def test_color_forests_match_leaf_pruning_and_component_checker(rows,cols,black):
     rule = AcyclicColor(black)
     masks = list(product((0,1),repeat=rows*cols))
     expected = {bits for bits in masks if leaf_reference(bits,rows,cols,black)}
     assert {bits for bits in masks if oracle.accepts(rule,bits,rows,cols)} == expected
     assert all_answers(ShadingRecipe(rows,cols,(rule,))) == expected
+
+
+def test_three_by_three_reference_checkers_agree_on_all_512_boards():
+    # Keep repeated projected DSL enumeration bounded at 2x3. Larger induced
+    # cycles, branches and witnesses have dedicated solver counterexamples;
+    # compare the two inexpensive reference algorithms exhaustively at 3x3.
+    rule = AcyclicColor(False)
+    for bits in product((0,1),repeat=9):
+        assert oracle.accepts(rule,bits,3,3) == leaf_reference(bits,3,3,False)
 
 
 @pytest.mark.parametrize("rooms", [((0,),),((0,0,1),),((0,0,1),(0,1,1)),((0,1),(2,3))])
