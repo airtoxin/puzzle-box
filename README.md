@@ -88,3 +88,30 @@ CI は Ubuntu / Windows、Python 3.12 / 3.13 で同じテスト・型検査・�
 生成結果は一意性と1ヒントずつの削除に対する既約性を確認します。
 最少ヒント数、均一なランダム分布、人間にとっての面白さは保証しません。
 現状と修正中の既知の制限はプロジェクトレビューに整理しています。
+
+## 辺に描くループでも試す
+
+黒白とは異なる回答空間の実例として、スリザーリンク形式でも同じ生成器を使えます。
+非空の単一ループに長さ指定・マス周囲の辺数・辺の使用状態を組み合わせます。
+
+```sh
+uv run --no-sync python examples/generate_slitherlink.py generate --loop-length 8 --seed 2 --output loop.json --quiet
+uv run --no-sync python examples/generate_slitherlink.py show loop.json
+uv run --no-sync python examples/generate_slitherlink.py verify loop.json
+```
+
+数字だけでは2解になる反例、API、合成できる範囲と未対応の接続は
+[ループのレシピ](docs/slitherlink-composition.md)を参照してください。
+
+## 黒マスとループを同時に生成する
+
+ヤジリンの「黒なら辺0本、白なら辺2本」という接続条件を使い、黒白セルとループ辺を
+1つの回答として生成・検証する例もあります。
+
+```sh
+uv run --no-sync python examples/generate_yajilin.py show examples/yajilin-sample.json
+uv run --no-sync python examples/generate_yajilin.py verify examples/yajilin-sample.json
+```
+
+[異種合成の例](docs/yajilin-composition.md)に、生成方法、数字を消しても残す矢印マス、
+黒白が同じでも2種類のループになる反例、合成の限界をまとめています。
