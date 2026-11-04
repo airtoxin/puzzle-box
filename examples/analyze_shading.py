@@ -21,6 +21,7 @@ from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
 from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
+from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -69,6 +70,16 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
                    for r in range(rows-1) for c in range(cols-1))
     if type(rule) is BlackDominoes:
         return all(len(group) == 2 for group in _components(black))
+    if type(rule) is NoTouchingEqualTetrominoes:
+        pieces = []
+        for label in {n for row in rule.rooms for n in row}:
+            selected = {(r,c) for r,c in black if rule.rooms[r][c] == label}
+            if len(selected) == 4 and len(_components(selected)) == 1:
+                pieces.append(selected)
+        for a,b in combinations(pieces,2):
+            if any(abs(r-s)+abs(c-t) == 1 for r,c in a for s,t in b) and _congruent(a,b):
+                return False
+        return True
     if type(rule) is ColorComponentSize:
         selected = black if rule.black else {(r,c) for r in range(rows) for c in range(cols)} - black
         return all(len(group) == rule.size for group in _components(selected))
@@ -131,6 +142,16 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     if type(rule) is LineBlackCount:
         return all(sum(line) == rule.count for line in row_lines + col_lines)
     raise ValueError("Diagnostics support exact built-in rule types only, not custom rules or subclasses")
+
+
+def _congruent(first: set[tuple[int,int]], second: set[tuple[int,int]]) -> bool:
+    """Independent signed-axis transforms, not polyomino variants or piece names."""
+    def origin(points):
+        low_r,low_c = min(r for r,c in points),min(c for r,c in points)
+        return {(r-low_r,c-low_c) for r,c in points}
+    target = origin(second)
+    return any(origin({(sr*(c if swap else r),sc*(r if swap else c)) for r,c in first}) == target
+               for swap in (False,True) for sr in (-1,1) for sc in (-1,1))
 
 
 def full_clues(recipe: ShadingRecipe, bits: Bits) -> tuple[Clue, ...]:

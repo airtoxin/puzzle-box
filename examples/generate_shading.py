@@ -23,6 +23,7 @@ from puzzle_defs import (
     RunLengthLimit,
     RoomRotationalSymmetry,
     ColorComponentSize,
+    NoTouchingEqualTetrominoes,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -205,6 +206,8 @@ def _rule_text(rule: ShadingRule) -> str:
     if type(rule) is ColorComponentSize:
         color = "black" if rule.black else "white"
         return f"Every edge-connected {color} component contains exactly {rule.size} cells; absence of {color} cells is allowed."
+    if type(rule) is NoTouchingEqualTetrominoes:
+        return "If a room's entire black set is a connected tetromino, it cannot touch a congruent room tetromino along an edge; rotations/reflections count as equal."
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         color = "black" if rule.black else "white"
         shape = "a filled rectangle" if type(rule) is RectangularComponents else "nonrectangular"

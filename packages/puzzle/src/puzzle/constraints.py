@@ -117,7 +117,7 @@ class CompoundConstraint(Symbolic):
 
 def non_touching(
     var_map: VarMap,
-    adjacency: Sequence[tuple[Cell, Cell]],
+    adjacency: Sequence[tuple[Hashable, Hashable]],
 ) -> CompoundConstraint:
     """No two selected variables in adjacent pairs are both true."""
     from puzzle.expr import sum_expr

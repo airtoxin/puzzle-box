@@ -12,6 +12,7 @@ from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
 from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
+from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs.puzzles.component_size import MAX_COMPONENT_CELLS
 from puzzle_defs.number_layout import DEFAULT_NUMBERS, NumberGrid, number_grid
 from puzzle_defs.room_layout import DEFAULT_ROOMS, RoomMap, room_map
@@ -27,7 +28,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
                       RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
-                      RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize)
+                      RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -45,6 +46,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "run-length-limit": RunLengthLimit(),
             "room-rotational-symmetry": RoomRotationalSymmetry(DEFAULT_ROOMS),
             "color-component-size": ColorComponentSize(3),
+            "no-touching-equal-tetrominoes": NoTouchingEqualTetrominoes(DEFAULT_ROOMS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -64,7 +66,7 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": "room-connected-black", "rooms": [list(row) for row in rule.rooms], "nonempty": rule.nonempty}
     if type(rule) is LineBlackCount:
         return {"type": "line-black-count", "count": rule.count}
-    if type(rule) is NoWhiteAcrossThreeRooms or type(rule) is RoomRotationalSymmetry:
+    if type(rule) is NoWhiteAcrossThreeRooms or type(rule) is RoomRotationalSymmetry or type(rule) is NoTouchingEqualTetrominoes:
         return {"type": rule.ui.identifier, "rooms": [list(row) for row in rule.rooms]}
     if type(rule) is DistinctWhiteNumbers:
         return {"type": rule.ui.identifier, "numbers": [list(row) for row in rule.numbers]}
@@ -106,11 +108,13 @@ def read_rule(data: Any) -> ShadingRule:
         return RunLengthLimit(data["max_length"])
     if kind == "color-component-size" and set(data) == {"type","size","black"}:
         return ColorComponentSize(data["size"],data["black"])
-    if kind in ("no-white-across-three-rooms","room-rotational-symmetry"):
+    if kind in ("no-white-across-three-rooms","room-rotational-symmetry","no-touching-equal-tetrominoes"):
         if (set(data) != {"type", "rooms"} or type(data["rooms"]) is not list
                 or any(type(row) is not list for row in data["rooms"])):
             raise ValueError("Invalid room rule parameters; rooms must be an array of arrays")
-        constructor = NoWhiteAcrossThreeRooms if kind == "no-white-across-three-rooms" else RoomRotationalSymmetry
+        constructor = {"no-white-across-three-rooms":NoWhiteAcrossThreeRooms,
+                       "room-rotational-symmetry":RoomRotationalSymmetry,
+                       "no-touching-equal-tetrominoes":NoTouchingEqualTetrominoes}[kind]
         return constructor(tuple(tuple(row) for row in data["rooms"]))
     if kind == "distinct-white-numbers":
         if (set(data) != {"type","numbers"} or type(data["numbers"]) is not list
@@ -134,7 +138,8 @@ def check_demo_size(recipe: ShadingRecipe) -> None:
 def shared_rooms(recipe: ShadingRecipe) -> RoomMap | None:
     layouts = [rule.rooms for rule in recipe.rules
                if type(rule) is RoomBlackCount or type(rule) is RoomConnectedBlack
-               or type(rule) is NoWhiteAcrossThreeRooms or type(rule) is RoomRotationalSymmetry]
+               or type(rule) is NoWhiteAcrossThreeRooms or type(rule) is RoomRotationalSymmetry
+               or type(rule) is NoTouchingEqualTetrominoes]
     for layout in layouts:
         room_map(layout, rows=recipe.rows, cols=recipe.cols)
     if layouts and any(layout != layouts[0] for layout in layouts):
