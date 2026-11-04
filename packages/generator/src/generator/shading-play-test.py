@@ -14,7 +14,10 @@ SAMPLES = (SCRIPT.with_name("shading-sample.json"), SCRIPT.with_name("shading-mi
 
 @pytest.fixture(scope="module")
 def app():
-    return runpy.run_path(str(SCRIPT))
+    # run_path does not add the standalone script's sibling helpers to sys.path.
+    with pytest.MonkeyPatch.context() as patch:
+        patch.syspath_prepend(str(SCRIPT.parent))
+        return runpy.run_path(str(SCRIPT))
 
 
 def _cli(*args: str) -> subprocess.CompletedProcess[str]:
