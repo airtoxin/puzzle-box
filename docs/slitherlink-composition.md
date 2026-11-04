@@ -132,7 +132,9 @@ CLI は9マス以下に制限しますが、実行時間の上限ではありま
 汎用ルール合成が完成したとは主張しません。今回確かめたのは、回答空間の違う2種類のレシピが
 同じ生成契約と求解基盤を使え、それぞれの意味を独立した検証器で確かめられることです。
 
-このPRは [PR #9](https://github.com/airtoxin/puzzle-box/pull/9) の `codex/composable-shading` (`e014aad`) を base にします。
-解の射影・生成契約を含む #2〜#8 と、#9 の seed 指定時の1 worker設定を使います。
+この実装は [PR #9](https://github.com/airtoxin/puzzle-box/pull/9) の黒白合成の土台から追加しました。
+解の射影・生成契約を含む #2〜#8 は main に採用済みで、#9 の seed 指定時の1 worker設定も使います。
 ヒント混在・端末体験の #10 / #11 とは別の追加差分にし、それらを含む統合状態でも検証します。
-いずれも main へ未反映で、土台の採否に応じて後で rebase / base変更が必要です。
+基盤の採用と、この機能や親PRの採用は別の段階です。現在の base・レビュー・採用状況は
+[PR #12](https://github.com/airtoxin/puzzle-box/pull/12) と
+[レビューガイド](https://github.com/airtoxin/puzzle-box/blob/codex/review-roadmap/docs/review-roadmap.md)を参照してください。
