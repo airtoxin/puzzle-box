@@ -92,7 +92,7 @@ CLI の25マス制限を維持しています。毎回求解して検証する�
 2桁の個数、ルールのオプション表記、終了コード、保存解の改変拒否、元ファイルの不変性を確認します。
 2×2の全16盤面について独立したルール判定と照合し、生成→表示→解答確認も実行します。
 
-この変更は [PR #10](https://github.com/airtoxin/puzzle-box/pull/10) を土台にした stacked draft です。
-base は `codex/mixed-shading-clues` (`19704ba`) で、#9 と #2〜#8 の統合土台にも依存します。
-新しい技術基盤や公開は追加していません。既存PRは維持し、土台の採否が決まった後に
-rebase / base変更が必要です。
+この実装は [PR #10](https://github.com/airtoxin/puzzle-box/pull/10) の混合ヒントを土台に追加しました。
+#9 の黒白合成と、main 採用済み #2〜#8 の求解・生成基盤も使います。
+新しい技術基盤や公開は追加していません。現在の base・レビュー・採用状況は
+[PR #11](https://github.com/airtoxin/puzzle-box/pull/11) とレビューガイドを参照してください。
