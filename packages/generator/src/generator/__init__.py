@@ -51,6 +51,7 @@ class ConstrainedRecipe[P: Puzzle, C]:
     invocation count. They may not change the base's answer meaning or clue
     extraction. The base's answer projection is preserved. This wrapper has no
     portable encoding: serializing only its base would omit the added rules.
+    Returned items must be DSL constraints; unique() is a solve query, not a rule.
     """
 
     base: GeneratablePuzzle[P, C]
@@ -65,6 +66,10 @@ class ConstrainedRecipe[P: Puzzle, C]:
     def _apply(self, puzzle: P) -> P:
         for builder in self.builders:
             for constraint in builder(puzzle):
+                if not isinstance(constraint, Constraint):
+                    raise TypeError("Builders must yield DSL constraint objects")
+                if isinstance(constraint, UniqueConstraint):
+                    raise ValueError("unique() is a solve query, not an additional base rule")
                 puzzle.add(constraint)
         return puzzle
 
