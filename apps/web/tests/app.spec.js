@@ -135,3 +135,94 @@ test('all columns of a wide board are reachable at narrow desktop widths', async
   expect(last.x + last.width).toBeLessThanOrEqual(visible.x + visible.width + 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('loop declarations, numeric and edge clues, keyboard entry and server answer checking', async ({page}) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.getByLabel('盤面の種類')).toHaveValue('shading');
+  await page.getByLabel('盤面の種類').selectOption('slitherlink');
+  await expect(page.getByLabel('空でない1本のループ', {exact: true})).toBeChecked();
+  await expect(page.getByLabel('空でない1本のループ', {exact: true})).toBeDisabled();
+  await expect(page.getByLabel('辺の本数', {exact: true})).toHaveAttribute('max', '12');
+  await expect(page.locator('.edge')).toHaveCount(12);
+  await page.getByLabel('Seed', {exact: true}).fill('2');
+  await expect(page.locator('#generate')).toBeEnabled();
+  const response = page.waitForResponse('**/api/generate');
+  await page.locator('#generate').click();
+  const artifact = await (await response).json();
+  expect(artifact.status).toBe('ok');
+  await expect(page.locator('#status')).toContainText('生成しました');
+  expect(new Set(artifact.clues.map(c => c.type))).toEqual(new Set(['cell-count', 'edge']));
+  for (const clue of artifact.clues.filter(c => c.type === 'cell-count'))
+    await expect(page.getByLabel(`${clue.row+1}行${clue.col+1}列の辺数: ${clue.count}`, {exact: true})).toHaveText(String(clue.count));
+  await expect(page.locator('.edge.fixed')).toHaveCount(artifact.clues.filter(c => c.type === 'edge').length);
+  const first = page.locator('.edge:enabled').first();
+  await expect(await textContrast(first)).toBeGreaterThanOrEqual(4.5);
+  await first.focus(); await page.keyboard.press('Space');
+  await expect(first).toBeFocused(); await expect(first).toHaveAttribute('data-value', '0');
+  await page.keyboard.press('Enter');
+  await expect(first).toBeFocused(); await expect(first).toHaveAttribute('data-value', '1');
+  await first.hover(); await expect(await textContrast(first)).toBeGreaterThanOrEqual(4.5);
+  // Enter an incorrect complete candidate first, preserving fixed clues.
+  for (const edge of await page.locator('.edge:enabled').all())
+    while (await edge.getAttribute('data-value') !== '0') await edge.click();
+  await page.locator('#check').click();
+  await expect(page.locator('#answer-status')).toContainText('まだ正解ではありません');
+  for (let i = 0; i < artifact.edges.length; i++) {
+    const edge = page.locator(`[data-edge-index="${i}"]`);
+    if (await edge.isEnabled() && artifact.record.solution.some(e => e.join(',') === artifact.edges[i].join(','))) await edge.click();
+  }
+  const checked = page.waitForResponse('**/api/check');
+  await page.locator('#check').click();
+  expect(await (await checked).json()).toEqual({status: 'ok', correct: true});
+  await expect(page.locator('#answer-status')).toContainText('正解です');
+  await page.locator('#reveal').click();
+  await expect(page.locator('.edge:enabled')).toHaveCount(0);
+  const download = page.waitForEvent('download'); await page.locator('#download').click();
+  expect((await download).suggestedFilename()).toBe('puzzle.json');
+  await page.setViewportSize({width: 390, height: 844});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({path: test.info().outputPath('loop-mobile.png'), fullPage: true});
+  await page.getByLabel('盤面の種類').selectOption('shading');
+  await expect(page.locator('.edge')).toHaveCount(0); await expect(page.locator('.cell')).toHaveCount(6);
+  await expect(page.locator('#actions')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('loop contradiction and insufficient hints remain distinct', async ({page}) => {
+  await page.goto('/'); await page.getByLabel('盤面の種類').selectOption('slitherlink');
+  await page.getByLabel('辺の本数', {exact: true}).fill('5');
+  await expect(page.locator('#generate')).toBeEnabled(); await page.locator('#generate').click();
+  await expect(page.locator('#status')).toContainText('満たす盤面はありません');
+  await page.getByLabel('辺の本数', {exact: true}).fill('8');
+  await page.getByLabel('セルを囲む辺の数').uncheck();
+  await page.getByLabel('線の有無を固定するヒント').uncheck();
+  await expect(page.locator('#generate')).toBeEnabled(); await page.locator('#generate').click();
+  await expect(page.locator('#status')).toContainText('どの完成盤面も一意に決まりません');
+});
+
+test('answer-check progress remains exposed to assistive technology while controls are locked', async ({page}) => {
+  await page.goto('/'); await page.getByLabel('盤面の種類').selectOption('slitherlink');
+  await page.getByLabel('ループの長さ', {exact: true}).uncheck();
+  await page.getByLabel('行数', {exact: true}).fill('1'); await page.getByLabel('列数', {exact: true}).fill('1');
+  await expect(page.locator('#generate')).toBeEnabled(); await page.locator('#generate').click();
+  await expect(page.locator('#status')).toContainText('生成しました');
+  for (const edge of await page.locator('.edge:enabled').all()) {await edge.click(); await edge.click();}
+  let resume, intercepted;
+  const pending = new Promise(resolve => {intercepted = resolve;});
+  await page.route('**/api/check', async route => {
+    await new Promise(resolve => {resume = resolve; intercepted();});
+    await route.fulfill({json: {status: 'timeout', budget_seconds: 10}});
+  });
+  await page.locator('#check').click(); await pending;
+  try {
+    const session = await page.context().newCDPSession(page);
+    const tree = await session.send('Accessibility.getFullAXTree');
+    expect(tree.nodes.some(n => !n.ignored && n.name?.value === 'サーバーでルールとヒントを確認中…')).toBe(true);
+    expect(await page.locator('#check').evaluate(el => el.closest('[inert]') !== null)).toBe(true);
+    expect(await page.locator('#board').evaluate(el => el.inert)).toBe(true);
+  } finally {resume();}
+  await expect(page.locator('#answer-status')).toContainText('解なしとは判定していません');
+  await expect(page.locator('#check')).toBeFocused();
+  expect(await page.locator('#check').evaluate(el => el.closest('[inert]') === null)).toBe(true);
+});

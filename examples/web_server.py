@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from json_records import _constant, _finite_float, _object
 from web_catalog import catalog, read_request
+from web_answers import read_check
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_BODY = 8192
@@ -20,10 +21,14 @@ ASSETS = {"/": ("index.html", "text/html"), "/app.js": ("app.js", "text/javascri
 
 
 def run_generation(data: Any) -> dict[str, Any]:
-    request = read_request(data)
+    return run_job(data)
+
+
+def run_job(data: Any, *, check: bool = False) -> dict[str, Any]:
+    request = read_check(data) if check else read_request(data)
     try:
         result = subprocess.run(
-            [sys.executable, str(ROOT / "examples/web_worker.py")], input=json.dumps(data),
+            [sys.executable, str(ROOT / "examples/web_worker.py"), *( ["--check"] if check else [])], input=json.dumps(data),
             capture_output=True, text=True, encoding="utf-8", cwd=ROOT, timeout=request.budget,
             env=dict(os.environ, PYTHONHASHSEED="0", PYTHONIOENCODING="utf-8"),
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
@@ -71,6 +76,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", content_type + "; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
+        self.send_header("Connection", "close")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; "
@@ -101,29 +107,44 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.json_response(404, {"status": "not_found"})
 
+    def read_body(self) -> bytes:
+        lengths = self.headers.get_all("Content-Length", [])
+        if len(lengths) != 1 or not lengths[0].isdigit() or "Transfer-Encoding" in self.headers:
+            raise ValueError("A single Content-Length is required")
+        length = int(lengths[0])
+        if length <= 0:
+            raise ValueError("Request must have a nonempty body")
+        # Consume a bounded, framed request before a rejection closes the socket:
+        # closing with incoming body data can erase the response via a TCP reset.
+        # Read at most one extra byte even if a hostile length declares gigabytes.
+        raw = self.rfile.read(min(length, MAX_BODY + 1))
+        if length > MAX_BODY:
+            raise ValueError("Request must be at most 8192 bytes")
+        if len(raw) != length:
+            raise ValueError("Incomplete request")
+        return raw
+
     def do_POST(self) -> None:
+        try:
+            raw = self.read_body()
+        except (ValueError, TimeoutError) as exc:
+            self.json_response(400, {"status": "invalid", "message": str(exc)})
+            return
+        except OSError:
+            return  # The client disconnected; no work or JSON parsing occurred.
         if not self.valid_host():
             return
         if (self.headers.get_all("Origin") != [self.application.origin]
                 or self.headers.get_content_type() != "application/json"):
             self.json_response(403, {"status": "forbidden"})
             return
-        if self.path not in ("/api/plan", "/api/generate"):
+        if self.path not in ("/api/plan", "/api/generate", "/api/check"):
             self.json_response(404, {"status": "not_found"})
             return
         try:
-            lengths = self.headers.get_all("Content-Length", [])
-            if len(lengths) != 1 or not lengths[0].isdigit() or "Transfer-Encoding" in self.headers:
-                raise ValueError("A single Content-Length is required")
-            length = int(lengths[0])
-            if not 0 < length <= MAX_BODY:
-                raise ValueError("Request must be at most 8192 bytes")
-            raw = self.rfile.read(length)
-            if len(raw) != length:
-                raise ValueError("Incomplete request")
             data = json.loads(raw.decode("utf-8"), object_pairs_hook=_object,
                               parse_constant=_constant, parse_float=_finite_float)
-            request = read_request(data)
+            request = read_check(data) if self.path == "/api/check" else read_request(data)
         except (ValueError, RecursionError, TimeoutError) as exc:
             self.json_response(400, {"status": "invalid", "message": str(exc)})
             return
@@ -133,7 +154,7 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response(409, {"status": "busy"})
         else:
             try:
-                self.json_response(200, run_generation(data))
+                self.json_response(200, run_job(data, check=True) if self.path == "/api/check" else run_generation(data))
             finally:
                 self.application.generation_lock.release()
 
