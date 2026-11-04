@@ -1,5 +1,20 @@
 import {test, expect} from '@playwright/test';
 
+async function textContrast(locator, property = 'color') {
+  const colors = await locator.evaluate((el, property) => {
+    const foreground = getComputedStyle(el)[property];
+    let background = 'rgba(0, 0, 0, 0)';
+    for (let node = el; node && background === 'rgba(0, 0, 0, 0)'; node = node.parentElement)
+      background = getComputedStyle(node).backgroundColor;
+    return [foreground, background];
+  }, property);
+  const luminance = color => color.match(/[\d.]+/g).slice(0, 3)
+    .map(Number).map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4)
+    .reduce((total, v, i) => total + v * [.2126, .7152, .0722][i], 0);
+  const values = colors.map(luminance).sort((a, b) => a - b);
+  return (values[1] + .05) / (values[0] + .05);
+}
+
 test('rule-declared controls, hint channels, real generation and answer interaction', async ({page}) => {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
@@ -79,10 +94,16 @@ test('keyboard cell entry retains focus and black cells keep contrast on hover',
   await page.getByRole('button', {name: 'この組合せで生成する →'}).click();
   await expect(page.locator('#status')).toContainText('生成しました');
   const cell = page.locator('.cell:enabled').first();
+  await expect.soft(await textContrast(cell)).toBeGreaterThanOrEqual(4.5);
+  await expect.soft(await textContrast(page.locator('h2 span').first())).toBeGreaterThanOrEqual(4.5);
+  await expect(await textContrast(cell, 'borderTopColor')).toBeGreaterThanOrEqual(3);
+  await expect(await textContrast(page.getByLabel('黒マス数', {exact: true}), 'borderTopColor')).toBeGreaterThanOrEqual(3);
   await cell.focus();
   await page.keyboard.press('Space');
   await expect(cell).toHaveAttribute('data-value', '0');
+  await expect(await textContrast(cell)).toBeGreaterThanOrEqual(4.5);
   await expect.soft(cell).toBeFocused();
+  await expect(await textContrast(cell, 'outlineColor')).toBeGreaterThanOrEqual(3);
   // Re-focus even before the fix so the hover regression is independently exercised.
   await cell.focus();
   await page.keyboard.press('Enter');
@@ -91,6 +112,7 @@ test('keyboard cell entry retains focus and black cells keep contrast on hover',
   await cell.hover();
   await expect.soft(cell).toHaveCSS('background-color', 'rgb(33, 60, 51)');
   await expect(cell).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await expect(await textContrast(cell)).toBeGreaterThanOrEqual(4.5);
   await page.keyboard.press('Tab');
   await expect(page.locator('.cell:enabled').nth(1)).toBeFocused();
 });

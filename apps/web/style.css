@@ -67,7 +67,7 @@ h2 {
 }
 
 h2 span {
-  color:#75968b;
+  color:#526e5e;
   font-size:.75rem;
   margin-right:12px;
 }
@@ -106,7 +106,7 @@ input[type=number] {
   display:block;
   width:100%;
   padding:8px 10px;
-  border:1px solid #b5c8bc;
+  border:1px solid #698374;
   border-radius:6px;
   background:#fff;
   color:#172b28;
@@ -170,7 +170,7 @@ input:disabled {
 
 button {
   font:inherit;
-  border:1px solid #a9bfb2;
+  border:1px solid #698374;
   border-radius:7px;
   background:#f4f8f1;
   color:#1d493b;
@@ -183,7 +183,7 @@ button:not(.cell):not(.primary):hover:enabled {
 }
 
 button:focus-visible,input:focus-visible,summary:focus-visible {
-  outline:3px solid #d08e40;
+  outline:3px solid #99601f;
   outline-offset:3px;
 }
 
@@ -249,7 +249,7 @@ td {
   width:clamp(34px,5.7vw,56px);
   height:clamp(34px,5.7vw,56px);
   padding:0;
-  border:1.5px solid #a4b8a9;
+  border:1.5px solid #698374;
   border-radius:5px;
   font-size:1.1rem;
   font-weight:750;
@@ -257,7 +257,7 @@ td {
 
 .cell[data-value="-1"] {
   background:#eef1e8;
-  color:#84958b;
+  color:#526e5e;
 }
 
 .cell[data-value="0"] {
