@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Iterable, Sequence
 
 from typing import Hashable
+from puzzle._symbolic import Symbolic
 
 if TYPE_CHECKING:
     from puzzle.expr import BoolExpr, Expr, LinearConstraint, Var, VarMap
@@ -11,28 +12,28 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class AllDifferentConstraint:
+class AllDifferentConstraint(Symbolic):
     vars: list[Var]
 
 
 @dataclass
-class UniqueConstraint:
+class UniqueConstraint(Symbolic):
     pass
 
 
 @dataclass
-class OneOfConstraint:
+class OneOfConstraint(Symbolic):
     constraints: list[LinearConstraint | BoolExpr]
 
 
 @dataclass
-class SingleCycleConstraint:
+class SingleCycleConstraint(Symbolic):
     edge_vars: VarMap
     grid: SquareGrid
 
 
 @dataclass
-class ConnectedConstraint:
+class ConnectedConstraint(Symbolic):
     cells: list[Cell]
     indicators: dict[Cell, BoolExpr | Var] = field(repr=False)
 
@@ -92,7 +93,7 @@ def at_most_one(exprs: Iterable[Expr]) -> LinearConstraint:
 
 
 @dataclass(frozen=True)
-class ShapeAcrossConstraint:
+class ShapeAcrossConstraint(Symbolic):
     """Constraint on piece shapes across a boundary edge."""
 
     forbidden_pairs: Sequence[tuple[Hashable, Hashable]]
@@ -100,7 +101,7 @@ class ShapeAcrossConstraint:
 
 
 @dataclass(frozen=True)
-class NoBoundaryCrossConstraint:
+class NoBoundaryCrossConstraint(Symbolic):
     """At each interior vertex, boundaries must not form a cross (+)."""
 
     vertex_bridges: Sequence[Sequence[Hashable]]
@@ -108,7 +109,7 @@ class NoBoundaryCrossConstraint:
 
 
 @dataclass
-class CompoundConstraint:
+class CompoundConstraint(Symbolic):
     """Multiple constraints to be added together."""
 
     constraints: list[LinearConstraint]

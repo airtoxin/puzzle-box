@@ -42,6 +42,7 @@ CLIの盤面・試行数の制限や、再現性の範囲は各機能の文書�
 | --- | --- |
 | パッケージ構成とDSL | [アーキテクチャ](../ARCHITECTURE.md) |
 | ルール・空間・回答・ヒントの接続 | [合成の設計](composition-design.md) |
+| 独自の黒白ルールを追加し、DSL条件を正しく組み合わせる | [独自ルールの作り方](custom-rules.md) |
 | 完成解の抽出とヒント削減の前提 | [生成レシピの契約](generation.md) |
 | 回答の射影、唯一性、`one_of`、空のループ | [求解の意味](solver-semantics.md) |
 | 式と変数を同じモデルに所属させる | [モデル所属](model-ownership.md) |

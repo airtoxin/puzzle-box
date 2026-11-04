@@ -5,6 +5,7 @@ from typing import Any, Hashable, Iterable, cast
 from ortools.sat.python import cp_model
 
 from puzzle.grid import Cell
+from puzzle._symbolic import Symbolic
 
 
 # Package-internal helpers shared by expression construction and Puzzle's
@@ -27,14 +28,14 @@ def _expression_vars(expression: cp_model.LinearExprT) -> list[cp_model.IntVar]:
     return []  # Integer constants are model-independent.
 
 
-class LinearConstraint:
+class LinearConstraint(Symbolic):
     """Public wrapper around a bounded linear expression."""
 
     def __init__(self, _internal: cp_model.BoundedLinearExpression | Any) -> None:
         self._internal: cp_model.BoundedLinearExpression = _internal
 
 
-class Expr:
+class Expr(Symbolic):
     """Wrapper around a CP-SAT linear expression."""
 
     def __init__(self, _internal: cp_model.LinearExprT) -> None:
