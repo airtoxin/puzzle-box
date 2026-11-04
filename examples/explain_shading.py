@@ -1,4 +1,4 @@
-"""Explain a few local shading deductions; stop honestly when they are insufficient."""
+"""Explain bounded shading deductions; stop honestly when they are insufficient."""
 
 import argparse
 from itertools import combinations
@@ -13,12 +13,41 @@ from generate_shading import verify
 from shading_recipe import load_json
 
 
+def _white_connector(cells: list[tuple[int, int]], known: dict[tuple[int, int], int]) -> tuple[tuple[int, int], dict[str, Any]] | None:
+    """Find a vertex whose removal separates two already-white terminals."""
+    possible = {c for c in cells if known.get(c) != 1}
+    white = {c for c in possible if known.get(c) == 0}
+    if len(white) < 2:
+        return None
+    start = min(white)
+
+    def reachable(allowed):
+        seen, pending = set(), [start]
+        while pending:
+            point = pending.pop()
+            if point in seen:
+                continue
+            seen.add(point)
+            r, c = point
+            pending.extend(n for n in ((r-1, c), (r+1, c), (r, c-1), (r, c+1)) if n in allowed and n not in seen)
+        return seen
+
+    if not white <= reachable(possible):
+        raise ValueError("Known white cells have no possible orthogonal connection")
+    for candidate in sorted(possible - white):
+        reached = reachable(possible - {candidate})
+        if separated := white - reached:
+            return candidate, {"terminals": [list(start), list(min(separated))],
+                               "reachable_without_cell": [list(c) for c in sorted(reached)]}
+    return None
+
+
 def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
     """Use validated built-in rules and clues only: no solver or saved answer."""
     cells = [(r, c) for r in range(recipe.rows) for c in range(recipe.cols)]
     known: dict[tuple[int, int], int] = {}
     origins: dict[tuple[int, int], dict[str, Any]] = {}
-    givens, constraints, unsupported = [], [], []
+    givens, constraints, connectivity = [], [], []
 
     def add(kind, scope, source, target=None):
         constraints.append({"kind": kind, "scope": [list(c) for c in scope],
@@ -38,7 +67,7 @@ def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
                 for c in range(recipe.cols-1):
                     add("has-black", [(r, c), (r, c+1), (r+1, c), (r+1, c+1)], source)
         elif type(rule) is ConnectedWhite:
-            unsupported.append(index)
+            connectivity.append(source)
         else:
             raise ValueError("Unsupported rule type")
     for index, clue in enumerate(clues, 1):
@@ -55,6 +84,9 @@ def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
             known[key] = value
             origins.setdefault(key, {"kind": "given", "index": index})
             givens.append({"clue_index": index, "cell": list(key), "value": value})
+    # Exhaust simpler local deductions before a graph deduction, then start over.
+    for source in connectivity:
+        add("connected-white", cells, source)
 
     steps = []
     while True:
@@ -64,6 +96,7 @@ def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
             black = sum(known.get(c, 0) for c in scope)
             kind, target = constraint["kind"], constraint["target"]
             inference: tuple[int, str, str] | None = None
+            chosen_cell, witness = None, None
             if kind == "count":
                 if black > target or black + len(unknown) < target:
                     raise ValueError("Count constraint conflicts with the known cells")
@@ -81,16 +114,23 @@ def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
                     raise ValueError("A 2x2 window is all white")
                 if len(unknown) == 1:
                     inference = (1, "last-in-window", "The other three cells of this 2x2 window are white, so its last cell must be black.")
+            elif kind == "connected-white":
+                if connector := _white_connector(cells, known):
+                    chosen_cell, witness = connector
+                    a, b = witness["terminals"]
+                    inference = (0, "white-connector", f"Making {list(chosen_cell)} black would separate known white cells {a} and {b} even if every other unknown cell were white. This connector must be white.")
             if inference is None:
                 continue
             value, technique, reason = inference
-            cell = unknown[0]
+            cell = chosen_cell if chosen_cell is not None else unknown[0]
             number = len(steps) + 1
             steps.append({"number": number, "cell": list(cell), "value": value,
                 "technique": technique, "reason": reason, "constraint": constraint,
                 "premises": [{"cell": list(c), "value": known[c], "origin": origins[c]}
                              for c in scope if c in known],
                 "unknown_cells": [list(c) for c in unknown]})
+            if witness is not None:
+                steps[-1]["connectivity_witness"] = witness
             known[cell] = value
             origins[cell] = {"kind": "step", "index": number}
             break  # Reconsider constraints after exactly one new fact.
@@ -99,7 +139,7 @@ def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
     return {"givens": givens, "steps": steps,
             "cells": [[known.get((r, c)) for c in range(recipe.cols)] for r in range(recipe.rows)],
             "unresolved_cells": [list(c) for c in cells if c not in known],
-            "rules_without_deductions": unsupported}
+            "rules_without_deductions": []}
 
 
 def explain_puzzle(data: Any) -> dict[str, Any]:
@@ -124,6 +164,8 @@ def explain(report: dict[str, Any]) -> str:
         lines.append(f"Step {step['number']}: {step['cell']} = {'black' if step['value'] else 'white'} "
                      f"from {source['kind']} {source['index']}. {step['reason']}")
         lines.append("  Scope: " + json.dumps(step["constraint"]["scope"]) + "; known premises: " + json.dumps(step["premises"]))
+        if "connectivity_witness" in step:
+            lines.append("  Connectivity witness: " + json.dumps(step["connectivity_witness"]))
     lines.append("State: " + picture(report["cells"]))
     lines.append("Solved by the supported deductions." if report["status"] == "solved" else
                  f"Unresolved: {len(report['unresolved_cells'])} cells. The supported deductions are exhausted; no guesses were made.")

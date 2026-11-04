@@ -130,13 +130,13 @@ def test_examples_separate_unique_answers_from_supported_deductions(name, status
         assert "no guesses" in deduction.explain(report)
 
 
-def test_unimplemented_connectivity_is_reported_and_cannot_fill_a_unique_cell():
+def test_nonempty_white_alone_is_not_a_supported_deduction():
     data = {"format": display.FORMAT, "rows": 1, "cols": 1,
             "rules": [{"type": "connected-white", "nonempty": True}], "clues": [], "solution": [[0]]}
     report = deduction.explain_puzzle(data)
     assert report["artifact_verification"]["unique"] is True
     assert report["status"] == "stalled" and report["cells"] == [[None]] and report["steps"] == []
-    assert report["rules_without_deductions"] == [1]
+    assert report["rules_without_deductions"] == []  # Supported types still have incomplete techniques.
 
 
 @pytest.mark.parametrize("damage", ["wrong-answer", "ambiguous", "contradictory", "redundant", "unknown-field", "recipe"])

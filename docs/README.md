@@ -10,7 +10,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 黒白ルールを選んで生成する | [黒白の合成](composable-shading.md) |
 | セルと行・列の黒数ヒントを混ぜる | [複数のヒント形式](mixed-shading-clues.md) |
 | 保存問題を表示し、完成した解答を確認する | [端末で遊ぶ](play-shading.md) |
-| 局所推論の根拠と、未解決で止まる箇所を確認する | [黒白の推論説明](shading-deductions.md) |
+| 限定した推論の根拠と、未解決で止まる箇所を確認する | [黒白の推論説明](shading-deductions.md) |
 | ルールの矛盾・ヒント不足・seedによる多様性を調べる | [小盤面診断](shading-diagnostics.md) |
 | ルールの部分集合・冗長性を比較する | [黒白の組合せ探索](shading-exploration.md) |
 | 選んだレシピを保存し、生成へ渡す | [レシピの保存と読込](shading-recipe-files.md) |
