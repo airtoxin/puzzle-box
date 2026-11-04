@@ -73,6 +73,50 @@ print(puzzle.result(solution))
 実装調査・課題・発展案は [プロジェクトレビュー](docs/project-review.md)、
 生成器の契約と使い方は [生成レシピ](docs/generation.md)を参照してください。
 
+## ルールとヒントの組合せを診断する
+
+9マス以下の黒白レシピでは、全配置を調べてルールの矛盾とヒント形式の不足を区別できます。
+
+```sh
+uv run --no-sync python examples/analyze_shading.py --seed-count 8
+```
+
+[小盤面の診断](docs/shading-diagnostics.md)に、同じ行列ヒントを持つ2つの答え、
+矛盾するルール集合、seedを変えたときの完成解の多様性をまとめています。
+
+候補ルールの全部分集合を比較する探索例もあります。
+
+```sh
+uv run --no-sync python examples/explore_shading.py
+uv run --no-sync python examples/explore_shading.py --rows 3 --cols 3 --black-counts 3 --candidates count non-touching --explain 1 2
+```
+
+[組合せの探索](docs/shading-exploration.md)では、完成解集合を変えないルールと、
+全候補ヒントがある場合の冗長性を分け、ルールを外すと唯一解を失う反例を表示します。
+
+## レシピを保存して生成する
+
+探索で選んだ設定を保存し、同じレシピから生成できます。
+
+```sh
+uv run --no-sync python examples/explore_shading.py --rows 3 --cols 3 --black-counts 3 --candidates count non-touching --hints cell row-count column-count --explain 1 2 --export-recipe chosen.json
+uv run --no-sync python examples/generate_shading.py generate --recipe chosen.json --seed 6 --output puzzle.json
+uv run --no-sync python examples/generate_shading.py verify puzzle.json
+```
+
+設定・問題・探索レポートの区別、入力検証、再現性は [レシピの保存と読込](docs/shading-recipe-files.md) を参照してください。
+
+## 保存した問題でルールを診断する
+
+生成された問題で、実際に残ったヒントに対するルールの必要性を診断できます。
+
+```sh
+uv run --no-sync python examples/diagnose_shading_rules.py puzzle.json --output rule-report.json
+```
+
+[保存ヒントでのルール診断](docs/stored-clue-rule-diagnostics.md)では、全候補ヒントとの違い、
+別解の盤面、個別の冗長性から一括削除できない理由を説明しています。レポートは答えも表示します。
+
 ## 開発と検証
 
 ```sh
