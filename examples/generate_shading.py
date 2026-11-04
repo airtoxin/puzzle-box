@@ -22,6 +22,7 @@ from puzzle_defs import (
     DistinctWhiteNumbers,
     RunLengthLimit,
     RoomRotationalSymmetry,
+    ColorComponentSize,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -201,6 +202,9 @@ def _rule_text(rule: ShadingRule) -> str:
         return f"Each horizontal or vertical run of black or white cells has length at most {rule.max_length}."
     if type(rule) is RoomRotationalSymmetry:
         return "Black cells in each room have 180-degree symmetry about its bounding-box center; rotation outside the room is forbidden."
+    if type(rule) is ColorComponentSize:
+        color = "black" if rule.black else "white"
+        return f"Every edge-connected {color} component contains exactly {rule.size} cells; absence of {color} cells is allowed."
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         color = "black" if rule.black else "white"
         shape = "a filled rectangle" if type(rule) is RectangularComponents else "nonrectangular"

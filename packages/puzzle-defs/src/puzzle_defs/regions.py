@@ -25,7 +25,12 @@ def _grow(
     size: int,
     results: set[frozenset[Cell]],
     board: SquareGrid,
+    seen: set[frozenset[Cell]] | None,
 ) -> None:
+    if seen is not None:
+        if current in seen:
+            return
+        seen.add(current)
     if len(current) == size:
         results.add(current)
         return
@@ -35,7 +40,7 @@ def _grow(
             if n in target and n not in current:
                 candidates.add(n)
     for c in sorted(candidates):
-        _grow(current | {c}, target, size, results, board)
+        _grow(current | {c}, target, size, results, board, seen)
 
 
 def enumerate_connected_regions(
@@ -43,11 +48,18 @@ def enumerate_connected_regions(
     size: int,
     board_cells: set[Cell] | None = None,
 ) -> list[Region]:
-    """Enumerate all connected regions of exactly `size` cells."""
+    """Enumerate all connected regions of exactly `size` cells.
+
+    Targets of at most nine cells memoize intermediate sets. Larger targets
+    retain the previous depth-first memory behavior. Enumeration is exponential.
+    """
     target = board_cells if board_cells is not None else set(board.cells)
+    if size <= 0 or size > len(target):
+        return []
     cell_sets: set[frozenset[Cell]] = set()
+    seen: set[frozenset[Cell]] | None = set() if len(target) <= 9 else None
     for start in sorted(target):
-        _grow(frozenset({start}), target, size, cell_sets, board)
+        _grow(frozenset({start}), target, size, cell_sets, board, seen)
     return [Region(cs) for cs in cell_sets]
 
 

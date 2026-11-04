@@ -20,6 +20,7 @@ from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
 from puzzle_defs import RoomRotationalSymmetry
+from puzzle_defs import ColorComponentSize
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -68,6 +69,9 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
                    for r in range(rows-1) for c in range(cols-1))
     if type(rule) is BlackDominoes:
         return all(len(group) == 2 for group in _components(black))
+    if type(rule) is ColorComponentSize:
+        selected = black if rule.black else {(r,c) for r in range(rows) for c in range(cols)} - black
+        return all(len(group) == rule.size for group in _components(selected))
     if type(rule) is RoomRotationalSymmetry:
         for label in {n for row in rule.rooms for n in row}:
             members = {(r,c) for r in range(rows) for c in range(cols) if rule.rooms[r][c] == label}

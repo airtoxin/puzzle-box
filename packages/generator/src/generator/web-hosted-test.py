@@ -81,7 +81,7 @@ def test_per_instance_lock_is_shared_by_generate_and_check_and_released_on_timeo
     assert call("generate")[1]["status"] == "timeout" and not hosted.JOB_LOCK.locked()
 
 
-@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry"])
+@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size"])
 def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, rule_group):
     output = tmp_path / "artifact"
     payload = prepare.export(output)
@@ -139,6 +139,11 @@ print('artifact generation passed')
                          {"id": "run-length-limit", "parameters": {"max_length": 3}}]
         if rule_group == "room-symmetry":
             data["rules"].append({"id": "room-rotational-symmetry", "parameters": {"rooms": [[0,0,0,0,0,0]]}})
+    elif rule_group == "component-size":
+        data["rows"],data["cols"] = 3,3
+        data["rules"] = [{"id": "count", "parameters": {"count": 6}},
+                         {"id": "connected-white", "parameters": {"nonempty": True}},
+                         {"id": "color-component-size", "parameters": {"size": 3, "black": True}}]
     result = subprocess.run([sys.executable, "-c", script], cwd=output, capture_output=True, text=True,
                             env={**os.environ, "PYTHONPATH": "", "PUZZLE_TEST_REQUEST": json.dumps(data),
                                  "PUZZLE_TEST_VENDOR": str(vendor)}, timeout=20)

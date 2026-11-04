@@ -11,6 +11,8 @@ from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
 from puzzle_defs import RoomRotationalSymmetry
+from puzzle_defs import ColorComponentSize
+from puzzle_defs.puzzles.component_size import MAX_COMPONENT_CELLS
 from puzzle_defs.number_layout import DEFAULT_NUMBERS, NumberGrid, number_grid
 from puzzle_defs.room_layout import DEFAULT_ROOMS, RoomMap, room_map
 from puzzle_defs.puzzles.shading import CLUE_KINDS, ShadingRule
@@ -25,7 +27,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
                       RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
-                      RunLengthLimit, RoomRotationalSymmetry)
+                      RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -42,6 +44,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "distinct-white-numbers": DistinctWhiteNumbers(DEFAULT_NUMBERS),
             "run-length-limit": RunLengthLimit(),
             "room-rotational-symmetry": RoomRotationalSymmetry(DEFAULT_ROOMS),
+            "color-component-size": ColorComponentSize(3),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -67,6 +70,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "numbers": [list(row) for row in rule.numbers]}
     if type(rule) is RunLengthLimit:
         return {"type": rule.ui.identifier, "max_length": rule.max_length}
+    if type(rule) is ColorComponentSize:
+        return {"type": rule.ui.identifier, "size": rule.size, "black": rule.black}
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         return {"type": rule.ui.identifier, "black": rule.black}
     for kind in PARAMETERLESS_RULE_TYPES:
@@ -99,6 +104,8 @@ def read_rule(data: Any) -> ShadingRule:
         return LineBlackCount(data["count"])
     if kind == "run-length-limit" and set(data) == {"type", "max_length"}:
         return RunLengthLimit(data["max_length"])
+    if kind == "color-component-size" and set(data) == {"type","size","black"}:
+        return ColorComponentSize(data["size"],data["black"])
     if kind in ("no-white-across-three-rooms","room-rotational-symmetry"):
         if (set(data) != {"type", "rooms"} or type(data["rooms"]) is not list
                 or any(type(row) is not list for row in data["rooms"])):
@@ -148,6 +155,12 @@ def read_recipe(data: Any) -> ShadingRecipe:
         raise ValueError("Recipe clue_kinds must be an array of cell, row-count or column-count values")
     recipe = ShadingRecipe(data["rows"], data["cols"], tuple(read_rule(r) for r in data["rules"]), tuple(kinds))
     check_demo_size(recipe)
+    for rule in recipe.rules:
+        if type(rule) is ColorComponentSize:
+            if recipe.rows*recipe.cols > MAX_COMPONENT_CELLS:
+                raise ValueError(f"Fixed component sizes support at most {MAX_COMPONENT_CELLS} board cells")
+            if rule.size > recipe.rows*recipe.cols:
+                raise ValueError("Component size cannot exceed the board area")
     shared_rooms(recipe)
     shared_numbers(recipe)
     if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
