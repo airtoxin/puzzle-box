@@ -18,6 +18,7 @@ from puzzle_defs import (
     ColumnCountClue, RowCountClue, ShadingRecipe,
     BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines, NoBlack2x2, NoThreeConsecutive,
     RoomBlackCount, RoomConnectedBlack, LineBlackCount,
+    RectangularComponents, NonRectangularComponents,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -186,6 +187,10 @@ def _rule_text(rule: ShadingRule) -> str:
         return f"Black cells connect inside each room without leaving it; {empty}."
     if type(rule) is LineBlackCount:
         return f"Every row and every column contains exactly {rule.count} black cells."
+    if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
+        color = "black" if rule.black else "white"
+        shape = "a filled rectangle" if type(rule) is RectangularComponents else "nonrectangular"
+        return f"Every edge-connected {color} component is {shape}; no {color} cells is allowed."
     raise ValueError("Cannot display an unknown rule")
 
 

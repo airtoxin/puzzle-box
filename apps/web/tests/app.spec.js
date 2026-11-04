@@ -2,8 +2,10 @@ import {test, expect} from '@playwright/test';
 
 test('new shading fragments share declared controls and generate without renderer changes', async ({page}) => {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const catalogResponse = page.waitForResponse('**/api/catalog');
   await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
-  await expect(page.locator('#rules .rule-card')).toHaveCount(13);
+  const catalog = await (await catalogResponse).json();
+  await expect(page.locator('#rules .rule-card')).toHaveCount(catalog.profiles.find(p => p.id === 'shading').rules.length);
   await page.getByLabel('白マスをつなぐ', {exact: true}).uncheck();
   await page.getByLabel('黒マス数', {exact: true}).fill('3');
   await page.getByLabel('黒マスをつなぐ', {exact: true}).check();

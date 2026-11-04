@@ -81,8 +81,8 @@ def test_per_instance_lock_is_shared_by_generate_and_check_and_released_on_timeo
     assert call("generate")[1]["status"] == "timeout" and not hosted.JOB_LOCK.locked()
 
 
-@pytest.mark.parametrize("room_rules", [False, True])
-def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, room_rules):
+@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes"])
+def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, rule_group):
     output = tmp_path / "artifact"
     payload = prepare.export(output)
     assert set(name for name in payload if name.startswith("public/")) == {"public/index.html", "public/app.js", "public/style.css"}
@@ -118,9 +118,13 @@ assert reply == ['200 OK'] and json.loads(body)['status'] == 'ok', body
 print('artifact generation passed')
 """
     data = request()
-    if room_rules:
+    if rule_group == "rooms":
         data["rules"] = [{"id": "room-black-count", "parameters": {"rooms": [[0,0,0], [1,1,1]], "count": 2}},
                          {"id": "black-dominoes", "parameters": {}}]
+    elif rule_group == "component-shapes":
+        data["rules"] = [{"id": "count", "parameters": {"count": 2}},
+                         {"id": "rectangular-components", "parameters": {"black": True}},
+                         {"id": "nonrectangular-components", "parameters": {"black": False}}]
     result = subprocess.run([sys.executable, "-c", script], cwd=output, capture_output=True, text=True,
                             env={**os.environ, "PYTHONPATH": "", "PUZZLE_TEST_REQUEST": json.dumps(data),
                                  "PUZZLE_TEST_VENDOR": str(vendor)}, timeout=20)
