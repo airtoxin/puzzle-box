@@ -15,7 +15,8 @@ from composed_shading_recipe import (
 )
 from generate_shading import _parse_answer, _render_puzzle, _rule_text, clue_record, read_clue
 from json_records import encode_json
-from shading_recipe import check_distinct_paths, load_json, shared_rooms, shared_numbers, shared_sight_counts, shared_island_areas
+from shading_recipe import (check_distinct_paths, load_json, shared_rooms, shared_numbers,
+                            shared_sight_counts, shared_island_areas, shared_neighbor_counts)
 
 FORMAT = "puzzle-box/composed-shading-v1"
 
@@ -110,7 +111,7 @@ def show(data: Any, *, reveal: bool = False, registry: ComponentRegistry = BUILT
     rules.extend(_component_text(component, registry) for component in recipe.builders)
     return _render_puzzle(base.rows, base.cols, clues, answer, rules, reveal=reveal,
                           rooms=shared_rooms(base), numbers=shared_numbers(base), sight_counts=shared_sight_counts(base),
-                          island_areas=shared_island_areas(base))
+                          island_areas=shared_island_areas(base), neighbor_counts=shared_neighbor_counts(base))
 
 
 def check_answer(data: Any, text: str, *, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> bool:
