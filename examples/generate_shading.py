@@ -20,6 +20,7 @@ from puzzle_defs import (
     RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms,
     RectangularComponents, NonRectangularComponents,
     DistinctWhiteNumbers,
+    RunLengthLimit,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -195,6 +196,8 @@ def _rule_text(rule: ShadingRule) -> str:
         return "A straight white run cannot cross two room boundaries; re-entering a room counts again."
     if type(rule) is DistinctWhiteNumbers:
         return "No row or column contains equal fixed numbers on two white cells."
+    if type(rule) is RunLengthLimit:
+        return f"Each horizontal or vertical run of black or white cells has length at most {rule.max_length}."
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         color = "black" if rule.black else "white"
         shape = "a filled rectangle" if type(rule) is RectangularComponents else "nonrectangular"

@@ -12,6 +12,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 部屋の配置・個数・連結を組み合わせる | [固定部屋のルール断片](room-fragments.md) |
 | 連結成分の長方形・長方形以外を組み合わせる | [成分の形の断片](component-shapes.md) |
 | 数字と部屋を重ねて黒白を生成する | [固定数字の断片](number-fragments.md) |
+| 同色の連続する長さを制限する | [連続長の上限](run-length.md) |
 | セルと行・列の黒数ヒントを混ぜる | [複数のヒント形式](mixed-shading-clues.md) |
 | 保存問題を表示し、完成した解答を確認する | [端末で遊ぶ](play-shading.md) |
 | 保存JSONの形式・読込エラー・互換性を確認する | [保存問題ファイル](saved-puzzle-files.md) |

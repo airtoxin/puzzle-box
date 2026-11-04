@@ -13,6 +13,8 @@
 | `BalancedLines()` / `balanced-lines` | 各行・列で黒数と白数が等しい | 片方でも奇数寸法なら矛盾。切捨てや自動サイズ変更はしない |
 | `DistinctLines()` / `distinct-lines` | 行同士・列同士がそれぞれ異なる配列 | 行と列の一致は許す。反転して同じ配列は、元の順序が違えば許す |
 
+同色の連続長を2以外にしたい場合は、[連続長の上限](run-length.md)を使います。最大長3は Aqre の4連続禁止に対応し、3連続禁止より弱い条件です。
+
 参照した規則は、[ニコリのぬりかべ](https://www.nikoli.co.jp/ja/puzzles/nurikabe/)と
 [LITS](https://www.nikoli.co.jp/ja/puzzles/lits/)の黒連結・黒2×2禁止、
 [のりのり](https://www.nikoli.co.jp/ja/puzzles/norinori/)の2マスの黒成分、

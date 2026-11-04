@@ -9,6 +9,7 @@ from puzzle_defs import (BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x
 from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms
 from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
+from puzzle_defs import RunLengthLimit
 from puzzle_defs.number_layout import DEFAULT_NUMBERS, NumberGrid, number_grid
 from puzzle_defs.room_layout import DEFAULT_ROOMS, RoomMap, room_map
 from puzzle_defs.puzzles.shading import CLUE_KINDS, ShadingRule
@@ -22,7 +23,7 @@ PARAMETERLESS_RULE_TYPES = (NoWhite2x2, NoBlack2x2, BlackDominoes, NoThreeConsec
 BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
-                      RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers)
+                      RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers, RunLengthLimit)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -37,6 +38,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "room-connected-black": RoomConnectedBlack(DEFAULT_ROOMS), "line-black-count": LineBlackCount(),
             "no-white-across-three-rooms": NoWhiteAcrossThreeRooms(DEFAULT_ROOMS),
             "distinct-white-numbers": DistinctWhiteNumbers(DEFAULT_NUMBERS),
+            "run-length-limit": RunLengthLimit(),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -60,6 +62,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "rooms": [list(row) for row in rule.rooms]}
     if type(rule) is DistinctWhiteNumbers:
         return {"type": rule.ui.identifier, "numbers": [list(row) for row in rule.numbers]}
+    if type(rule) is RunLengthLimit:
+        return {"type": rule.ui.identifier, "max_length": rule.max_length}
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         return {"type": rule.ui.identifier, "black": rule.black}
     for kind in PARAMETERLESS_RULE_TYPES:
@@ -90,6 +94,8 @@ def read_rule(data: Any) -> ShadingRule:
         return RoomConnectedBlack(tuple(tuple(row) for row in data["rooms"]), data["nonempty"])
     if kind == "line-black-count" and set(data) == {"type", "count"}:
         return LineBlackCount(data["count"])
+    if kind == "run-length-limit" and set(data) == {"type", "max_length"}:
+        return RunLengthLimit(data["max_length"])
     if kind == "no-white-across-three-rooms":
         if (set(data) != {"type", "rooms"} or type(data["rooms"]) is not list
                 or any(type(row) is not list for row in data["rooms"])):
