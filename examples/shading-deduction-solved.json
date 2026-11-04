@@ -1,0 +1,9 @@
+{
+  "format": "puzzle-box/shading-v2",
+  "rows": 2,
+  "cols": 2,
+  "rules": [{"type": "count", "count": 2}, {"type": "non-touching", "diagonal": false}],
+  "clue_kinds": ["cell", "row-count", "column-count"],
+  "clues": [{"type": "cell", "row": 1, "col": 1, "value": 1}],
+  "solution": [[1, 0], [0, 1]]
+}

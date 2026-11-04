@@ -1,0 +1,113 @@
+"""Saving a result must not drop semantics supplied by custom Python code."""
+
+import importlib
+from pathlib import Path
+
+import pytest
+
+from puzzle import Cell
+from puzzle_defs import BlackCount, ColumnCountClue, RowCountClue, ShadingRecipe
+
+EXAMPLES = Path(__file__).resolve().parents[4] / "examples"
+with pytest.MonkeyPatch.context() as patch:
+    patch.syspath_prepend(str(EXAMPLES))
+    display = importlib.import_module("generate_shading")
+    importlib.import_module("finite_shading")  # puzzle_record imports selection metadata lazily.
+    comparison = importlib.import_module("compare_shading_seeds")
+    analysis = importlib.import_module("analyze_shading")
+    recipes = importlib.import_module("shading_recipe")
+
+
+class ExtraBlack(ShadingRecipe):
+    def build_from_clues(self, clues):
+        puzzle = super().build_from_clues(clues)
+        puzzle.add(puzzle.black[Cell(0, 0)] == 1)
+        return puzzle
+
+
+def test_export_does_not_drop_a_subclass_rule_from_a_unique_answer():
+    recipe = ExtraBlack(1, 1, ())
+    puzzle = recipe.create_empty()
+    solution = puzzle.solve()
+    assert solution is not None and puzzle.result(solution) == [[1]]
+    # Before the guard this returned a shading-v1 file with rules=[], clues=[],
+    # solution=[[1]], which verify() correctly rejected as ambiguous.
+    with pytest.raises(ValueError, match="exact ShadingRecipe"):
+        display.puzzle_record(recipe, [], seed=0)
+
+
+def test_export_rejects_a_custom_rule_before_executing_it():
+    class CustomRule:
+        def apply(self, puzzle, board, black):
+            pytest.fail("Unsupported rules must not run while exporting")
+    with pytest.raises(ValueError, match="exact built-in"):
+        display.puzzle_record(ShadingRecipe(1, 1, (CustomRule(),)), [], seed=0)
+
+
+@pytest.mark.parametrize("kinds", [("cell",), ("row-count", "column-count")])
+def test_supported_exports_still_round_trip_with_selection_metadata(kinds):
+    recipe = ShadingRecipe(1, 1, (BlackCount(0),), kinds)
+    record = display.puzzle_record(recipe, [], seed=0, selection="finite")
+    assert record["environment"]["completion_selection"] == "finite-identifiable-v1"
+    assert display.verify(record) == {"valid": True, "unique": True, "irreducible": True, "clue_count": 0}
+
+
+@pytest.mark.parametrize("cols", [25, 26])
+def test_export_enforces_its_readers_board_limit_before_building(cols, monkeypatch):
+    recipe = ShadingRecipe(1, cols, (BlackCount(0),))
+    if cols == 25:
+        record = display.puzzle_record(recipe, [], seed=0)
+        assert display.verify(record)["valid"]
+    else:
+        monkeypatch.setattr(ShadingRecipe, "build_from_clues",
+                            lambda *a, **k: pytest.fail("Reject oversized exports before building"))
+        with pytest.raises(ValueError, match="at most 25 cells"):
+            display.puzzle_record(recipe, [], seed=0)
+
+
+@pytest.mark.parametrize("kind,clue", [("cell", (Cell(0, 0), 1)),
+                                      ("row-count", RowCountClue(0, 1)),
+                                      ("column-count", ColumnCountClue(0, 1))])
+@pytest.mark.parametrize("enabled", [True, False])
+def test_export_and_reader_agree_on_each_enabled_clue_kind(kind, clue, enabled, monkeypatch):
+    kinds = (kind,) if enabled else (("row-count",) if kind == "cell" else ("cell",))
+    recipe = ShadingRecipe(1, 1, (), kinds)
+    if enabled:
+        record = display.puzzle_record(recipe, [clue], seed=0)
+        assert display.verify(record)["valid"]
+    else:
+        monkeypatch.setattr(ShadingRecipe, "build_from_clues",
+                            lambda *a, **k: pytest.fail("Reject disabled clues before building"))
+        with pytest.raises(ValueError, match="not enabled by clue_kinds"):
+            display.puzzle_record(recipe, [clue], seed=0)
+
+
+@pytest.mark.parametrize("rules,clues", [((BlackCount(0),), [(Cell(0, 0), 0)]),
+                                        ((), [(Cell(0, 0), 1), (Cell(0, 0), 1)])])
+def test_export_rejects_redundant_clues_just_like_verification(rules, clues):
+    with pytest.raises(ValueError, match="not irreducible"):
+        display.puzzle_record(ShadingRecipe(1, 1, rules), clues, seed=0)
+
+
+@pytest.mark.parametrize("row,col", [(False, 0), (0, False), (0.0, 0), (0, 0.0)])
+@pytest.mark.parametrize("kinds", [("cell",), ("cell", "row-count")])
+def test_export_uses_reader_coordinate_types_before_building(row, col, kinds, monkeypatch):
+    recipe = ShadingRecipe(1, 1, (), kinds)
+    monkeypatch.setattr(ShadingRecipe, "build_from_clues",
+                        lambda *a, **k: pytest.fail("Reject invalid serialized clues before building"))
+    with pytest.raises(ValueError, match="coordinates must be integers"):
+        display.puzzle_record(recipe, [(Cell(row, col), 1)], seed=0)
+
+
+@pytest.mark.parametrize("operation", ["compare", "analyze", "export"])
+def test_subclass_is_rejected_even_when_analysis_would_skip_generation(operation, monkeypatch):
+    recipe = ExtraBlack(1, 1, (), ())
+    monkeypatch.setattr(ExtraBlack, "build_from_clues",
+                        lambda *a, **k: pytest.fail("Reject unknown semantics before building"))
+    with pytest.raises(ValueError, match="exact ShadingRecipe"):
+        if operation == "compare":
+            comparison.compare(recipe, [0])
+        elif operation == "analyze":
+            analysis.analyze(recipe)
+        else:
+            recipes.recipe_record(recipe)
