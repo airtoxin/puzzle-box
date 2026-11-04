@@ -1,0 +1,13 @@
+{
+  "format": "puzzle-box/shading-v2",
+  "rows": 3,
+  "cols": 3,
+  "rules": [{"type": "count", "count": 3}, {"type": "non-touching", "diagonal": false}],
+  "clue_kinds": ["row-count", "column-count"],
+  "clues": [
+    {"type": "row-count", "row": 1, "count": 1},
+    {"type": "column-count", "col": 1, "count": 0},
+    {"type": "column-count", "col": 2, "count": 2}
+  ],
+  "solution": [[0, 0, 1], [1, 0, 0], [0, 0, 1]]
+}
