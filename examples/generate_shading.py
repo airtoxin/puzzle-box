@@ -168,7 +168,14 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
     # alone is not evidence that the saved problem is uniquely solvable.
     verify(data)
     recipe, clues, answer = _read_record(data)
-    cells = [["?" for _ in range(recipe.cols)] for _ in range(recipe.rows)]
+    return _render_puzzle(recipe.rows, recipe.cols, clues, answer,
+                          [_rule_text(rule) for rule in recipe.rules], reveal=reveal)
+
+
+def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[int]],
+                   rules: list[str], *, reveal: bool = False) -> str:
+    """Presentation only: each format's caller must verify its full recipe first."""
+    cells = [["?" for _ in range(cols)] for _ in range(rows)]
     row_counts: dict[int, int] = {}
     col_counts: dict[int, int] = {}
     for clue in clues:
@@ -182,13 +189,13 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
     if reveal:
         cells = [["#" if value else "." for value in row] for row in answer]
     title = "Solution" if reveal else "Shading puzzle"
-    lines = [f"{title}: {recipe.rows} rows x {recipe.cols} columns", "", "Rules:"]
-    lines.extend(f"- {_rule_text(rule)}" for rule in recipe.rules)
-    if not recipe.rules:
+    lines = [f"{title}: {rows} rows x {cols} columns", "", "Rules:"]
+    lines.extend(f"- {text}" for text in rules)
+    if not rules:
         lines.append("- No additional rules.")
     lines.extend([
-        "", f"{'column':>11} " + " ".join(f"{c+1:>2}" for c in range(recipe.cols)),
-        f"{'count':>11} " + " ".join(f"{col_counts.get(c, '-'):>2}" for c in range(recipe.cols)),
+        "", f"{'column':>11} " + " ".join(f"{c+1:>2}" for c in range(cols)),
+        f"{'count':>11} " + " ".join(f"{col_counts.get(c, '-'):>2}" for c in range(cols)),
         f"{'row':>3} {'count':>5} |",
     ])
     lines.extend(f"{r+1:>3} {row_counts.get(r, '-'):>5} | " + " ".join(f"{v:>2}" for v in row)
