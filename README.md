@@ -117,6 +117,9 @@ uv run --no-sync python examples/diagnose_shading_rules.py puzzle.json --output 
 [保存ヒントでのルール診断](docs/stored-clue-rule-diagnostics.md)では、全候補ヒントとの違い、
 別解の盤面、個別の冗長性から一括削除できない理由を説明しています。レポートは答えも表示します。
 
+[局所推論を説明する](docs/shading-deductions.md)では、唯一解の確認と推論による解決を分け、
+各手順の根拠を表示します。対応する手順で進まない場合は、未知のマスを残して未解決と報告します。
+
 ## 開発と検証
 
 ```sh
