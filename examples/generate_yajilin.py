@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import platform
+import sys
 from typing import Any
 
 import ortools
@@ -14,7 +15,7 @@ from puzzle_defs import ArrowCountClue, ArrowSite, BlackCellClue, EdgeStateClue,
 from puzzle_defs.puzzles.yajilin_recipe import YAJILIN_CLUE_KINDS, YajilinClue
 from generate_slitherlink import edge_record, read_edge
 from edge_answers import edge_rows, edge_template, parse_edge_answer
-from json_records import load_json, read_array
+from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/yajilin-v1"
 ARROWS = {"up": "^", "down": "v", "left": "<", "right": ">"}
@@ -271,11 +272,11 @@ def main() -> int:
         if args.attempts > 1:
             data["generation"] = {"initial_seed": args.seed, "attempt_limit": args.attempts,
                                   "attempts_used": attempts_used}
-        encoded = json.dumps(data, indent=2, sort_keys=True) + "\n"
+        encoded = encode_json(data)
         if args.output is not None:
-            args.output.write_text(encoded, encoding="utf-8")
+            args.output.write_bytes(encoded)
         if not args.quiet:
-            print(encoded, end="")
+            sys.stdout.buffer.write(encoded)
         return 0
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
         parser.error(str(exc))

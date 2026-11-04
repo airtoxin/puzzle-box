@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 import platform
+import sys
 from typing import Any
 
 import ortools
@@ -18,7 +19,7 @@ from puzzle_defs import (
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from shading_recipe import RULES, check_demo_size, check_distinct_paths, load_recipe, read_rule, rule_record
-from json_records import load_json, read_array
+from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/shading-v1"
 MIXED_FORMAT = "puzzle-box/shading-v2"
@@ -294,11 +295,11 @@ def main() -> int:
                                  "to retain disambiguating clues") from exc
             raise
         record = puzzle_record(recipe, clues, seed=args.seed, selection=args.selection)
-        encoded = json.dumps(record, indent=2, sort_keys=True) + "\n"
+        encoded = encode_json(record)
         if args.output is not None:
-            args.output.write_text(encoded, encoding="utf-8")
+            args.output.write_bytes(encoded)
         if not args.quiet:
-            print(encoded, end="")
+            sys.stdout.buffer.write(encoded)
         return 0
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
         parser.error(str(exc))
