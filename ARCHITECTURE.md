@@ -5,8 +5,8 @@
 パズルのルールを宣言的に記述して解を求めるための Python DSL とソルバー集です。
 内部で CP-SAT (Google OR-Tools) を使いますが、利用者はそれを意識しません。
 
-実行方法は [README](README.md)、実装調査と今後の開発案は
-[プロジェクトレビュー](docs/project-review.md)を参照してください。
+実行方法は [README](README.md)、ルール・ヒント・回答を接続するときの契約は
+[合成の設計](docs/composition-design.md)、各機能の使い方は[ドキュメント一覧](docs/README.md)を参照してください。
 現在のパッケージ構成は `puzzle`（DSL）、`puzzle-defs`（定義・列挙）、
 `solvers`（関数API）、`generator`（ヒント生成・削減）の4層です。
 
