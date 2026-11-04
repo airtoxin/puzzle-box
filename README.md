@@ -146,6 +146,7 @@ uv run --no-sync python examples/generate_slitherlink.py verify loop.json
 
 数字だけでは2解になる反例、API、合成できる範囲と未対応の接続は
 [ループのレシピ](docs/slitherlink-composition.md)を参照してください。
+表示したテンプレートから完成した辺を入力し、[解答の正誤確認](docs/play-slitherlink.md)もできます。
 
 ## 黒マスとループを同時に生成する
 
