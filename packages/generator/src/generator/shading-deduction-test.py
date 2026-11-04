@@ -182,7 +182,8 @@ def test_cli_reports_honest_exit_status_and_preserves_source(tmp_path, name, exp
 
 
 @pytest.mark.parametrize("raw", ["{", '{"format":1,"format":2}', " " * 65537,
-    json.dumps({"format": "puzzle-box/shading-v1", "rows": 2, "cols": 5, "rules": [], "clues": [], "solution": [[0]*5]*2})])
+    json.dumps({"format": "puzzle-box/shading-v1", "rows": 2, "cols": 5, "rules": [], "clues": [], "solution": [[0]*5]*2})],
+    ids=["malformed-json", "duplicate-key", "oversized-input", "oversized-board"])
 def test_cli_rejects_malformed_or_out_of_scope_input_without_writing(tmp_path, raw):
     source = tmp_path / "bad.json"
     source.write_text(raw)
