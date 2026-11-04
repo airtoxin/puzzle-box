@@ -3,7 +3,7 @@
 import json
 import sys
 from typing import Any
-from puzzle_defs import SlitherlinkRecipe
+from puzzle_defs import SlitherlinkRecipe, YajilinRecipe
 
 from analyze_shading import finite_space, full_clues
 from finite_shading import generate_finite
@@ -14,6 +14,9 @@ from web_catalog import read_request
 def generate_request(data: Any) -> dict[str, Any]:
     request = read_request(data)
     recipe = request.recipe
+    if isinstance(recipe, YajilinRecipe):
+        from web_coupled import generate_coupled
+        return generate_coupled(request, data)
     if isinstance(recipe, SlitherlinkRecipe):
         from web_loop import generate_loop
         return generate_loop(request, data)
