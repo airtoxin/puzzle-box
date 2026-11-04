@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from puzzle import Cell
-from puzzle_defs import BlackCount, ShadingRecipe
+from puzzle_defs import BlackCount, ColumnCountClue, RowCountClue, ShadingRecipe
 
 EXAMPLES = Path(__file__).resolve().parents[4] / "examples"
 with pytest.MonkeyPatch.context() as patch:
@@ -60,3 +60,20 @@ def test_export_enforces_its_readers_board_limit_before_building(cols, monkeypat
                             lambda *a, **k: pytest.fail("Reject oversized exports before building"))
         with pytest.raises(ValueError, match="at most 25 cells"):
             display.puzzle_record(recipe, [], seed=0)
+
+
+@pytest.mark.parametrize("kind,clue", [("cell", (Cell(0, 0), 1)),
+                                      ("row-count", RowCountClue(0, 1)),
+                                      ("column-count", ColumnCountClue(0, 1))])
+@pytest.mark.parametrize("enabled", [True, False])
+def test_export_and_reader_agree_on_each_enabled_clue_kind(kind, clue, enabled, monkeypatch):
+    kinds = (kind,) if enabled else (("row-count",) if kind == "cell" else ("cell",))
+    recipe = ShadingRecipe(1, 1, (), kinds)
+    if enabled:
+        record = display.puzzle_record(recipe, [clue], seed=0)
+        assert display.verify(record)["valid"]
+    else:
+        monkeypatch.setattr(ShadingRecipe, "build_from_clues",
+                            lambda *a, **k: pytest.fail("Reject disabled clues before building"))
+        with pytest.raises(ValueError, match="not enabled by clue_kinds"):
+            display.puzzle_record(recipe, [clue], seed=0)

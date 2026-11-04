@@ -23,6 +23,14 @@ FORMAT = "puzzle-box/shading-v1"
 MIXED_FORMAT = "puzzle-box/shading-v2"
 
 
+def _check_clue_kinds(recipe: ShadingRecipe, clues: list[Clue]) -> None:
+    for clue in clues:
+        kind = "row-count" if isinstance(clue, RowCountClue) else (
+            "column-count" if isinstance(clue, ColumnCountClue) else "cell")
+        if kind not in recipe.clue_kinds:
+            raise ValueError("Stored clue type is not enabled by clue_kinds")
+
+
 def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
                   selection: str = "solver") -> dict[str, Any]:
     """Serialize generated clues only after proving their unique visible answer."""
@@ -32,6 +40,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     if selection not in ("solver", "finite"):
         raise ValueError("Unknown completion selection")
     rules = [rule_record(rule) for rule in recipe.rules]
+    _check_clue_kinds(recipe, clues)
     puzzle = recipe.build_from_clues(clues)
     puzzle.add(unique())
     solution = puzzle.solve()
@@ -94,11 +103,7 @@ def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[
                            ("cell",) if legacy else tuple(data["clue_kinds"]))
     check_demo_size(recipe)
     clues = [read_clue(clue, legacy=legacy) for clue in data["clues"]]
-    for clue in clues:
-        kind = "row-count" if isinstance(clue, RowCountClue) else (
-            "column-count" if isinstance(clue, ColumnCountClue) else "cell")
-        if kind not in recipe.clue_kinds:
-            raise ValueError("Stored clue type is not enabled by clue_kinds")
+    _check_clue_kinds(recipe, clues)
     answer = data["solution"]
     if (not isinstance(answer, list) or len(answer) != recipe.rows
             or any(not isinstance(row, list) or len(row) != recipe.cols
