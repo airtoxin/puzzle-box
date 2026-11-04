@@ -17,6 +17,7 @@ from puzzle_defs import WhiteVisibilityCounts
 from puzzle_defs import ComponentsTouchBorder
 from puzzle_defs import WhiteIslandAreas
 from puzzle_defs import AdjacentBlackCounts
+from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs.clue_layout import ClueGrid, clue_grid
 from puzzle_defs.puzzles.adjacent_black_counts import DEFAULT_NEIGHBOR_COUNTS
 from puzzle_defs.puzzles.white_island_areas import DEFAULT_ISLAND_AREAS
@@ -37,7 +38,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
                       RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
-                      ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts)
+                      ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -60,6 +61,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "components-touch-border": ComponentsTouchBorder(),
             "white-island-areas": WhiteIslandAreas(DEFAULT_ISLAND_AREAS),
             "adjacent-black-counts": AdjacentBlackCounts(DEFAULT_NEIGHBOR_COUNTS),
+            "color-degree-range": ColorDegreeRange(), "color-endpoint-count": ColorEndpointCount(),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -89,6 +91,10 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "areas": [list(row) for row in rule.areas]}
     if type(rule) is AdjacentBlackCounts:
         return {"type": rule.ui.identifier, "neighbor_counts": [list(row) for row in rule.neighbor_counts], "diagonal": rule.diagonal}
+    if type(rule) is ColorDegreeRange:
+        return {"type": rule.ui.identifier, "minimum": rule.minimum, "maximum": rule.maximum, "black": rule.black}
+    if type(rule) is ColorEndpointCount:
+        return {"type": rule.ui.identifier, "count": rule.count, "black": rule.black}
     if type(rule) is RunLengthLimit:
         return {"type": rule.ui.identifier, "max_length": rule.max_length}
     if type(rule) is ColorComponentSize:
@@ -129,6 +135,10 @@ def read_rule(data: Any) -> ShadingRule:
         return RunLengthLimit(data["max_length"])
     if kind == "color-component-size" and set(data) == {"type","size","black"}:
         return ColorComponentSize(data["size"],data["black"])
+    if kind == "color-degree-range" and set(data) == {"type", "minimum", "maximum", "black"}:
+        return ColorDegreeRange(data["minimum"], data["maximum"], data["black"])
+    if kind == "color-endpoint-count" and set(data) == {"type", "count", "black"}:
+        return ColorEndpointCount(data["count"], data["black"])
     if kind == "components-touch-border" and set(data) == {"type", "black"}:
         return ComponentsTouchBorder(data["black"])
     if kind in ("no-white-across-three-rooms","room-rotational-symmetry","no-touching-equal-tetrominoes"):
@@ -212,6 +222,8 @@ def read_recipe(data: Any) -> ShadingRecipe:
     if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
            and r.count > recipe.rows * recipe.cols for r in recipe.rules):
         raise ValueError("Black count cannot exceed the board area")
+    if any(type(r) is ColorEndpointCount and r.count > recipe.rows * recipe.cols for r in recipe.rules):
+        raise ValueError("Endpoint count cannot exceed the board area")
     return recipe
 
 
