@@ -75,7 +75,7 @@ def test_custom_play_keeps_component_identity_and_all_parameter_values():
     assert "Answer template: #??/???" in shown
     assert "example/row-black-band/v1" in shown
     assert '"minimum": 0' in shown and '"maximum": 1' in shown
-    assert "see trusted implementation" in shown
+    assert "Each row contains between 0 and 1 black cells (inclusive)." in shown
     assert data == before
 
 

@@ -6,6 +6,7 @@ and builders are trusted code; this registry is not a sandbox for that code.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field, fields, is_dataclass
 from inspect import Parameter as SignatureParameter, signature
 import re
@@ -77,6 +78,7 @@ class ComponentRegistry:
     """An immutable registry; with_component returns a new independent value."""
 
     _entries: tuple[_Entry, ...] = field(default=(), init=False, repr=False)
+    _descriptions: tuple[tuple[type, Callable[[Any], str]], ...] = field(default=(), init=False, repr=False)
 
     def require_base(self, baseline: ComponentRegistry) -> None:
         if any(entry not in self._entries for entry in baseline._entries):
@@ -111,7 +113,36 @@ class ComponentRegistry:
         entry = _Entry(identifier, builder_type, tuple((f.name, parameters[f.name]) for f in declared))
         extended = ComponentRegistry()
         object.__setattr__(extended, "_entries", (*self._entries, entry))
+        object.__setattr__(extended, "_descriptions", self._descriptions)
         return extended
+
+    def with_description(self, builder_type: type, describe: Callable[[Any], str], /) -> ComponentRegistry:
+        """Attach trusted presentation code without changing the saved schema."""
+        if not any(e.builder_type is builder_type for e in self._entries):
+            raise ValueError("Register the exact component type before adding a description")
+        if any(t is builder_type for t, _ in self._descriptions):
+            raise ValueError("Component description already registered")
+        if not callable(describe):
+            raise ValueError("Description must be callable with one component argument")
+        try:
+            signature(describe).bind(object())
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Description must be callable with one component argument") from exc
+        extended = ComponentRegistry()
+        object.__setattr__(extended, "_entries", self._entries)
+        object.__setattr__(extended, "_descriptions", (*self._descriptions, (builder_type, describe)))
+        return extended
+
+    def describe(self, builder: Any) -> str | None:
+        """Return optional prose for a validated exact component; never infer it."""
+        self.encode(builder)
+        renderer = next((f for t, f in self._descriptions if t is type(builder)), None)
+        if renderer is None:
+            return None
+        text = renderer(builder)
+        if type(text) is not str or not text.strip() or not text.isprintable():
+            raise ValueError("Component description must be nonempty printable single-line text")
+        return text
 
     def decode(self, data: Any) -> Any:
         if not isinstance(data, dict):

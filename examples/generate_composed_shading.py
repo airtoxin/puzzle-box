@@ -84,6 +84,11 @@ def verify(data: Any, *, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> di
 
 
 def _component_text(component: Any, registry: ComponentRegistry) -> str:
+    description = registry.describe(component)
+    if description is not None:
+        # Retain machine identity/settings beside trusted human prose. The prose
+        # is presentation only, never used to solve or certify the puzzle.
+        return description + " Settings: " + json.dumps(registry.encode(component), sort_keys=True, ensure_ascii=True)
     if type(component) is CellCount:
         subject = "cell is" if component.count == 1 else "cells are"
         return f"Exactly {component.count} {subject} {component.color}."

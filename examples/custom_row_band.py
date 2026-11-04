@@ -29,10 +29,14 @@ class RowBlackBand:
 
 # This code is selected by the application author. No file controls imports or
 # registrations, and extending this value does not mutate BUILTIN_COMPONENTS.
+def describe_row_band(rule: RowBlackBand) -> str:
+    return f"Each row contains between {rule.minimum} and {rule.maximum} black cells (inclusive)."
+
+
 COMPONENTS = BUILTIN_COMPONENTS.with_component(
     "example/row-black-band/v1", RowBlackBand,
     minimum=IntParam(0, 9), maximum=IntParam(0, 9),
-)
+).with_description(RowBlackBand, describe_row_band)
 
 
 if __name__ == "__main__":
