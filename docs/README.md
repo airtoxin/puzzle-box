@@ -48,6 +48,7 @@ CLIの盤面・試行数の制限や、再現性の範囲は各機能の文書�
 | ルール・空間・回答・ヒントの接続 | [合成の設計](composition-design.md) |
 | 独自の黒白ルールを追加し、DSL条件を正しく組み合わせる | [独自ルールの作り方](custom-rules.md) |
 | 完成解の抽出とヒント削減の前提 | [生成レシピの契約](generation.md) |
+| 既存レシピへ共通の追加制約を適用する | [制約部品の合成](recipe-constraint-composition.md) |
 | 回答の射影、唯一性、`one_of`、空のループ | [求解の意味](solver-semantics.md) |
 | 式と変数を同じモデルに所属させる | [モデル所属](model-ownership.md) |
 | 求解後の値とスナップショット | [解から値を読む](solution-values.md) |
