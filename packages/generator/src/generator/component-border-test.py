@@ -53,7 +53,16 @@ def test_all_three_by_three_visible_answers_match_in_board_boundary_flood(black)
     expected = {bits for bits in product((0,1),repeat=9) if reaches_boundary(bits,3,3,black)}
     assert len(expected) == 496
     assert {b for b in product((0,1),repeat=9) if oracle.accepts(rule,b,3,3)} == expected
-    assert all_answers(ShadingRecipe(3,3,(rule,))) == expected
+    recipe = ShadingRecipe(3,3,(rule,))
+    # Fix every candidate board instead of accumulating hundreds of exclusions
+    # while leaving all visible cells free. Cover all 512 masks, including the
+    # 16 impossible ones, without growing a harder projected-enumeration model.
+    for bits in product((0,1),repeat=9):
+        puzzle = recipe.build_from_clues([(Cell(i//3,i%3),bit) for i,bit in enumerate(bits)])
+        solution = puzzle.solve(seed=0)
+        assert (solution is not None) == (bits in expected), (black,bits)
+        if solution is not None:
+            assert tuple(v for row in puzzle.result(solution) for v in row) == bits
 
 
 @pytest.mark.parametrize("rows,cols", [(1,1),(1,4),(4,1),(2,3)])
