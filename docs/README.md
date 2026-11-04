@@ -14,6 +14,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 数字と部屋を重ねて黒白を生成する | [固定数字の断片](number-fragments.md) |
 | 数字から見える白マス数を固定する | [黒どこの可視数](white-visibility.md) |
 | 黒・白の各成分から外枠へ到達させる | [成分と外枠の接続](component-border.md) |
+| 数字ごとに白い島の面積を指定する | [ぬりかべの島](white-island-areas.md) |
 | 同色の連続する長さを制限する | [連続長の上限](run-length.md) |
 | 黒・白の各連結成分を同じサイズにする | [固定成分サイズ](component-size.md) |
 | LITS の部屋ピースの同形接触を禁止する | [テトロミノの接触](tetromino-contact.md) |

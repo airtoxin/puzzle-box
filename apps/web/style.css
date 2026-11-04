@@ -302,6 +302,9 @@ td {
 .cell-mark {position:absolute; right:2px; bottom:0; font-size:.6rem; line-height:1.2;}
 .sight-number {display:inline-block; min-width:1.4em; border:1px solid currentColor; border-radius:50%; font-size:.95rem; line-height:1.4;}
 .dual-numbered .sight-number {position:absolute; left:1px; top:1px; font-size:.6rem;}
+.area-number {display:inline-block; min-width:1.4em; border:1px solid currentColor; border-radius:1px; font-size:.95rem; line-height:1.4;}
+.dual-numbered .area-number {position:absolute; right:1px; top:1px; font-size:.6rem;}
+.mixed-numeric-givens .sight-number {position:absolute; left:1px; top:1px; font-size:.6rem;}
 .numbered-cell.fixed::after {position:absolute; left:2px; bottom:0; margin:0;}
 
 .loop-board {border-spacing:3px; text-align:center;}

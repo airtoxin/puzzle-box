@@ -6,7 +6,7 @@ const hints = new Map();
 // Capabilities of these renderers, independent of what a newer server declares.
 const renderers = {
   shading: {topology: 'rectangular-cells', maxCells: 9, minSide: 1, required: ['answer'],
-    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts'}},
+    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts', 'island-areas': 'cell-island-areas'}},
   slitherlink: {topology: 'rectangular-cells', maxCells: 4, minSide: 1, required: ['answer'],
     channels: {answer: 'binary-edges', 'cell-counts': 'cell-edge-counts', 'edge-givens': 'edge-givens'}},
   coupled: {topology: 'rectangular-cell-centers', maxCells: 9, minSide: 2, required: ['answer-cells', 'answer-edges'],
@@ -49,17 +49,14 @@ function assertRenderablePlan(candidate, request) {
     const shown = JSON.stringify(canonicalRooms(candidate.rooms, candidate.rows, candidate.cols));
     if (requestedRooms.some(rooms => JSON.stringify(canonicalRooms(rooms, candidate.rows, candidate.cols)) !== shown)) throw new UnsupportedUiError();
   }
-  const requestedNumbers = request.rules.filter(r => Object.hasOwn(r.parameters, 'numbers')).map(r => r.parameters.numbers);
-  if (seen.has('numbers') !== (requestedNumbers.length > 0) || !seen.has('numbers') && candidate.numbers !== undefined) throw new UnsupportedUiError();
-  if (seen.has('numbers')) {
-    const shown = JSON.stringify(checkedGrid(candidate.numbers, candidate.rows, candidate.cols, 99));
-    if (requestedNumbers.some(numbers => JSON.stringify(checkedGrid(numbers, candidate.rows, candidate.cols, 99)) !== shown)) throw new UnsupportedUiError();
-  }
-  const requestedCounts = request.rules.filter(r => Object.hasOwn(r.parameters, 'counts')).map(r => r.parameters.counts);
-  if (seen.has('sight-counts') !== (requestedCounts.length > 0) || !seen.has('sight-counts') && candidate.sight_counts !== undefined) throw new UnsupportedUiError();
-  if (seen.has('sight-counts')) {
-    const shown = JSON.stringify(checkedGrid(candidate.sight_counts, candidate.rows, candidate.cols, 99));
-    if (requestedCounts.some(counts => JSON.stringify(checkedGrid(counts, candidate.rows, candidate.cols, 99)) !== shown)) throw new UnsupportedUiError();
+  for (const [parameter, channel, payload] of [['numbers','numbers','numbers'],
+    ['counts','sight-counts','sight_counts'], ['areas','island-areas','island_areas']]) {
+    const requested = request.rules.filter(r => Object.hasOwn(r.parameters, parameter)).map(r => r.parameters[parameter]);
+    if (seen.has(channel) !== (requested.length > 0) || !seen.has(channel) && candidate[payload] !== undefined) throw new UnsupportedUiError();
+    if (seen.has(channel)) {
+      const shown = JSON.stringify(checkedGrid(candidate[payload], candidate.rows, candidate.cols, 99));
+      if (requested.some(grid => JSON.stringify(checkedGrid(grid, candidate.rows, candidate.cols, 99)) !== shown)) throw new UnsupportedUiError();
+    }
   }
 }
 function rejectUnsupportedUi() {
@@ -170,7 +167,8 @@ function renderBoard(reveal = false) {
     }
     for (let c = 0; c < plan.cols; c++) {
       const index = r * plan.cols + c;
-      const value = reveal ? artifact.record.solution[r][c] : artifact ? input[index] : plan.sight_counts?.[r][c] > 0 ? 0 : -1;
+      const givenWhite = plan.sight_counts?.[r][c] > 0 || plan.island_areas?.[r][c] > 0;
+      const value = reveal ? artifact.record.solution[r][c] : artifact ? input[index] : givenWhite ? 0 : -1;
       const td = node('td'); td.append(cellButton(index, r, c, value, reveal));
       if (channels.has('rooms')) {
         const room = plan.rooms[r][c]; td.dataset.room = room;
@@ -191,16 +189,19 @@ function cellButton(index, r, c, value, reveal) {
   const paint = value => {
     const mark = value === -1 ? '?' : value === 0 ? '○' : '■';
     const sight = plan.sight_counts?.[r][c] || 0;
-    if (plan.numbers || sight) {
+    const area = plan.island_areas?.[r][c] || 0;
+    if (plan.numbers || sight || area) {
       button.classList.add('numbered-cell');
       const labels = [];
       if (plan.numbers) labels.push(node('span', String(plan.numbers[r][c]), 'cell-number'));
       if (sight) labels.push(node('span', String(sight), 'sight-number'));
-      if (plan.numbers && sight) button.classList.add('dual-numbered');
+      if (area) labels.push(node('span', String(area), 'area-number'));
+      if (plan.numbers && (sight || area)) button.classList.add('dual-numbered');
+      if (sight && area) button.classList.add('mixed-numeric-givens');
       button.replaceChildren(...labels, node('span', mark, 'cell-mark'));
     } else button.textContent = mark;
     button.dataset.value = value;
-    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${sight ? `（見える白${sight}）` : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
+    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${sight ? `（見える白${sight}）` : ''}${area ? `（白い島の面積${area}）` : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
   };
   paint(value);
   button.addEventListener('click', () => {
@@ -345,8 +346,8 @@ form.addEventListener('submit', async event => {
       const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
       const area = plan.rows * plan.cols;
       input = Array(isCoupled() ? area + loopEdges().length : isLoop ? loopEdges().length : area).fill(-1);
-      if (plan.sight_counts) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
-        if (plan.sight_counts[r][c] > 0) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
+      for (const grid of [plan.sight_counts, plan.island_areas]) if (grid) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
+        if (grid[r][c] > 0) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
       }
       for (const clue of result.clues) {
         let index, value;
