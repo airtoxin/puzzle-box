@@ -70,7 +70,7 @@ print(puzzle.result(solution))
 | `generator` | ヒント抽出と一意性を保つ削減 | `generate`, `reduce_clues`, `GeneratablePuzzle` |
 
 構造の詳細は [ARCHITECTURE.md](ARCHITECTURE.md)、
-実装調査・課題・発展案は [プロジェクトレビュー](docs/project-review.md)、
+ルール・ヒント・回答の接続は [合成の設計](docs/composition-design.md)、
 生成器の契約と使い方は [生成レシピ](docs/generation.md)を参照してください。
 
 ## ルールとヒントの組合せを診断する
@@ -131,7 +131,7 @@ CI は Ubuntu / Windows、Python 3.12 / 3.13 で同じテスト・型検査・�
 
 生成結果は一意性と1ヒントずつの削除に対する既約性を確認します。
 最少ヒント数、均一なランダム分布、人間にとっての面白さは保証しません。
-現状と修正中の既知の制限はプロジェクトレビューに整理しています。
+機能ごとの仕様・実行手順・制限は [ドキュメント一覧](docs/README.md)から参照できます。
 
 ## 辺に描くループでも試す
 
