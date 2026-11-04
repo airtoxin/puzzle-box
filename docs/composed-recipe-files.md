@@ -20,7 +20,41 @@ uv run --no-sync python examples/generate_composed_shading.py verify composed-pu
 読込時の入力が小さくても、長い文字列パラメータのエスケープなどで出力が上限を超える場合はエラーになります。
 その場合はパラメータを短くしてください。出力の改行はOSにかかわらずLFで、従来のCRLFファイルも引き続き読めます。
 矛盾する部品やヒント不足で生成に失敗した場合も、問題ファイルは作成しません。
-JSONには答えも含まれます。現在は生成・検証用であり、答えを隠す表示や解答入力のCLIはありません。
+JSONには答えも含まれます。答えを見ずに遊ぶ場合は、ファイルを直接開かず `show` を使います。
+
+## 問題を表示して解答する
+
+```sh
+uv run --no-sync python examples/generate_composed_shading.py show composed-puzzle.json
+```
+
+セルヒントだけを `#`（黒）と `.`（白）で表示し、未確定のセルは `?` にします。
+行・列の黒数ヒントと基礎ルール、追加部品をすべて表示します。0というヒントと、ヒントなしの `-` は区別します。
+表示の行・列番号は1から始まります。`Answer template` の `?` をすべて埋め、行を `/` で区切って入力します。
+
+```sh
+# 入力形式の例。盤面に合わせて文字列を自分の解答に置き換えてください。
+uv run --no-sync python examples/generate_composed_shading.py check composed-puzzle.json --answer ".#./#.."
+# 答えを確認したい場合だけ指定します。
+uv run --no-sync python examples/generate_composed_shading.py show composed-puzzle.json --solution
+```
+
+`check` は正解なら終了コード0、不正解なら1、不完全な解答やファイルの検証エラーなら2です。
+誤答時に正解は表示しません。`show` / `check` / `show --solution` は、追加部品を含むレシピで
+保存解・一意性・ヒント既約性を検証してから表示・採点します。ファイルは変更しません。
+共有するのは盤面の描画と入力書式だけで、通常の黒白形式へ変換して追加条件を捨てることはありません。
+
+自作登録部品も、生成時と同じ信頼済みの入口で使えます。
+
+```sh
+uv run --no-sync python examples/custom_row_band.py show row-band-puzzle.json
+uv run --no-sync python examples/custom_row_band.py check row-band-puzzle.json --answer ".#./#.."
+```
+
+標準の個数・連結部品には文章の説明があります。自作部品は登録IDと全設定値を表示しますが、
+その意味を自動で自然言語に翻訳しません。自作部品の説明は信頼済み実装の文書と併せて確認してください。
+標準CLIは知らないIDを拒否し、ファイルから対応コードを自動importしません。
+毎回求解するため、9セルの制限内でも応答時間の上限や人間の解きやすさは保証しません。
 
 生成物は `puzzle-box/composed-shading-v1` 形式で、`recipe` に追加部品を含む設定全体、
 `seed`、`clues`、`solution` を保存します。検証時は必ずそのレシピを再構築し、保存された答えと
