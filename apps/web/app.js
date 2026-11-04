@@ -216,13 +216,13 @@ form.addEventListener('submit', async event => {
 $('check').addEventListener('click', async () => {
   if (!artifact) return;
   if (input.includes(-1)) {$('answer-status').textContent = '未入力のマスまたは辺があります。'; return;}
-  form.inert = $('board').inert = $('actions').inert = true;
+  form.inert = $('board').inert = $('answer-buttons').inert = true;
   $('answer-status').textContent = 'サーバーでルールとヒントを確認中…';
   try {
     const result = await post('/api/check', {format: 'puzzle-box/web-answer-v1', request: artifact.request, clues: artifact.clues, answer: [...input]});
     $('answer-status').textContent = result.status === 'ok' ? (result.correct ? '正解です。すべてのルールとヒントを満たしています。' : 'まだ正解ではありません。ルールとヒントを確認してください。') : messages[result.status] || '解答を検証できませんでした。';
   } catch {$('answer-status').textContent = '通信が途切れました。解答の正しさは未確認です。';}
-  finally {form.inert = $('board').inert = $('actions').inert = false; $('check').focus();}
+  finally {form.inert = $('board').inert = $('answer-buttons').inert = false; $('check').focus();}
 });
 $('reveal').addEventListener('click', () => {
   if (!artifact) return;

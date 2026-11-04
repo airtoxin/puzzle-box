@@ -200,3 +200,29 @@ test('loop contradiction and insufficient hints remain distinct', async ({page})
   await expect(page.locator('#generate')).toBeEnabled(); await page.locator('#generate').click();
   await expect(page.locator('#status')).toContainText('どの完成盤面も一意に決まりません');
 });
+
+test('answer-check progress remains exposed to assistive technology while controls are locked', async ({page}) => {
+  await page.goto('/'); await page.getByLabel('盤面の種類').selectOption('slitherlink');
+  await page.getByLabel('ループの長さ', {exact: true}).uncheck();
+  await page.getByLabel('行数', {exact: true}).fill('1'); await page.getByLabel('列数', {exact: true}).fill('1');
+  await expect(page.locator('#generate')).toBeEnabled(); await page.locator('#generate').click();
+  await expect(page.locator('#status')).toContainText('生成しました');
+  for (const edge of await page.locator('.edge:enabled').all()) {await edge.click(); await edge.click();}
+  let resume, intercepted;
+  const pending = new Promise(resolve => {intercepted = resolve;});
+  await page.route('**/api/check', async route => {
+    await new Promise(resolve => {resume = resolve; intercepted();});
+    await route.fulfill({json: {status: 'timeout', budget_seconds: 10}});
+  });
+  await page.locator('#check').click(); await pending;
+  try {
+    const session = await page.context().newCDPSession(page);
+    const tree = await session.send('Accessibility.getFullAXTree');
+    expect(tree.nodes.some(n => !n.ignored && n.name?.value === 'サーバーでルールとヒントを確認中…')).toBe(true);
+    expect(await page.locator('#check').evaluate(el => el.closest('[inert]') !== null)).toBe(true);
+    expect(await page.locator('#board').evaluate(el => el.inert)).toBe(true);
+  } finally {resume();}
+  await expect(page.locator('#answer-status')).toContainText('解なしとは判定していません');
+  await expect(page.locator('#check')).toBeFocused();
+  expect(await page.locator('#check').evaluate(el => el.closest('[inert]') === null)).toBe(true);
+});
