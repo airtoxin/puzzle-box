@@ -105,6 +105,27 @@ def test_bad_worker_result_is_not_a_deduction_result(app, monkeypatch, fault):
     assert "trace" not in result and "inferred_cells" not in result
 
 
+@pytest.mark.parametrize("fault", ["disagreement", "contradiction"])
+def test_real_worker_distinguishes_internal_deductions_from_invalid_candidates(app, monkeypatch, tmp_path, fault):
+    proxy = tmp_path / "worker.py"
+    body = ('return {"cells": [[1, None, None], [None, None, None]]}' if fault == "disagreement"
+            else 'raise ValueError("injected contradictory deduction")')
+    proxy.write_text(
+        f"import sys\nsys.path.insert(0, {str(EXAMPLES)!r})\nimport explain_shading as d\n"
+        f"def fail(*args):\n    {body}\nd._propagate = fail\nraise SystemExit(d.main())\n", encoding="utf-8")
+    monkeypatch.setattr(app, "EXPLAINER", proxy)
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text('{"format": "unsupported"}', encoding="utf-8")
+    report = app.compare([EXAMPLES / "shading-connector-sample.json", invalid],
+                         phase_seconds=30, total_seconds=90)
+    assert report["counts"] == {"error": 1, "rejected": 1}
+    internal, rejected = report["attempts"]
+    assert internal["returncode"] == 3 and "Internal error:" in internal["reason"]
+    assert ("disagrees" if fault == "disagreement" else "after puzzle verification") in internal["reason"]
+    assert rejected["returncode"] == 2
+    assert all("trace" not in a and "inferred_cells" not in a for a in report["attempts"])
+
+
 def _accepts(bits, clues):
     # Independent tiny-board oracle: explicit 2x3 adjacency, no DSL or explainer.
     white = {i for i, bit in enumerate(bits) if bit == 0}
