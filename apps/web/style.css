@@ -414,3 +414,7 @@ footer {
 .black-run-numbered .run-number {position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:.7rem; line-height:1.2; white-space:nowrap;}
 .black-run-numbered .cell-number {position:absolute; left:50%; top:6px; transform:translateX(-50%); font-size:.75rem; line-height:1.2;}
 .black-run-numbered .cell-mark {display:none;}
+.black-run-numbered .sight-number {position:absolute; left:1px; top:1px; font-size:.6rem;}
+.black-run-numbered .area-number {position:absolute; right:1px; top:1px; font-size:.6rem;}
+.black-run-numbered .neighbor-number {position:absolute; left:1px; bottom:0; font-size:.55rem; line-height:1.2;}
+.black-run-numbered .component-number {position:absolute; right:1px; bottom:0; font-size:.55rem;}

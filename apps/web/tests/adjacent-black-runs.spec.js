@@ -78,6 +78,29 @@ test('zero run clue is visible and absent cells remain unmarked',async({page})=>
   await expect(page.locator('[data-cell-index="0"]')).toHaveAttribute('data-value','-1');
 });
 
+for (const [title,label,value,selector,runs] of [
+  ['数字から見える白マス数を固定','見える白マス数（0は指定なし）','1 0 0\n0 0 0','.sight-number','3'],
+  ['数字がある白成分の面積を固定','白い島の面積（0は数字なし）','1 0 0\n0 0 0','.area-number','3'],
+  ['数字の周囲の黒マス数を固定','周囲の黒数（. は数字なし、0も有効）','3 . .\n. . .','.neighbor-number','3'],
+  ['接する黒成分の面積合計を固定','接する黒成分の面積合計（. は丸なし）','3 . .\n. . .','.component-number','3'],
+  ['数字の周囲の黒マス数を固定','周囲の黒数（. は数字なし、0も有効）','0 . .\n. . .','.neighbor-number','0'],
+  ['接する黒成分の面積合計を固定','接する黒成分の面積合計（. は丸なし）','0 . .\n. . .','.component-number','0'],
+]) test(`only run clues and ${selector} ${runs} remain separately readable`,async({page})=>{
+  await page.goto('/');await expect(page.locator('#generate')).toBeEnabled();
+  await page.getByLabel('黒マスの個数',{exact:true}).uncheck();
+  await page.getByLabel('白マスをつなぐ',{exact:true}).uncheck();
+  await page.getByLabel('周囲8マスの黒い連続長を指定',{exact:true}).check();
+  await page.getByLabel('黒の連続長（複数は1,2、なしは.、黒0個は0）',{exact:true}).fill(`${runs} . .\n. . .`);
+  await page.getByLabel(title,{exact:true}).check();
+  await page.getByLabel(label,{exact:true}).fill(value);
+  await expect(page.locator('#generate')).toBeEnabled();
+  await page.setViewportSize({width:390,height:844});
+  const cell=page.locator('[data-cell-index="0"]');
+  const a=await cell.locator('.run-number').boundingBox(),b=await cell.locator(selector).boundingBox();
+  expect(a.x+a.width<=b.x || b.x+b.width<=a.x || a.y+a.height<=b.y || b.y+b.height<=a.y).toBe(true);
+  await expect(cell).toHaveAccessibleName(/周囲の黒い連続長/);
+});
+
 test('impossible cyclic partitions are rejected as malformed input',async({page})=>{
   await configure(page);
   await page.getByLabel('黒の連続長（複数は1,2、なしは.、黒0個は0）',{exact:true}).fill('. 1,7 .\n. 6 .\n. . .');
