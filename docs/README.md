@@ -15,6 +15,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | ルールの矛盾・ヒント不足・seedによる多様性を調べる | [小盤面診断](shading-diagnostics.md) |
 | ルールの部分集合・冗長性を比較する | [黒白の組合せ探索](shading-exploration.md) |
 | 選んだレシピを保存し、生成へ渡す | [レシピの保存と読込](shading-recipe-files.md) |
+| 固定レシピを時間予算付きで生成・検証して測る | [生成ベンチマーク](generation-benchmark.md) |
 | 実際に残ったヒントでルールの必要性を調べる | [黒白の保存ヒント診断](stored-clue-rule-diagnostics.md) |
 | 辺を回答とするパズルを生成する | [Slitherlink](slitherlink-composition.md) |
 | 黒セルとループを接続して生成する | [ヤジリン](yajilin-composition.md) |
