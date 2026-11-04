@@ -26,8 +26,11 @@ MIXED_FORMAT = "puzzle-box/shading-v2"
 def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
                   selection: str = "solver") -> dict[str, Any]:
     """Serialize generated clues only after proving their unique visible answer."""
+    if type(recipe) is not ShadingRecipe:
+        raise ValueError("This format requires an exact ShadingRecipe; composed recipes and subclasses need their own codec")
     if selection not in ("solver", "finite"):
         raise ValueError("Unknown completion selection")
+    rules = [rule_record(rule) for rule in recipe.rules]
     puzzle = recipe.build_from_clues(clues)
     puzzle.add(unique())
     solution = puzzle.solve()
@@ -37,7 +40,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     record = {
         "format": FORMAT if legacy else MIXED_FORMAT,
         "rows": recipe.rows, "cols": recipe.cols,
-        "rules": [rule_record(rule) for rule in recipe.rules], "seed": seed,
+        "rules": rules, "seed": seed,
         "clues": [clue_record(clue, legacy=legacy) for clue in clues],
         "solution": puzzle.result(solution),
         "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
