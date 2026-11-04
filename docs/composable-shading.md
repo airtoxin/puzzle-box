@@ -104,7 +104,7 @@ seed を省略した求解はソルバーの既定設定を使います。同じ
 座標は0始まりです。例題には解も入っているため、プレイヤーへ渡す画面では解を隠す必要があります。
 検証時は seed を再実行せず、保存された問題そのものを検証します。
 環境情報と seed は記録用で、検証器は環境一致を強制しません。
-このファイル形式は[部屋・行列・ピースの6断片](room-fragments.md)、[成分の形の2断片](component-shapes.md)、[固定数字](number-fragments.md)、[連続長上限](run-length.md)、[固定成分サイズ](component-size.md)、[白の可視数](white-visibility.md)、[外枠への接続](component-border.md)、[白い島の面積](white-island-areas.md)、[隣接黒数](adjacent-black-counts.md)を含む25種類の組み込みルール専用で、任意のコードを読み込む仕組みはありません。
+このファイル形式は[部屋・行列・ピースの6断片](room-fragments.md)、[成分の形の2断片](component-shapes.md)、[固定数字](number-fragments.md)、[連続長上限](run-length.md)、[固定成分サイズ](component-size.md)、[白の可視数](white-visibility.md)、[外枠への接続](component-border.md)、[白い島の面積](white-island-areas.md)、[隣接黒数](adjacent-black-counts.md)、[セルの道の2断片](cell-path-fragments.md)を含む27種類の組み込みルール専用で、任意のコードを読み込む仕組みはありません。
 追加ルールのIDを知らない旧版の読み手は拒否します。既存IDの意味と既定の4ルールは変更していません。
 行列個数を含むヒント候補には v2 を使います。両形式を読み込める検証器と
 その使い方は [複数のヒント形式](mixed-shading-clues.md)を参照してください。

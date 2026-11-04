@@ -81,7 +81,7 @@ def test_per_instance_lock_is_shared_by_generate_and_check_and_released_on_timeo
     assert call("generate")[1]["status"] == "timeout" and not hosted.JOB_LOCK.locked()
 
 
-@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border", "island-areas", "neighbor-counts"])
+@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border", "island-areas", "neighbor-counts", "cell-path"])
 def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, rule_group):
     output = tmp_path / "artifact"
     payload = prepare.export(output)
@@ -165,6 +165,10 @@ print('artifact generation passed')
                          {"id": "no-black-2x2", "parameters": {}}]
     elif rule_group == "neighbor-counts":
         data["rules"] = [{"id": "adjacent-black-counts", "parameters": {"neighbor_counts": [[0,None,1],[None,1,None]], "diagonal": True}}]
+    elif rule_group == "cell-path":
+        data["rules"] = [{"id": "connected-black", "parameters": {"nonempty": True}},
+                         {"id": "color-degree-range", "parameters": {"minimum": 1, "maximum": 2, "black": True}},
+                         {"id": "color-endpoint-count", "parameters": {"count": 2, "black": True}}]
     result = subprocess.run([sys.executable, "-c", script], cwd=output, capture_output=True, text=True,
                             env={**os.environ, "PYTHONPATH": "", "PUZZLE_TEST_REQUEST": json.dumps(data),
                                  "PUZZLE_TEST_VENDOR": str(vendor)}, timeout=20)

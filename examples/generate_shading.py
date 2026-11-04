@@ -28,6 +28,7 @@ from puzzle_defs import (
     ComponentsTouchBorder,
     WhiteIslandAreas,
     AdjacentBlackCounts,
+    ColorDegreeRange, ColorEndpointCount,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -218,6 +219,12 @@ def _rule_text(rule: ShadingRule) -> str:
     if type(rule) is AdjacentBlackCounts:
         neighbors = "eight surrounding" if rule.diagonal else "four orthogonally adjacent"
         return f"Numbered cells are white and count black cells in the {neighbors} cells, excluding themselves; zero is a real clue, and absent entries impose no condition."
+    if type(rule) is ColorDegreeRange:
+        color = "black" if rule.black else "white"
+        return f"Every {color} cell has {rule.minimum}..{rule.maximum} orthogonally adjacent {color} cells; no connectivity or nonemptiness is implied."
+    if type(rule) is ColorEndpointCount:
+        color = "black" if rule.black else "white"
+        return f"Exactly {rule.count} {color} cells have one orthogonal {color} neighbor; isolated cells are not endpoints, and branches or cycles are not excluded."
     if type(rule) is ComponentsTouchBorder:
         color = "black" if rule.black else "white"
         return f"Every edge-connected {color} component reaches the board boundary through {color} cells; separate border components and absence of {color} cells are allowed."
