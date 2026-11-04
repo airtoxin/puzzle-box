@@ -7,7 +7,7 @@ and builders are trusted code; this registry is not a sandbox for that code.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, is_dataclass
-from inspect import signature
+from inspect import Parameter as SignatureParameter, signature
 import re
 from typing import Any
 
@@ -96,9 +96,11 @@ class ComponentRegistry:
             raise ValueError("Component type must be a frozen callable dataclass")
         declared = fields(builder_type)
         constructor = signature(builder_type)
+        named_parameters = {name for name, param in constructor.parameters.items()
+                            if param.kind != SignatureParameter.VAR_KEYWORD}
         if ("id" in parameters or any(not f.init for f in declared)
                 or set(parameters) != {f.name for f in declared}
-                or set(constructor.parameters) != set(parameters)):
+                or not named_parameters <= set(parameters)):
             raise ValueError("Parameters must match all dataclass constructor fields; id is reserved")
         try:
             constructor.bind(**dict.fromkeys(parameters))
