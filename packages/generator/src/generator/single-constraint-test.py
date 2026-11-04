@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import importlib
 from itertools import product
 import json
@@ -15,6 +16,9 @@ EXAMPLES = Path(__file__).resolve().parents[4] / "examples"
 with pytest.MonkeyPatch.context() as patch:
     patch.syspath_prepend(str(EXAMPLES))
     demo = importlib.import_module("compose_connected_shading")
+    registry_api = importlib.import_module("component_registry")
+    codec = importlib.import_module("composed_shading_recipe")
+    saved = importlib.import_module("generate_composed_shading")
 
 
 def _connected(cells):
@@ -157,3 +161,21 @@ def test_direct_constraint_cannot_bypass_the_answer_projection_guard():
     recipe = with_constraints(ShadingRecipe(1, 1, ()), changed)
     with pytest.raises(ValueError, match="answer projection"):
         recipe.create_empty()
+
+
+def test_registered_component_can_return_one_constraint_after_recipe_round_trip():
+    @dataclass(frozen=True)
+    class SingleCount:
+        count: int
+        def __call__(self, puzzle):
+            return sum_expr(puzzle.black[c] for c in puzzle.board.cells) == self.count
+    registry = codec.BUILTIN_COMPONENTS.with_component(
+        "example/single-count/v1", SingleCount, count=registry_api.IntParam(0, 2))
+    recipe = with_constraints(ShadingRecipe(1, 2, ()), SingleCount(1))
+    data = codec.recipe_record(recipe, registry=registry)
+    restored = codec.read_recipe(data, registry=registry)
+    for values in product((0, 1), repeat=2):
+        clues = [(Cell(0, i), value) for i, value in enumerate(values)]
+        assert (restored.build_from_clues(clues).solve() is not None) == (sum(values) == 1)
+    record = saved.generate_record(data, registry=registry)
+    assert saved.verify(record, registry=registry)["valid"]
