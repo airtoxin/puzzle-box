@@ -7,6 +7,7 @@ from puzzle_defs import (BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x
                          BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines,
                          NoBlack2x2, NoThreeConsecutive)
 from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount
+from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs.room_layout import DEFAULT_ROOMS, RoomMap, room_map
 from puzzle_defs.puzzles.shading import CLUE_KINDS, ShadingRule
 from json_records import MAX_BYTES as MAX_RECIPE_BYTES, load_json as _load_json
@@ -18,7 +19,8 @@ PARAMETERLESS_RULE_TYPES = (NoWhite2x2, NoBlack2x2, BlackDominoes, NoThreeConsec
                            BalancedLines, DistinctLines)
 BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
-                      BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount)
+                      BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
+                      RectangularComponents, NonRectangularComponents)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -27,6 +29,8 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
     return {"count": BlackCount(count), "non-touching": NonTouchingBlack(diagonal),
             "connected-white": ConnectedWhite(not allow_empty_white),
             "connected-black": ConnectedBlack(),
+            "rectangular-components": RectangularComponents(),
+            "nonrectangular-components": NonRectangularComponents(),
             "room-black-count": RoomBlackCount(DEFAULT_ROOMS),
             "room-connected-black": RoomConnectedBlack(DEFAULT_ROOMS), "line-black-count": LineBlackCount(),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
@@ -48,6 +52,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": "room-connected-black", "rooms": [list(row) for row in rule.rooms], "nonempty": rule.nonempty}
     if type(rule) is LineBlackCount:
         return {"type": "line-black-count", "count": rule.count}
+    if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
+        return {"type": rule.ui.identifier, "black": rule.black}
     for kind in PARAMETERLESS_RULE_TYPES:
         if type(rule) is kind:
             return {"type": kind.ui.identifier}
@@ -76,6 +82,9 @@ def read_rule(data: Any) -> ShadingRule:
         return RoomConnectedBlack(tuple(tuple(row) for row in data["rooms"]), data["nonempty"])
     if kind == "line-black-count" and set(data) == {"type", "count"}:
         return LineBlackCount(data["count"])
+    for shape_rule in (RectangularComponents, NonRectangularComponents):
+        if kind == shape_rule.ui.identifier and set(data) == {"type", "black"}:
+            return shape_rule(data["black"])
     for rule_type in PARAMETERLESS_RULE_TYPES:
         if kind == rule_type.ui.identifier and set(data) == {"type"}:
             return rule_type()
