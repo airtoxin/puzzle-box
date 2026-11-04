@@ -70,3 +70,6 @@ uv run --no-sync python examples/diagnose_shading_rules.py puzzle.json
 探索CLIで保存した実ファイルを生成・表示・正誤確認・検証・診断へ渡す流れと、別プロセスでの再現性も検証します。
 
 異種パズルへの同様の選択、探索結果のランキング、任意DSLの生成方針には一般化していません。
+
+[複数 seed の比較](compare-shading-seeds.md)では、保存済みレシピから生成した問題について、
+削減後のヒントに対するルールの必要性を比べ、１問を選んで保存できます。

@@ -1,14 +1,13 @@
 """Strict data-only interchange for the small built-in shading recipes."""
 
-import json
 from pathlib import Path
 from typing import Any
 
 from puzzle_defs import BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2, ShadingRecipe
 from puzzle_defs.puzzles.shading import CLUE_KINDS, ShadingRule
+from json_records import MAX_BYTES as MAX_RECIPE_BYTES, load_json as _load_json
 
 RECIPE_FORMAT = "puzzle-box/shading-recipe-v1"
-MAX_RECIPE_BYTES = 65536
 MAX_RECIPE_RULES = 8
 RULES = ("count", "non-touching", "connected-white", "no-white-2x2")
 
@@ -65,36 +64,17 @@ def read_recipe(data: Any) -> ShadingRecipe:
 
 
 def recipe_record(recipe: ShadingRecipe) -> dict[str, Any]:
+    if type(recipe) is not ShadingRecipe:
+        raise ValueError("This format requires an exact ShadingRecipe; composed recipes and subclasses need their own codec")
     record = {"format": RECIPE_FORMAT, "rows": recipe.rows, "cols": recipe.cols,
               "rules": [rule_record(r) for r in recipe.rules], "clue_kinds": list(recipe.clue_kinds)}
     read_recipe(record)  # Enforce the same bounds for export and import.
     return record
 
 
-def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError(f"Duplicate JSON key: {key}")
-        result[key] = value
-    return result
-
-
-def _constant(value: str) -> Any:
-    raise ValueError(f"Non-finite JSON number is not supported: {value}")
-
-
 def load_json(path: Path, *, label: str = "Recipe") -> Any:
     """Read bounded JSON without silently accepting duplicate fields or NaN."""
-    with path.open("rb") as stream:
-        raw = stream.read(MAX_RECIPE_BYTES + 1)
-    if len(raw) > MAX_RECIPE_BYTES:
-        raise ValueError(f"{label} file must be at most 65536 bytes")
-    try:
-        data = json.loads(raw.decode("utf-8"), object_pairs_hook=_object, parse_constant=_constant)
-    except RecursionError as exc:
-        raise ValueError(f"{label} JSON is nested too deeply") from exc
-    return data
+    return _load_json(path, label=label)
 
 
 def load_recipe(path: Path) -> ShadingRecipe:
