@@ -1,6 +1,5 @@
 """Bounded data-only input for saved Yajilin and experimental coupled puzzles."""
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -8,34 +7,14 @@ from puzzle_defs import YajilinAnswer, YajilinRecipe
 from puzzle_defs.puzzles.yajilin_recipe import YajilinClue
 from coupled_oracle import HINTS, rule_names
 from generate_yajilin import FORMAT as YAJILIN_FORMAT, read_record
+from json_records import MAX_BYTES as MAX_BYTES, load_json
 
 FORMAT = "puzzle-box/coupled-puzzle-v1"
-MAX_BYTES = 65536
 MAX_CLUES = 32
 
 
-def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError(f"Duplicate JSON key: {key}")
-        result[key] = value
-    return result
-
-
-def _constant(value: str) -> Any:
-    raise ValueError(f"Non-finite JSON number: {value}")
-
-
 def load_puzzle(path: Path) -> Any:
-    with path.open("rb") as stream:
-        raw = stream.read(MAX_BYTES + 1)
-    if len(raw) > MAX_BYTES:
-        raise ValueError("Puzzle file must be at most 65536 bytes")
-    try:
-        return json.loads(raw.decode("utf-8"), object_pairs_hook=_object, parse_constant=_constant)
-    except RecursionError as exc:
-        raise ValueError("Puzzle JSON is nested too deeply") from exc
+    return load_json(path)
 
 
 def check_output(source: Path, output: Path) -> None:

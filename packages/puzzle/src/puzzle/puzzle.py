@@ -228,6 +228,10 @@ class Puzzle:
             self._check_var_map_model(constraint.edge_vars)
         elif isinstance(constraint, (ShapeAcrossConstraint, NoBoundaryCrossConstraint)):
             self._check_var_map_model(constraint.use_vars)
+        elif isinstance(constraint, UniqueConstraint):
+            pass
+        else:
+            raise TypeError("Puzzle.add() expects a DSL constraint, not a Python value or collection")
 
     def _check_var_map_model(self, var_map: VarMap) -> None:
         _check_same_model(

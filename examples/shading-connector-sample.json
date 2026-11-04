@@ -1,0 +1,12 @@
+{
+  "format": "puzzle-box/shading-v1",
+  "rows": 2,
+  "cols": 3,
+  "rules": [
+    {"type": "connected-white", "nonempty": true},
+    {"type": "no-white-2x2"}
+  ],
+  "clues": [[0, 0, 0], [1, 0, 1], [1, 1, 1], [1, 2, 0]],
+  "solution": [[0, 0, 0], [1, 1, 0]],
+  "seed": 2
+}
