@@ -12,6 +12,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 部屋の配置・個数・連結・対称を組み合わせる | [固定部屋のルール断片](room-fragments.md) |
 | 連結成分の長方形・長方形以外を組み合わせる | [成分の形の断片](component-shapes.md) |
 | 数字と部屋を重ねて黒白を生成する | [固定数字の断片](number-fragments.md) |
+| 数字から見える白マス数を固定する | [黒どこの可視数](white-visibility.md) |
 | 同色の連続する長さを制限する | [連続長の上限](run-length.md) |
 | 黒・白の各連結成分を同じサイズにする | [固定成分サイズ](component-size.md) |
 | LITS の部屋ピースの同形接触を禁止する | [テトロミノの接触](tetromino-contact.md) |

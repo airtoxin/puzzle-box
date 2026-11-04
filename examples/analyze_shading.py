@@ -22,6 +22,7 @@ from puzzle_defs import RunLengthLimit
 from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
+from puzzle_defs import WhiteVisibilityCounts
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -50,6 +51,23 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is WhiteVisibilityCounts:
+        for r in range(rows):
+            for c in range(cols):
+                count = rule.counts[r][c]
+                if not count:
+                    continue
+                if (r, c) in black:
+                    return False
+                visible = 1
+                for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    s, t = r + dr, c + dc
+                    while 0 <= s < rows and 0 <= t < cols and (s, t) not in black:
+                        visible += 1
+                        s, t = s + dr, t + dc
+                if visible != count:
+                    return False
+        return True
     if type(rule) is DistinctWhiteNumbers:
         lines = [[(r,c) for c in range(cols)] for r in range(rows)] + [[(r,c) for r in range(rows)] for c in range(cols)]
         for line in lines:

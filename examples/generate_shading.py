@@ -24,12 +24,13 @@ from puzzle_defs import (
     RoomRotationalSymmetry,
     ColorComponentSize,
     NoTouchingEqualTetrominoes,
+    WhiteVisibilityCounts,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
 from puzzle_defs.number_layout import NumberGrid
 from shading_recipe import (RULES, DEFAULT_RULES, rule_choices, check_demo_size, check_distinct_paths,
-                            load_recipe, read_rule, rule_record, shared_rooms, shared_numbers)
+                            load_recipe, read_rule, rule_record, shared_rooms, shared_numbers, shared_sight_counts)
 from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/shading-v1"
@@ -63,6 +64,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     rules = [rule_record(rule) for rule in recipe.rules]
     shared_rooms(recipe)
     shared_numbers(recipe)
+    shared_sight_counts(recipe)
     _check_clue_kinds(recipe, clues)
     legacy = recipe.clue_kinds == ("cell",)
     encoded_clues = [clue_record(clue, legacy=legacy) for clue in clues]
@@ -140,6 +142,7 @@ def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[
     check_demo_size(recipe)
     shared_rooms(recipe)
     shared_numbers(recipe)
+    shared_sight_counts(recipe)
     clues = [read_clue(clue, legacy=legacy) for clue in read_array(data["clues"], "clues")]
     _check_clue_kinds(recipe, clues)
     answer = data["solution"]
@@ -199,6 +202,8 @@ def _rule_text(rule: ShadingRule) -> str:
         return "A straight white run cannot cross two room boundaries; re-entering a room counts again."
     if type(rule) is DistinctWhiteNumbers:
         return "No row or column contains equal fixed numbers on two white cells."
+    if type(rule) is WhiteVisibilityCounts:
+        return "Positive sight counts require white cells and count visible white cells in four straight directions, including themselves once, stopping before black cells or the border; zero is no requirement."
     if type(rule) is RunLengthLimit:
         return f"Each horizontal or vertical run of black or white cells has length at most {rule.max_length}."
     if type(rule) is RoomRotationalSymmetry:
@@ -222,14 +227,19 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
     recipe, clues, answer = _read_record(data)
     return _render_puzzle(recipe.rows, recipe.cols, clues, answer,
                           [_rule_text(rule) for rule in recipe.rules], reveal=reveal,
-                          rooms=shared_rooms(recipe), numbers=shared_numbers(recipe))
+                          rooms=shared_rooms(recipe), numbers=shared_numbers(recipe), sight_counts=shared_sight_counts(recipe))
 
 
 def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[int]],
                    rules: list[str], *, reveal: bool = False, rooms: RoomMap | None = None,
-                   numbers: NumberGrid | None = None) -> str:
+                   numbers: NumberGrid | None = None, sight_counts: NumberGrid | None = None) -> str:
     """Presentation only: each format's caller must verify its full recipe first."""
     cells = [["?" for _ in range(cols)] for _ in range(rows)]
+    if sight_counts is not None:
+        for r in range(rows):
+            for c in range(cols):
+                if sight_counts[r][c] > 0:
+                    cells[r][c] = "."
     row_counts: dict[int, int] = {}
     col_counts: dict[int, int] = {}
     for clue in clues:
@@ -265,6 +275,9 @@ def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[in
     if numbers is not None:
         lines.extend(["", "Fixed numbers (labels, not answer values):"])
         lines.extend(" ".join(str(n) for n in row) for row in numbers)
+    if sight_counts is not None:
+        lines.extend(["", "Fixed white sight counts (. = no requirement; origin is counted once):"])
+        lines.extend(" ".join(str(n) if n else "." for n in row) for row in sight_counts)
     return "\n".join(lines)
 
 

@@ -13,6 +13,8 @@ from puzzle_defs import RunLengthLimit
 from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
+from puzzle_defs import WhiteVisibilityCounts
+from puzzle_defs.puzzles.white_visibility import DEFAULT_SIGHT_COUNTS
 from puzzle_defs.puzzles.component_size import MAX_COMPONENT_CELLS
 from puzzle_defs.number_layout import DEFAULT_NUMBERS, NumberGrid, number_grid
 from puzzle_defs.room_layout import DEFAULT_ROOMS, RoomMap, room_map
@@ -28,7 +30,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
                       RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
-                      RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes)
+                      RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -47,6 +49,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "room-rotational-symmetry": RoomRotationalSymmetry(DEFAULT_ROOMS),
             "color-component-size": ColorComponentSize(3),
             "no-touching-equal-tetrominoes": NoTouchingEqualTetrominoes(DEFAULT_ROOMS),
+            "white-visibility-counts": WhiteVisibilityCounts(DEFAULT_SIGHT_COUNTS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -70,6 +73,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "rooms": [list(row) for row in rule.rooms]}
     if type(rule) is DistinctWhiteNumbers:
         return {"type": rule.ui.identifier, "numbers": [list(row) for row in rule.numbers]}
+    if type(rule) is WhiteVisibilityCounts:
+        return {"type": rule.ui.identifier, "counts": [list(row) for row in rule.counts]}
     if type(rule) is RunLengthLimit:
         return {"type": rule.ui.identifier, "max_length": rule.max_length}
     if type(rule) is ColorComponentSize:
@@ -121,6 +126,11 @@ def read_rule(data: Any) -> ShadingRule:
                 or any(type(row) is not list for row in data["numbers"])):
             raise ValueError("Fixed numbers must be an array of arrays")
         return DistinctWhiteNumbers(tuple(tuple(row) for row in data["numbers"]))
+    if kind == "white-visibility-counts":
+        if (set(data) != {"type", "counts"} or type(data["counts"]) is not list
+                or any(type(row) is not list for row in data["counts"])):
+            raise ValueError("Sight counts must be an array of arrays")
+        return WhiteVisibilityCounts(tuple(tuple(row) for row in data["counts"]))
     for shape_rule in (RectangularComponents, NonRectangularComponents):
         if kind == shape_rule.ui.identifier and set(data) == {"type", "black"}:
             return shape_rule(data["black"])
@@ -168,6 +178,7 @@ def read_recipe(data: Any) -> ShadingRecipe:
                 raise ValueError("Component size cannot exceed the board area")
     shared_rooms(recipe)
     shared_numbers(recipe)
+    shared_sight_counts(recipe)
     if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
            and r.count > recipe.rows * recipe.cols for r in recipe.rules):
         raise ValueError("Black count cannot exceed the board area")
@@ -190,6 +201,15 @@ def recipe_record(recipe: ShadingRecipe) -> dict[str, Any]:
               "rules": [rule_record(r) for r in recipe.rules], "clue_kinds": list(recipe.clue_kinds)}
     read_recipe(record)  # Enforce the same bounds for export and import.
     return record
+
+
+def shared_sight_counts(recipe: ShadingRecipe) -> NumberGrid | None:
+    grids = [rule.counts for rule in recipe.rules if type(rule) is WhiteVisibilityCounts]
+    for grid in grids:
+        number_grid(grid, rows=recipe.rows, cols=recipe.cols)
+    if grids and any(grid != grids[0] for grid in grids):
+        raise ValueError("Visibility rules must share the same sight counts for this file/UI format")
+    return grids[0] if grids else None
 
 
 def load_json(path: Path, *, label: str = "Recipe") -> Any:
