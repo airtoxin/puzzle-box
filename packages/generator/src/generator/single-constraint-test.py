@@ -9,7 +9,7 @@ import sys
 import pytest
 
 from generator import generate, with_constraints
-from puzzle import Cell, non_touching, sum_expr, unique
+from puzzle import Cell, CompoundConstraint, non_touching, one_of, sum_expr, unique
 from puzzle_defs import BlackCount, ShadingRecipe, SlitherlinkRecipe
 
 EXAMPLES = Path(__file__).resolve().parents[4] / "examples"
@@ -179,3 +179,20 @@ def test_registered_component_can_return_one_constraint_after_recipe_round_trip(
         assert (restored.build_from_clues(clues).solve() is not None) == (sum(values) == 1)
     record = saved.generate_record(data, registry=registry)
     assert saved.verify(record, registry=registry)["valid"]
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+@pytest.mark.parametrize("outer", ["compound", "one-of"])
+@pytest.mark.parametrize("with_clues", [False, True])
+def test_nested_uniqueness_queries_are_rejected_before_compilation(wrapped, outer, with_clues):
+    def builder(puzzle):
+        # Deliberately malformed nested input must not activate a solve query.
+        inner = CompoundConstraint([unique()])  # type: ignore[arg-type]
+        result = CompoundConstraint([inner]) if outer == "compound" else one_of(inner)  # type: ignore[arg-type]
+        return [result] if wrapped else result
+    recipe = with_constraints(ShadingRecipe(1, 1, ()), builder)
+    with pytest.raises(ValueError, match="unique"):
+        if with_clues:
+            recipe.build_from_clues([(Cell(0, 0), 0)])
+        else:
+            recipe.create_empty()

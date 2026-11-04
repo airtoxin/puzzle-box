@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from puzzle import Constraint, Puzzle, Solution
-from puzzle.constraints import UniqueConstraint
+from puzzle.constraints import CompoundConstraint, OneOfConstraint, UniqueConstraint
 
 
 class InitialCluesNotUniqueError(ValueError):
@@ -40,6 +40,14 @@ class GeneratablePuzzle[P: Puzzle, C](Protocol):
 
 
 type ConstraintBuilder[P: Puzzle] = Callable[[P], Constraint | Iterable[Constraint]]
+
+
+def _contains_uniqueness_query(constraint: Constraint) -> bool:
+    if isinstance(constraint, UniqueConstraint):
+        return True
+    if isinstance(constraint, (CompoundConstraint, OneOfConstraint)):
+        return any(_contains_uniqueness_query(member) for member in constraint.constraints)
+    return False
 
 
 def _answer_projection(puzzle: Puzzle) -> frozenset[int] | None:
@@ -88,7 +96,7 @@ class ConstrainedRecipe[P: Puzzle, C]:
             for constraint in constraints:
                 if not isinstance(constraint, Constraint):
                     raise TypeError("Builders must yield DSL constraint objects")
-                if isinstance(constraint, UniqueConstraint):
+                if _contains_uniqueness_query(constraint):
                     raise ValueError("unique() is a solve query, not an additional base rule")
                 puzzle.add(constraint)
             if _answer_projection(puzzle) != answer_projection:
