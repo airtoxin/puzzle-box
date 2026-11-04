@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from puzzle import Cell, Edge, Puzzle, Vertex, at_least_one
-from puzzle_defs import BlackCellClue, SlitherlinkRecipe, YajilinAnswer, YajilinRecipe
+from puzzle_defs import BlackCellClue, BlackCount, EdgeStateClue, ShadingRecipe, SlitherlinkRecipe, YajilinAnswer, YajilinRecipe
 from puzzle_defs.ui import UiRequirements, merge_requirements
 
 with pytest.MonkeyPatch.context() as patch:
@@ -66,6 +66,26 @@ def test_no_rule_is_optional_and_parameters_cannot_extend_the_fixed_profile():
         with pytest.raises(ValueError): api.read_request(data)
     data = request(); data["rules"][1] = data["rules"][0]
     with pytest.raises(ValueError): api.read_request(data)
+
+
+def test_real_cell_and_edge_declarations_do_not_imply_cross_profile_compatibility():
+    # The shared word "answer" does not make black cells and corner edges equal.
+    with pytest.raises(ValueError, match="Conflicting UI channel"):
+        merge_requirements([ShadingRecipe.ui, SlitherlinkRecipe.ui], supported=api.RENDERERS)
+    # Even known cell-count rules and fixed-edge hints need an explicit binding
+    # to cell centers, plus matching generation/serialization semantics.
+    for declaration in (BlackCount.ui.requirements, EdgeStateClue.ui.requirements):
+        with pytest.raises(ValueError, match="topolog"):
+            merge_requirements([YajilinRecipe.ui, declaration], supported=api.COUPLED_RENDERERS,
+                               supported_topology=YajilinRecipe.ui.topology)
+    for identifier, parameters in (("count", {"count": 1}), ("single-loop", {}),
+                                    ("loop-length", {"length": 8})):
+        data = request(); data["rules"][0] = {"id": identifier, "parameters": parameters}
+        with pytest.raises(ValueError, match="Unknown"):
+            api.read_request(data)
+    # Known hints from the corner-edge profile cannot be reinterpreted as
+    # counts around a cell in the center-edge profile.
+    with pytest.raises(ValueError): api.read_request({**request(), "clue_kinds": ["cell-count"]})
 
 
 def independent_answers(rows, cols):
