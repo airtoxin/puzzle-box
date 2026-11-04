@@ -1,0 +1,110 @@
+{
+  "arrow_sites": [
+    {
+      "cell": [
+        1,
+        0
+      ],
+      "direction": "right"
+    }
+  ],
+  "clue_kinds": [
+    "arrow",
+    "edge"
+  ],
+  "clues": [
+    {
+      "cell": [
+        1,
+        0
+      ],
+      "count": 0,
+      "type": "arrow"
+    },
+    {
+      "edge": [
+        1,
+        3,
+        2,
+        3
+      ],
+      "type": "edge",
+      "used": 1
+    }
+  ],
+  "cols": 4,
+  "environment": {
+    "ortools": "9.15.6755",
+    "python": "3.12.14",
+    "seeded_search_workers": 1
+  },
+  "format": "puzzle-box/yajilin-v1",
+  "rows": 3,
+  "seed": 6,
+  "solution": {
+    "black_cells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    "loop_edges": [
+      [
+        0,
+        1,
+        0,
+        2
+      ],
+      [
+        1,
+        2,
+        1,
+        3
+      ],
+      [
+        2,
+        1,
+        2,
+        2
+      ],
+      [
+        2,
+        2,
+        2,
+        3
+      ],
+      [
+        0,
+        1,
+        1,
+        1
+      ],
+      [
+        0,
+        2,
+        1,
+        2
+      ],
+      [
+        1,
+        1,
+        2,
+        1
+      ],
+      [
+        1,
+        3,
+        2,
+        3
+      ]
+    ]
+  }
+}

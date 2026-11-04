@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+
 from puzzle import Puzzle, Solution, single_cycle, square_grid, sum_expr
 from puzzle.grid import Cell, Vertex
 
@@ -17,7 +19,12 @@ class YajilinPuzzle(Puzzle):
     """Yajilin puzzle: shade cells and draw a single loop through the
     remaining non-clue cells, respecting arrow clue counts."""
 
-    def __init__(self, grid: Grid) -> None:
+    def __init__(self, grid: Grid, *, reserved_clue_cells: Iterable[Cell] = ()) -> None:
+        """Reserve clue cells even when their arrow counts have been removed.
+
+        Reserved cells are neither black nor traversable by the loop. Existing
+        callers need no reservation: numbered cells in grid remain clue cells.
+        """
         super().__init__("yajilin")
         self.grid = grid
         self.height = len(grid)
@@ -28,6 +35,11 @@ class YajilinPuzzle(Puzzle):
 
         # Identify clue cells
         self.clue_cells: set[Cell] = set()
+        for cell in reserved_clue_cells:
+            if (not isinstance(cell, Cell) or any(type(n) is not int for n in cell)
+                    or not (0 <= cell.row < self.height and 0 <= cell.col < self.width)):
+                raise ValueError("Reserved clue cells must be cells inside the board")
+            self.clue_cells.add(cell)
         for r in range(self.height):
             for c in range(self.width):
                 if grid[r][c] is not None:
@@ -40,6 +52,7 @@ class YajilinPuzzle(Puzzle):
 
         # Dual grid: vertices = cells, edges = cell adjacencies
         dual = square_grid(self.height - 1, self.width - 1)
+        self.loop_board = dual
         self.edge_on = self.bool_var_map("edge_on", dual.edges)
 
         # --- Constraints ---
