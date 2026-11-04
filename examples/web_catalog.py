@@ -9,14 +9,14 @@ from puzzle_defs.puzzles.shading import CLUE_UI, ClueKind
 from puzzle_defs.puzzles.slitherlink_recipe import LoopClueKind
 from puzzle_defs.puzzles.yajilin_recipe import YajilinClueKind
 from puzzle_defs.ui import merge_requirements
-from shading_recipe import BUILT_IN_RULE_TYPES, MAX_RECIPE_RULES, shared_rooms
+from shading_recipe import BUILT_IN_RULE_TYPES, MAX_RECIPE_RULES, shared_rooms, shared_numbers
 
 FORMAT = "puzzle-box/web-request-v1"
 PROFILE_FORMAT = "puzzle-box/web-request-v2"
 RULE_TYPES = BUILT_IN_RULE_TYPES
 CATALOG = {kind.ui.identifier: kind for kind in RULE_TYPES}
 RENDERERS = {"answer": "binary-cells", "givens": "cell-givens",
-             "row-counts": "row-counts", "column-counts": "column-counts", "rooms": "cell-regions"}
+             "row-counts": "row-counts", "column-counts": "column-counts", "rooms": "cell-regions", "numbers": "cell-numbers"}
 LOOP_RENDERERS = {"answer": "binary-edges", "cell-counts": "cell-edge-counts", "edge-givens": "edge-givens"}
 LOOP_CLUES = (CellEdgeCountClue.ui, EdgeStateClue.ui)
 COUPLED_RENDERERS = {"answer-cells": "binary-cells", "answer-edges": "binary-edges",
@@ -115,6 +115,8 @@ def _read_shading(data: Any) -> Request:
             "requirements": asdict(merged), "rules": raw, "clue_kinds": hints}
     if (rooms := shared_rooms(recipe)) is not None:
         plan["rooms"] = [list(row) for row in rooms]
+    if (numbers := shared_numbers(recipe)) is not None:
+        plan["numbers"] = [list(row) for row in numbers]
     return Request(recipe, seed, budget, plan)
 
 

@@ -1,0 +1,12 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 2,
+  "cols": 3,
+  "rules": [
+    {"type": "distinct-white-numbers", "numbers": [[1, 1, 2], [2, 3, 2]]},
+    {"type": "non-touching", "diagonal": false},
+    {"type": "connected-white", "nonempty": true},
+    {"type": "room-black-count", "rooms": [[0, 0, 0], [1, 1, 1]], "count": 1}
+  ],
+  "clue_kinds": ["cell"]
+}

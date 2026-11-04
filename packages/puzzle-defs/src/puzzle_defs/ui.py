@@ -2,7 +2,8 @@
 
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
-from puzzle_defs.room_layout import RoomMap, room_map
+from puzzle_defs.room_layout import room_map
+from puzzle_defs.number_layout import number_grid
 
 
 @dataclass(frozen=True)
@@ -24,8 +25,8 @@ class UiRequirements:
 class UiParameter:
     name: str
     label: str
-    kind: Literal["integer", "boolean", "region-map"]
-    default: int | bool | RoomMap
+    kind: Literal["integer", "boolean", "region-map", "number-grid"]
+    default: int | bool | tuple[tuple[int, ...], ...]
     minimum: int = 0
     maximum: int | Literal["area", "edges"] = "area"
 
@@ -40,11 +41,15 @@ class UiParameter:
                 raise ValueError("An edge bound requires the number of grid edges")
             if type(value) is not int or not self.minimum <= value <= maximum:
                 raise ValueError(f"{self.name} must be an integer in {self.minimum}..{maximum}")
-        elif self.kind == "region-map":
+        elif self.kind in ("region-map","number-grid"):
             if (rows is None or cols is None or type(value) is not list or len(value) != rows
                     or any(type(row) is not list or len(row) != cols for row in value)):
-                raise ValueError("Room map must be an array matching the board dimensions")
-            room_map(value, rows=rows, cols=cols)
+                label = "Room map" if self.kind == "region-map" else "Number grid"
+                raise ValueError(f"{label} must be an array matching the board dimensions")
+            if self.kind == "region-map":
+                room_map(value, rows=rows, cols=cols)
+            else:
+                number_grid(value, rows=rows, cols=cols)
         else:
             raise ValueError(f"Unsupported parameter kind: {self.kind}")
 

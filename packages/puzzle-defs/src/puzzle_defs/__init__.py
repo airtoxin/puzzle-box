@@ -38,8 +38,10 @@ from puzzle_defs.puzzles.shading_fragments import (
 )
 from puzzle_defs.puzzles.room_fragments import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms
 from puzzle_defs.puzzles.component_shapes import RectangularComponents, NonRectangularComponents
+from puzzle_defs.puzzles.number_fragments import DistinctWhiteNumbers
 
 __all__ = [
+    "DistinctWhiteNumbers",
     "NoWhiteAcrossThreeRooms",
     "RectangularComponents",
     "NonRectangularComponents",

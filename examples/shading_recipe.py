@@ -8,6 +8,8 @@ from puzzle_defs import (BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x
                          NoBlack2x2, NoThreeConsecutive)
 from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms
 from puzzle_defs import RectangularComponents, NonRectangularComponents
+from puzzle_defs import DistinctWhiteNumbers
+from puzzle_defs.number_layout import DEFAULT_NUMBERS, NumberGrid, number_grid
 from puzzle_defs.room_layout import DEFAULT_ROOMS, RoomMap, room_map
 from puzzle_defs.puzzles.shading import CLUE_KINDS, ShadingRule
 from json_records import MAX_BYTES as MAX_RECIPE_BYTES, load_json as _load_json
@@ -20,7 +22,7 @@ PARAMETERLESS_RULE_TYPES = (NoWhite2x2, NoBlack2x2, BlackDominoes, NoThreeConsec
 BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
-                      RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms)
+                      RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -34,6 +36,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "room-black-count": RoomBlackCount(DEFAULT_ROOMS),
             "room-connected-black": RoomConnectedBlack(DEFAULT_ROOMS), "line-black-count": LineBlackCount(),
             "no-white-across-three-rooms": NoWhiteAcrossThreeRooms(DEFAULT_ROOMS),
+            "distinct-white-numbers": DistinctWhiteNumbers(DEFAULT_NUMBERS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -55,6 +58,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": "line-black-count", "count": rule.count}
     if type(rule) is NoWhiteAcrossThreeRooms:
         return {"type": rule.ui.identifier, "rooms": [list(row) for row in rule.rooms]}
+    if type(rule) is DistinctWhiteNumbers:
+        return {"type": rule.ui.identifier, "numbers": [list(row) for row in rule.numbers]}
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         return {"type": rule.ui.identifier, "black": rule.black}
     for kind in PARAMETERLESS_RULE_TYPES:
@@ -90,6 +95,11 @@ def read_rule(data: Any) -> ShadingRule:
                 or any(type(row) is not list for row in data["rooms"])):
             raise ValueError("Invalid room rule parameters; rooms must be an array of arrays")
         return NoWhiteAcrossThreeRooms(tuple(tuple(row) for row in data["rooms"]))
+    if kind == "distinct-white-numbers":
+        if (set(data) != {"type","numbers"} or type(data["numbers"]) is not list
+                or any(type(row) is not list for row in data["numbers"])):
+            raise ValueError("Fixed numbers must be an array of arrays")
+        return DistinctWhiteNumbers(tuple(tuple(row) for row in data["numbers"]))
     for shape_rule in (RectangularComponents, NonRectangularComponents):
         if kind == shape_rule.ui.identifier and set(data) == {"type", "black"}:
             return shape_rule(data["black"])
@@ -128,10 +138,20 @@ def read_recipe(data: Any) -> ShadingRecipe:
     recipe = ShadingRecipe(data["rows"], data["cols"], tuple(read_rule(r) for r in data["rules"]), tuple(kinds))
     check_demo_size(recipe)
     shared_rooms(recipe)
+    shared_numbers(recipe)
     if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
            and r.count > recipe.rows * recipe.cols for r in recipe.rules):
         raise ValueError("Black count cannot exceed the board area")
     return recipe
+
+
+def shared_numbers(recipe: ShadingRecipe) -> NumberGrid | None:
+    grids = [rule.numbers for rule in recipe.rules if type(rule) is DistinctWhiteNumbers]
+    for grid in grids:
+        number_grid(grid,rows=recipe.rows,cols=recipe.cols)
+    if grids and any(grid != grids[0] for grid in grids):
+        raise ValueError("Number rules must share the same fixed numbers for this file/UI format")
+    return grids[0] if grids else None
 
 
 def recipe_record(recipe: ShadingRecipe) -> dict[str, Any]:

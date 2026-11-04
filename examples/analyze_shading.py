@@ -17,6 +17,7 @@ from puzzle_defs import (BlackCount, ColumnCountClue, ConnectedWhite, NonTouchin
                          NoBlack2x2, NoThreeConsecutive)
 from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms
 from puzzle_defs import RectangularComponents, NonRectangularComponents
+from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -45,6 +46,12 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is DistinctWhiteNumbers:
+        lines = [[(r,c) for c in range(cols)] for r in range(rows)] + [[(r,c) for r in range(rows)] for c in range(cols)]
+        for line in lines:
+            remaining = [rule.numbers[r][c] for r,c in line if (r,c) not in black]
+            if len(remaining) != len(set(remaining)): return False
+        return True
     if type(rule) is NonTouchingBlack:
         return not any((max(abs(r-s), abs(c-t)) if rule.diagonal else abs(r-s)+abs(c-t)) == 1
                        for (r, c), (s, t) in combinations(black, 2))
