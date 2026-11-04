@@ -16,21 +16,20 @@
 uv sync --all-packages --group dev --locked
 uv run --no-sync python examples/generate_yajilin.py show examples/yajilin-sample.json
 uv run --no-sync python examples/generate_yajilin.py verify examples/yajilin-sample.json
-uv run --no-sync python examples/generate_yajilin.py show examples/yajilin-sample.json --solution
 ```
 
 問題の盤面部分は次のようになります。
 
 ```text
- .  ?  .  ?  .  ?  .
+[?] ? [?] ? [?] ? [?]
        ?     ?     ?
->0     .  ?  .  ?  .
+>0    [?] ? [?] ? [?]
        ?     ?     |
- .  ?  .  ?  .  ?  .
+[?] ? [?] ? [?] ? [?]
 ```
 
 - `>0` は右方向に黒マスが0個というヒントです。このマス自体は黒にもループにも使いません。
-- `.` は未確定の普通のマス、マス間の `?` は未確定の辺、`|` は使用する辺のヒントです。
+- `[?]` は未確定の普通セル、`.` はループ上の白セルです。マス間の `?` は未確定の辺、`|` は使用する辺のヒントです。
 - すべての普通のマスを黒マスかループ上の白マスにします。黒マスは縦横に隣接できません。
 - すべての白マスを、分岐・交差しない1本の非空ループで通ります。
 - 矢印は盤面の端まで数え、別の矢印マスがあればそこだけを飛ばします。
@@ -39,6 +38,8 @@ uv run --no-sync python examples/generate_yajilin.py show examples/yajilin-sampl
 両方を残すと1解であることを、独立した全列挙でも確認しています。
 `show` は通常はヒントだけを表示し、`--solution` のときだけ全回答を表示します。
 `verify` は**黒マスとループの両方**が保存した答えに一致するかを確認します。
+人が解いた黒白と辺は、`check FILE --cells ... --edges ...` で両方を入力して確認できます。
+`show` の2つのテンプレートと、[完成解の入力方法](play-yajilin.md)を使ってください。
 
 ```sh
 uv run --no-sync python examples/generate_yajilin.py generate --seed 6 --output coupled.json --quiet

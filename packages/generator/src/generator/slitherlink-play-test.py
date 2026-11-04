@@ -24,7 +24,9 @@ EDGE_ROWS = [
 
 @pytest.fixture(scope="module")
 def app():
-    return runpy.run_path(str(SCRIPT))
+    with pytest.MonkeyPatch.context() as patch:
+        patch.syspath_prepend(str(SCRIPT.parent))
+        return runpy.run_path(str(SCRIPT))
 
 
 def _cli(*args: str) -> subprocess.CompletedProcess[str]:
