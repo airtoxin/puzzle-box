@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 import platform
+import sys
 from typing import Any
 
 import ortools
@@ -18,6 +19,7 @@ from puzzle_defs import (
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from shading_recipe import RULES, check_demo_size, check_distinct_paths, load_recipe, read_rule, rule_record
+from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/shading-v1"
 MIXED_FORMAT = "puzzle-box/shading-v2"
@@ -92,6 +94,8 @@ def clue_record(clue: Clue, *, legacy: bool = False) -> dict[str, Any] | list[in
 
 def read_clue(data: Any, *, legacy: bool = False) -> Clue:
     if legacy:
+        if not isinstance(data, list) or len(data) != 3:
+            raise ValueError("A v1 cell clue must be an array of row, column and value")
         row, col, value = data
     elif isinstance(data, dict):
         if data.get("type") == "row-count" and set(data) == {"type", "row", "count"}:
@@ -109,13 +113,14 @@ def read_clue(data: Any, *, legacy: bool = False) -> Clue:
 
 
 def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[list[int]]]:
-    if data["format"] not in (FORMAT, MIXED_FORMAT):
-        raise ValueError("Unsupported puzzle format")
+    if not isinstance(data, dict) or data.get("format") not in (FORMAT, MIXED_FORMAT):
+        raise ValueError(f"Unsupported puzzle format; expected an object with format {FORMAT} or {MIXED_FORMAT}")
     legacy = data["format"] == FORMAT
-    recipe = ShadingRecipe(data["rows"], data["cols"], tuple(read_rule(r) for r in data["rules"]),
-                           ("cell",) if legacy else tuple(data["clue_kinds"]))
+    recipe = ShadingRecipe(data["rows"], data["cols"],
+                           tuple(read_rule(r) for r in read_array(data["rules"], "rules")),
+                           ("cell",) if legacy else tuple(read_array(data["clue_kinds"], "clue_kinds")))
     check_demo_size(recipe)
-    clues = [read_clue(clue, legacy=legacy) for clue in data["clues"]]
+    clues = [read_clue(clue, legacy=legacy) for clue in read_array(data["clues"], "clues")]
     _check_clue_kinds(recipe, clues)
     answer = data["solution"]
     if (not isinstance(answer, list) or len(answer) != recipe.rows
@@ -237,14 +242,14 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command == "verify":
-            result = verify(json.loads(args.file.read_text(encoding="utf-8")))
+            result = verify(load_json(args.file))
             print(json.dumps(result, sort_keys=True))
             return 0
         if args.command == "show":
-            print(show(json.loads(args.file.read_text(encoding="utf-8")), reveal=args.solution))
+            print(show(load_json(args.file), reveal=args.solution))
             return 0
         if args.command == "check":
-            correct = check_answer(json.loads(args.file.read_text(encoding="utf-8")), args.answer)
+            correct = check_answer(load_json(args.file), args.answer)
             print("Correct. All rules and clues are satisfied." if correct else
                   "Not correct. Check the rules and given clues.")
             return 0 if correct else 1
@@ -285,11 +290,11 @@ def main() -> int:
                                  "to retain disambiguating clues") from exc
             raise
         record = puzzle_record(recipe, clues, seed=args.seed, selection=args.selection)
-        encoded = json.dumps(record, indent=2, sort_keys=True) + "\n"
+        encoded = encode_json(record)
         if args.output is not None:
-            args.output.write_text(encoded, encoding="utf-8")
+            args.output.write_bytes(encoded)
         if not args.quiet:
-            print(encoded, end="")
+            sys.stdout.buffer.write(encoded)
         return 0
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
         parser.error(str(exc))
