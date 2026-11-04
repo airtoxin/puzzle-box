@@ -23,7 +23,7 @@ uv run --no-sync python examples/custom_row_band.py verify row-band-puzzle.json
 
 ## 部品と登録表を書く
 
-部品は `@dataclass(frozen=True)` とし、`__call__(puzzle)` がそのモデルのDSL制約を列挙して返します。
+部品は `@dataclass(frozen=True)` とし、`__call__(puzzle)` がそのモデルのDSL制約を1つ、またはその列挙を返します。
 設定は固定とし、ヒント・求解結果・呼び出し回数に依存しない[生成契約](recipe-constraint-composition.md)を守ります。
 部品自体の実装は例の `RowBlackBand` を参照してください。
 
