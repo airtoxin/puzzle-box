@@ -3,16 +3,17 @@
 from dataclasses import asdict, dataclass
 from typing import Any, cast
 
-from puzzle_defs import (BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2, ShadingRecipe,
+from puzzle_defs import (ShadingRecipe,
                          SlitherlinkRecipe, CellEdgeCountClue, EdgeStateClue, YajilinRecipe)
 from puzzle_defs.puzzles.shading import CLUE_UI, ClueKind
 from puzzle_defs.puzzles.slitherlink_recipe import LoopClueKind
 from puzzle_defs.puzzles.yajilin_recipe import YajilinClueKind
 from puzzle_defs.ui import merge_requirements
+from shading_recipe import BUILT_IN_RULE_TYPES, MAX_RECIPE_RULES
 
 FORMAT = "puzzle-box/web-request-v1"
 PROFILE_FORMAT = "puzzle-box/web-request-v2"
-RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2)
+RULE_TYPES = BUILT_IN_RULE_TYPES
 CATALOG = {kind.ui.identifier: kind for kind in RULE_TYPES}
 RENDERERS = {"answer": "binary-cells", "givens": "cell-givens",
              "row-counts": "row-counts", "column-counts": "column-counts"}
@@ -26,7 +27,7 @@ def catalog() -> dict[str, Any]:
     return {"format": "puzzle-box/web-catalog-v1", "request_format": FORMAT,
             "rules": [kind.ui.record() for kind in RULE_TYPES],
             "clues": [asdict(clue) for clue in CLUE_UI], "renderers": RENDERERS,
-            "limits": {"max_cells": 9, "max_rules": 4, "max_budget_seconds": 30},
+            "limits": {"max_cells": 9, "max_rules": MAX_RECIPE_RULES, "max_budget_seconds": 30},
             "board": asdict(ShadingRecipe.ui), "profiles": profiles()}
 
 
@@ -82,8 +83,8 @@ def _read_shading(data: Any) -> Request:
     seed = _integer(data["seed"], "seed", 0, 2**31-1)
     budget = _integer(data["budget_seconds"], "budget_seconds", 1, 30)
     raw = data["rules"]
-    if type(raw) is not list or len(raw) > len(CATALOG):
-        raise ValueError("rules must be an array of at most 4 distinct supported rules")
+    if type(raw) is not list or len(raw) > MAX_RECIPE_RULES:
+        raise ValueError("rules must be an array of at most 8 distinct supported rules")
     rules, seen = [], set()
     requirements = [ShadingRecipe.ui]
     for item in raw:

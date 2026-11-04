@@ -12,7 +12,7 @@
 クラスメソッドを持つ `SudokuPuzzle` はそのまま渡せます。
 サイズやルールを持つインスタンスを渡せば、生成器にパズル固有の分岐を足さずに
 設定を引き回せます。実行可能な例は [compose_binary.py](../examples/compose_binary.py)と、
-2次元で4種類の部品を選べる [黒白盤面の生成](composable-shading.md)です。
+2次元で部品を選べる [黒白盤面の生成](composable-shading.md)です。
 
 例えば Slitherlink のサイズを保持するレシピは次のように書けます。
 

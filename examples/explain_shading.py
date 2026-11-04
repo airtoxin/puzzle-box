@@ -11,7 +11,7 @@ from puzzle_defs import BlackCount, ColumnCountClue, ConnectedWhite, NonTouching
 from puzzle_defs.puzzles.shading import Clue
 from diagnose_shading_rules import _read_puzzle
 from generate_shading import verify
-from shading_recipe import load_json
+from shading_recipe import BUILT_IN_RULE_TYPES, load_json
 
 
 def _white_connector(cells: list[tuple[int, int]], known: dict[tuple[int, int], int]) -> tuple[tuple[int, int], dict[str, Any]] | None:
@@ -49,6 +49,7 @@ def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
     known: dict[tuple[int, int], int] = {}
     origins: dict[tuple[int, int], dict[str, Any]] = {}
     givens, constraints, connectivity = [], [], []
+    unsupported = []
 
     def add(kind, scope, source, target=None):
         constraints.append({"kind": kind, "scope": [list(c) for c in scope],
@@ -69,6 +70,8 @@ def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
                     add("has-black", [(r, c), (r, c+1), (r+1, c), (r+1, c+1)], source)
         elif type(rule) is ConnectedWhite:
             connectivity.append(source)
+        elif type(rule) in BUILT_IN_RULE_TYPES:
+            unsupported.append(index)
         else:
             raise ValueError("Unsupported rule type")
     for index, clue in enumerate(clues, 1):
@@ -140,7 +143,7 @@ def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
     return {"givens": givens, "steps": steps,
             "cells": [[known.get((r, c)) for c in range(recipe.cols)] for r in range(recipe.rows)],
             "unresolved_cells": [list(c) for c in cells if c not in known],
-            "rules_without_deductions": []}
+            "rules_without_deductions": unsupported}
 
 
 def explain_puzzle(data: Any) -> dict[str, Any]:

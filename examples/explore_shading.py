@@ -9,11 +9,11 @@ from typing import Any
 
 import ortools
 
-from puzzle_defs import BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2, ShadingRecipe
+from puzzle_defs import BlackCount, ConnectedWhite, NonTouchingBlack, ShadingRecipe
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ClueKind, ShadingRule
 from analyze_shading import finite_space, full_clues
 from generate_shading import RULES, clue_record, rule_record
-from shading_recipe import check_distinct_paths, recipe_record
+from shading_recipe import DEFAULT_RULES, rule_choices, check_distinct_paths, recipe_record
 
 
 def explore(rows: int, cols: int, candidates: Sequence[ShadingRule],
@@ -122,7 +122,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rows", type=int, default=2)
     parser.add_argument("--cols", type=int, default=2)
-    parser.add_argument("--candidates", nargs="*", choices=RULES, default=list(RULES))
+    parser.add_argument("--candidates", nargs="*", choices=RULES, default=list(DEFAULT_RULES))
     parser.add_argument("--black-counts", type=int, nargs="+", default=[2])
     parser.add_argument("--include-diagonal", action="store_true",
                         help="Include a second non-touching candidate that also forbids diagonal contact")
@@ -151,7 +151,7 @@ def main() -> int:
             elif kind == "connected-white":
                 candidates.append(ConnectedWhite(not args.allow_empty_white))
             else:
-                candidates.append(NoWhite2x2())
+                candidates.append(rule_choices()[kind])
         report = explore(args.rows, args.cols, candidates, tuple(args.hints))
         rendered = explain(report, args.explain)  # Validate selection before writing.
         exported = None
