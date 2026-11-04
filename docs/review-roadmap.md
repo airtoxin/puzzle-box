@@ -1,18 +1,18 @@
 # 組合せ生成の現在地と PR #9〜#20 のレビューガイド
 
-**#2〜#8 は main に採用済みです。#9〜#20 は ready に移行し、Copilot レビューと指摘対応を進めています。**
-未マージと draft は別の状態です。採用はレビュー・必要なCIの成功後、ユーザーの指示に従って依存順に進めます。
-2026-11-04 UTC の土台は `dd7eb32b3b02170c9ddae2fe2031ea13d19181f3`。
-#9 の base を main に変更し、後続にも採用後の修正を反映しました。
-この資料は #17 の文書1ファイルの差分で、実装PRとは独立して採用できます。
+**#2〜#16・#18〜#20 の実装は main に採用済みです。**
+2026-11-04 UTC、各PRを ready にし、Copilot の修正後レビューと4環境のCIを確認して依存順に採用しました。
+実装の固定再現点は `f613b97e5591f81369697bfd3ec57a8fc1eb10b1`（#20 採用後）。
+#17 はこの文書1ファイルだけのPRで、最新状態・レビュー・チェックは [PR #17](https://github.com/airtoxin/puzzle-box/pull/17) を参照してください。
+追加の保存問題診断 [#21](https://github.com/airtoxin/puzzle-box/pull/21) は別の draft です。下記の main の機能には含めません。
 
 既存 DSL による黒白・ループ・黒白と辺の相互制約、保存したレシピからの生成、
 小盤面での組合せ探索まで動きます。任意のパズル型や DSL 式を自動接続する汎用機構にはしていません。
 
 ## 最初に見るもの
 
-- **段階的にレビュー:** 下記の依存図とPR一覧。まず #9、以後は親の後で各系列を選べます。
-- **まとめて試す:** 「統合版を試す」の固定コミット。統合ブランチは検証用で、一括採用を求めるものではありません。
+- **変更を確認:** 下記の依存図と、採用したhead・CIの一覧。各PRの目的と差分を追えます。
+- **まとめて試す:** 「採用版を試す」の main と固定コミット。過去の統合ブランチを取得する必要はありません。
 - **次の開発を判断:** 「削減後の異種合成を調べる予備実験」と優先順位。全候補ヒントでの冗長性だけでは出題後を評価できません。
 
 ## 採用済みの基盤
@@ -33,11 +33,11 @@
 Ubuntu / Windows × Python 3.12 / 3.13 の4環境で259テスト・型検査・全4パッケージのビルド成功。
 保護設定は変更していません。
 
-## 現在の依存関係
+## 開発時の機能・ブランチ依存
 
 ```mermaid
 flowchart LR
-  M["main: #2〜#8 採用済み"] --> A["#9 黒白合成"]
+  M["開発時の基盤: #2〜#8"] --> A["#9 黒白合成"]
   M --> G["#17 この文書だけ"]
   A --> B["#10 混合ヒント"]
   B --> C["#11 表示・解答確認"]
@@ -51,33 +51,36 @@ flowchart LR
   J --> L["#20 異種合成の小盤面探索"]
 ```
 
-矢印はブランチの依存です。#12 が #9 上にあることは、Slitherlink が黒白ルールを論理的に必要とする意味ではありません。
-#11 と #15、#14 と #20 はそれぞれ兄弟です。#18・#19 は #11 に依存せず、#20 は #14〜#19 に依存しません。
+矢印は開発時の依存です。現在の対象実装はすべて main に含まれています。
+#12 が #9 上にあったことは、Slitherlink が黒白ルールを論理的に必要とする意味ではありません。
+#11 と #15、#14 と #20 は機能上の兄弟です。#18・#19 は #11 に、#20 は #14〜#19 に論理的には依存しません。
 
-推奨順は **#9 → #10 → #11 → #15 → #16 → #18 → #19** と、
-**#9 → #12 → #13 → #14 / #20** の2系列です。#17 は任意の段階で独立にレビューできます。
-異種合成を先に確認したい場合は、親を先に採用する条件で後者を優先できます。
-実際に採用する順序で最終CIを確認してください。
+実際の採用順は **#9 → #10 → #15 → #16 → #18 → #19 → #11 → #12 → #13 → #14 → #20**。
+別系列の採用後に main の内容が増えた場合は、その内容を通常mergeで取り込み、最新headで再レビューしました。
+一時的に #12 のbaseを #11、#20 を #14 にして固有差分を確認し、親採用後は同じtreeの main に移しています。
+#17 の文書は実装とは独立です。マージ・保護設定の迂回や force push は行っていません。
 
-## 後続 PR 一覧（基盤更新時のスナップショット）
+## 採用した PR と検証記録
 
-以下は更新後headのスナップショットです。各PRの「Files changed」は記載のbaseとの比較です。
-テスト件数は枝ごとに含む機能が違うため、合算しません。CIリンクは今回の更新headに対応します。
+以下は採用したheadと、そのheadのPR CIです。#17以外は main へ通常merge済みです。
+各実装PRで、最新headに対する Copilot の「Approval recommended / No open issues」と未解決スレッドなしを確認しました。
+Copilot の結果は COMMENTED として記録されるため、人間の APPROVED と同一視していません。
+テスト件数は各時点で含む機能が違うため合算しません。CIはすべて4環境のテスト・型検査・ビルド成功です。
 
-| PR / head | 目的 | 現在の base | 更新後の CI | 主な限界 |
+| PR / 採用head | 目的 | 採用先 | 採用時の CI | 主な限界 |
 | --- | --- | --- | --- | --- |
-| [#9](https://github.com/airtoxin/puzzle-box/pull/9) / `adaafcf` | 黒数・黒非接触・白連結・白2×2禁止を合成し、生成・保存・検証。 | main | 290件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746468614) | 同じ黒白セルの4型。CLIは25セル以下、seed指定時1 worker。 |
-| [#10](https://github.com/airtoxin/puzzle-box/pull/10) / `910d00a` | セル、行、列の黒数ヒントを混在。 | #9 | 338件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746470041) | 数だけで非一意なら成功としない。選んでいないヒントを補わない。 |
-| [#11](https://github.com/airtoxin/puzzle-box/pull/11) / `2f994a6` | 黒白問題のテキスト表示、完全解答の確認。 | #10 | 374件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746468611) | 途中手・論理的な解き筋・ブラウザUIは未対応。 |
-| [#12](https://github.com/airtoxin/puzzle-box/pull/12) / `d03c317` | Slitherlink の非空単一ループ・長さ・数字／辺ヒント。 | #9 | 342件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746470275) | CLIは9セル以下。数字だけでは非一意の場合がある。 |
-| [#13](https://github.com/airtoxin/puzzle-box/pull/13) / `3d48d09` | ヤジリンで黒白セルとループ辺を相互制約で接続。 | #12 | 406件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746470319) | 固定矢印位置、CLIは12セル以下。答えは黒白と辺の両方。 |
-| [#14](https://github.com/airtoxin/puzzle-box/pull/14) / `6543fb8` | ヒント形式を変えず連続seedを有限回試す。 | #13 | 427件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746471055) | 上限32回。初期ヒント非一意だけを再試行。時間・成功率の保証なし。 |
-| [#15](https://github.com/airtoxin/puzzle-box/pull/15) / `514fb6b` | 小盤面の矛盾、ヒント不足、多様性を全列挙で診断。 | #10 | 397件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746469684) | 9セル・8ルール出現・黒白4型。seed頻度を確率と解釈しない。 |
-| [#16](https://github.com/airtoxin/puzzle-box/pull/16) / `5eaafde` | ルール部分集合と冗長性、一意性への寄与を比較。 | #15 | 420件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746469391) | 最大512盤面×256部分集合。全候補ヒントに対する評価。 |
-| [#17](https://github.com/airtoxin/puzzle-box/pull/17) | このレビューガイド。 | main | PR上の最新チェックを参照 | 文書1ファイルのみ。CLIはこの枝には存在しない。 |
-| [#18](https://github.com/airtoxin/puzzle-box/pull/18) / `7d68098` | 探索レシピの保存→安全な読込→生成。 | #16 | 490件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746470919) | 版付き黒白4型専用。未知の型・項目、重複JSONキー等を拒否。 |
-| [#19](https://github.com/airtoxin/puzzle-box/pull/19) / `b1afb3c` | 削減後に残ったヒントを固定し、ルールを外した別解を表示。 | #18 | 531件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746470420) | 保存された1問題の比較。冗長ルールの一括削除や同時最小化はしない。 |
-| [#20](https://github.com/airtoxin/puzzle-box/pull/20) / `2330c56` | 黒白と辺の3規則の有無×3ヒント形式の有無を比較。 | #13 | 433件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41746470562) | 最大8セル・10辺。全候補ヒントのみ。規則を外した構成は通常のヤジリンではない。 |
+| [#9](https://github.com/airtoxin/puzzle-box/pull/9) / `389dff2` | 黒数・黒非接触・白連結・白2×2禁止を合成し、生成・保存・検証。 | main | 290件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41749321123) | 同じ黒白セルの4型。CLIは25セル以下、seed指定時1 worker。 |
+| [#10](https://github.com/airtoxin/puzzle-box/pull/10) / `c69fb20` | セル、行、列の黒数ヒントを混在。 | main | 338件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41749763731) | 数だけで非一意なら成功としない。選んでいないヒントを補わない。 |
+| [#11](https://github.com/airtoxin/puzzle-box/pull/11) / `4346e60` | 黒白問題のテキスト表示、完全解答の確認。 | main | 567件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41752404778) | 途中手・論理的な解き筋・ブラウザUIは未対応。 |
+| [#12](https://github.com/airtoxin/puzzle-box/pull/12) / `b5e2724` | Slitherlink の非空単一ループ・長さ・数字／辺ヒント。 | main | 619件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41752526371) | CLIは9セル以下。数字だけでは非一意の場合がある。 |
+| [#13](https://github.com/airtoxin/puzzle-box/pull/13) / `6d14015` | ヤジリンで黒白セルとループ辺を相互制約で接続。 | main | 683件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41752591118) | 固定矢印位置、CLIは12セル以下。答えは黒白と辺の両方。 |
+| [#14](https://github.com/airtoxin/puzzle-box/pull/14) / `1346dff` | ヒント形式を変えず連続seedを有限回試す。 | main | 704件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41752647172) | 上限32回。初期ヒント非一意だけを再試行。時間・成功率の保証なし。 |
+| [#15](https://github.com/airtoxin/puzzle-box/pull/15) / `cf782ec` | 小盤面の矛盾、ヒント不足、多様性を全列挙で診断。 | main | 397件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41749759458) | 9セル・8ルール出現・黒白4型。seed頻度を確率と解釈しない。 |
+| [#16](https://github.com/airtoxin/puzzle-box/pull/16) / `08eb151` | ルール部分集合と冗長性、一意性への寄与を比較。 | main | 420件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41749762530) | 最大512盤面×256部分集合。全候補ヒントに対する評価。 |
+| [#17](https://github.com/airtoxin/puzzle-box/pull/17) | このレビューガイド。 | main | PR上の最新チェックを参照 | 差分は文書1ファイルのみ。実装は採用済みmainを含む。 |
+| [#18](https://github.com/airtoxin/puzzle-box/pull/18) / `7ca6f16` | 探索レシピの保存→安全な読込→生成。 | main | 490件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41749763787) | 版付き黒白4型専用。未知の型・項目、重複JSONキー等を拒否。 |
+| [#19](https://github.com/airtoxin/puzzle-box/pull/19) / `2436498` | 削減後に残ったヒントを固定し、ルールを外した別解を表示。 | main | 531件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41749762996) | 保存された1問題の比較。冗長ルールの一括削除や同時最小化はしない。 |
+| [#20](https://github.com/airtoxin/puzzle-box/pull/20) / `d44e73e` | 黒白と辺の3規則の有無×3ヒント形式の有無を比較。 | main | 731件 / [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41752761628) | 最大8セル・10辺。全候補ヒントのみ。規則を外した構成は通常のヤジリンではない。 |
 
 ## 土台の更新と競合をどう検証したか
 
@@ -90,25 +93,27 @@ flowchart LR
   有限回探索と異種探索の説明を両方残しました。統合treeは前回検証済み `0660738` と完全一致しました。
 - #17にもmainを取り込みました。baseとの差分は引き続き文書1ファイルです。本文更新だけを実装とは独立にレビューできます。
 
-今回の再統合順は #11 系列 → #14 系列 → #19 系列 → #20 → #17。
-上記はこの組合せでの結果で、将来の競合なしや別順のマージ結果を保証しません。
-全12件に Copilot レビューを依頼しました。以下のheadとCIは基盤更新完了時の記録で、指摘修正後の最新head・レビュー結果は各PRを参照してください。古いレビューを変更後のheadの承認として扱わないでください。
+基盤更新時の統合順は #11 系列 → #14 系列 → #19 系列 → #20 → #17 でした。
+今回の実際の採用順は上記のとおりで、各マージ後に base と固有差分を再確認しました。
+親の採用後mainと元の親headのtreeが一致する場合は、子のheadを変えずbaseを更新しました。
+兄弟系列が既に採用されていた場合は内容を取り込み、新headのCIと再レビューを確認しています。
+将来、squash/rebaseで採用すると履歴が変わるため、この手順だけで無競合とは保証できません。
 
-将来、親PRを採用したら、そのmainと子の差分を再確認してから子のbaseをmainへ移します。
-通常mergeなら今回の親履歴も祖先になりますが、squash/rebase採用では履歴が変わるため再整理が必要です。
-親のコードが子のPRに再掲されていないこと、CIが新しい組合せに対して成功していることを確認します。
-ユーザーの追加指示により #9以降もready化し、必要なレビューとCIを確認して依存順に採用する段階へ進みました。最新の採用状況は各PRを参照してください。
+Copilot の文書指摘は #9・#12 の古い依存説明、#17 の draft と未マージの混同でした。
+修正して再レビュー済みです。さらに #11 の main 取り込み後、テスト単独実行の import 失敗が見つかりました。
+`shading-play-test.py` だけの実行で10成功・26 setup errorを再現し、スクリプト読込時だけ検索パスを追加するよう修正しました。
+修正後は単独36件成功、全体567件成功。Copilot は修正を解決済みと確認しています。
+全体テストだけでは他モジュールの検索パスに隠れる失敗であり、単独実行の確認も必要だった事例です。
 
-## 統合版を試す
+## 採用版を試す
 
-更新した各PRの実際の履歴を合わせた検証ブランチは `codex/integration-refreshed-drafts`。
-機能を固定して試すコミットは **`f68a0436ff3d7d546112df3e2bd12496644c5643`** です。
-この文書だけの枝には、以下のCLIはありません。新しいディレクトリで実行してください。
+採用済み実装を固定して試すコミットは **`f613b97e5591f81369697bfd3ec57a8fc1eb10b1`** です。
+mainから取得できます。既存の作業を保つため、新しいディレクトリで試してください。
 
 ```sh
-git clone --branch codex/integration-refreshed-drafts https://github.com/airtoxin/puzzle-box.git puzzle-box-review
+git clone https://github.com/airtoxin/puzzle-box.git puzzle-box-review
 cd puzzle-box-review
-git switch --detach f68a0436ff3d7d546112df3e2bd12496644c5643
+git switch --detach f613b97e5591f81369697bfd3ec57a8fc1eb10b1
 uv sync --all-packages --group dev --locked
 uv run --no-sync python examples/generate_shading.py show examples/shading-mixed-sample.json
 uv run --no-sync python examples/generate_shading.py verify examples/shading-mixed-sample.json
@@ -137,11 +142,14 @@ Python 3.12.14 / OR-Tools 9.15.6755では、黒白の例は行ヒント2個に�
 
 ## 検証結果
 
-更新後の実装11PRは、それぞれ Ubuntu / Windows × Python 3.12 / 3.13 の全4環境で成功しました。
-再統合 `f68a043` の [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41747170388) も全4環境で731テスト成功、Pyright 0エラー・0警告、全4パッケージのsdist/wheelビルド成功です。
-ローカルの再統合は730成功・1スキップ（ハードリンク権限）で、CIではその試験も成功しました。
-文書の10個のCLI実行例と1個のPython例、固定コミットへの資料リンク、Markdownのコードフェンスも検証しています。
-#17自身の文書更新に対するCIは、PR上の最新チェックを参照してください。統合ブランチに後からこの資料だけを反映した場合も、機能の固定再現点は上記コミットです。
+採用した実装11PRは、それぞれ Ubuntu / Windows × Python 3.12 / 3.13 の全4環境で成功しました。
+全機能を含む #20 の [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41752761628) は731テスト、
+Pyright 0エラー・0警告、全4パッケージのsdist/wheelビルド成功です。
+ローカル統合は730成功・1スキップ（ハードリンク作成権限）で、CIではその試験も成功しました。
+以前の統合 `f68a043` の [CI](https://github.com/airtoxin/puzzle-box/actions/runs/41747170388) も731件成功でしたが、
+今回の採用では #11 の単独実行修正を含む最新headを使いました。
+文書の10個のCLI実行例と1個のPython例は基盤更新時に検証しています。採用版でリンク先とCLIの内容を再確認しました。
+#17 自身の最新文書CIと、採用後 main のチェックは GitHub の各PR・Actionsを参照してください。
 
 テストは件数だけでなく、独立な全列挙との一致、補助変数を除いた回答の射影、
 初期ヒントの一意性、残したヒントの必要性、安全なレシピ入力、CLIの再現性を確認しています。
@@ -163,7 +171,7 @@ Python 3.12.14 / OR-Tools 9.15.6755では、黒白の例は行ヒント2個に�
 元の18ヒントを全部固定すると、どの行でも各規則を外して1解のままです。
 削減後の解集合は独立列挙器とDSLモデルの両方で照合しました。
 1つの完成解と固定削減順の実験であり、他の配置・最少ヒント数・難易度の証明ではありません。
-新たな生成・保存APIはまだ追加していません。mask 3の中心となる反例は、統合版のルートから次で再現できます。
+採用版には新たな生成・保存APIをまだ追加していません。mask 3の中心となる反例は、リポジトリのルートから次で再現できます。
 
 ```python
 import sys
@@ -188,12 +196,12 @@ for mask, count in [(3, 1), (2, 123), (1, 3)]:
 ## 次の優先順位と残るギャップ
 
 旧計画のレシピ保存・生成接続は #18、保存ヒント診断は #19、異種探索は #20で限定範囲を実装済みです。
-基盤の採用は完了しました。後続の採用は個別のレビュー結果に従います。機能一覧への掲載だけでは main で利用可能になったという意味ではありません。
+対象の実装は main に採用済みです。追加の [#21](https://github.com/airtoxin/puzzle-box/pull/21) は保存問題に対する異種ルール診断の draft で、上記の採用版には含まれません。
 
 | 優先 | 次の一歩 | 小さな完了条件・制限 |
 | --- | --- | --- |
-| P0 | 上記依存順で後続をレビュー | 各PRの差分・新headのCI・必要なレビューを確認。ユーザーの承認に従い、依存順に採用する。 |
-| P1 | 異種探索で選んだ規則・答えからヒントを削減し、その問題で規則の寄与を比較 | まず #20 の8セル・3規則だけ。黒白＋辺の射影、固定ヒント、別解証拠を保ち、上の123解／3解を回帰例にする。通常ヤジリンの形式に異なる規則を偽装しない。 |
+| 完了 | #9〜#20 の実装を依存順に採用 | 修正後レビュー・4環境CIを確認。#17の文書の現在状態はPRを参照。 |
+| P1 | 保存問題に対する異種診断 #21 をレビュー | 8セル・3規則、保存ヒントを固定、黒白＋辺の射影と別解証拠。123解／3解を含む58ケースを追加。通常ヤジリンを直接読み、異なる規則は別形式。生成・削減APIの追加は含まない。 |
 | P2 | 異種の設定・問題を版付きで保存し、探索から生成へ接続 | #18の厳密な入力検証を参考にする。mask 0〜6の意味を明示し、既存ヤジリン形式との互換性を区別。任意Python式の実行や汎用DSL直列化はしない。 |
 | P3 | 求解予算・終了理由・多様性を可視化 | 時間切れ、不成立、複数解を区別し、未完了を唯一解と認定しない。同一答えの重複を測り、対称性による分類は座標一致とは別に扱う。 |
 | P4 | 説明可能な少数の推論規則で人間の解き筋を評価 | 各手を反例探索で検証し、試遊と合わせる。唯一解や既約性だけで面白さ・難易度を主張しない。 |
@@ -204,10 +212,10 @@ for mask, count in [(3, 1), (2, 123), (1, 3)]:
 
 ## 詳細資料
 
-以下は今回の更新前後で内容を保持した機能資料です。固定統合コミットで参照できます。
+以下は採用済み実装に対応する資料です。固定コミットで参照できます。
 
-- [元の設計・課題](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/project-review.md)
-- [黒白合成](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/composable-shading.md) / [混合ヒント](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/mixed-shading-clues.md) / [遊ぶCLI](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/play-shading.md)
-- [Slitherlink](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/slitherlink-composition.md) / [ヤジリンと有限回探索](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/yajilin-composition.md)
-- [小盤面診断](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/shading-diagnostics.md) / [組合せ探索](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/shading-exploration.md)
-- [レシピ保存と生成](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/shading-recipe-files.md) / [保存ヒントの診断](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/stored-clue-rule-diagnostics.md) / [異種合成の探索](https://github.com/airtoxin/puzzle-box/blob/f68a0436ff3d7d546112df3e2bd12496644c5643/docs/coupled-rule-exploration.md)
+- [元の設計・課題](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/project-review.md)
+- [黒白合成](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/composable-shading.md) / [混合ヒント](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/mixed-shading-clues.md) / [遊ぶCLI](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/play-shading.md)
+- [Slitherlink](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/slitherlink-composition.md) / [ヤジリンと有限回探索](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/yajilin-composition.md)
+- [小盤面診断](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/shading-diagnostics.md) / [組合せ探索](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/shading-exploration.md)
+- [レシピ保存と生成](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/shading-recipe-files.md) / [保存ヒントの診断](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/stored-clue-rule-diagnostics.md) / [異種合成の探索](https://github.com/airtoxin/puzzle-box/blob/f613b97e5591f81369697bfd3ec57a8fc1eb10b1/docs/coupled-rule-exploration.md)
