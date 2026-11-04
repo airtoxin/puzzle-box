@@ -1,5 +1,6 @@
 """Unsupported extensions must not receive built-in-only guarantees."""
 
+from copy import deepcopy
 import importlib
 from itertools import product
 from pathlib import Path
@@ -88,11 +89,29 @@ def test_legacy_verification_and_display_reject_unknown_semantics(version, field
 
 
 @pytest.mark.parametrize("version", [1, 2])
-def test_legacy_optional_metadata_remains_accepted(version):
+def test_unknown_top_level_metadata_is_not_implicitly_migrated(version, monkeypatch):
     data = _legacy_record(version)
-    data.update(seed=0, environment={"completion_selection": "finite-identifiable-v1"})
+    data["extra_metadata"] = {"ratio": 1.25, "label": "日本語"}
+    before = deepcopy(data)
+    monkeypatch.setattr(Puzzle, "solve", lambda *a, **k: pytest.fail("Reject unknown fields before solving"))
+    for operation in (display.verify, display.show, lambda record: display.check_answer(record, ".")):
+        with pytest.raises(ValueError, match="Missing or unknown puzzle fields"):
+            operation(data)
+    assert data == before
+
+
+@pytest.mark.parametrize("version", [1, 2])
+@pytest.mark.parametrize("metadata", [None, {"ratio": 1.25, "label": "日本語"}],
+                         ids=["no-metadata", "environment-metadata"])
+def test_legacy_optional_metadata_remains_accepted(version, metadata):
+    data = _legacy_record(version)
+    if metadata is not None:
+        data.update(seed=0, environment={"completion_selection": "finite-identifiable-v1", **metadata})
+    before = deepcopy(data)
     assert display.verify(data) == {"valid": True, "unique": True, "irreducible": True, "clue_count": 0}
     assert "Shading puzzle" in display.show(data)
+    assert display.check_answer(data, ".")
+    assert data == before
 
 
 def test_supported_custom_generation_stays_separate_from_builtin_diagnostics(monkeypatch):
