@@ -97,7 +97,7 @@ class ComponentRegistry:
         declared = fields(builder_type)
         constructor = signature(builder_type)
         named_parameters = {name for name, param in constructor.parameters.items()
-                            if param.kind != SignatureParameter.VAR_KEYWORD}
+                            if param.kind not in (SignatureParameter.VAR_POSITIONAL, SignatureParameter.VAR_KEYWORD)}
         if ("id" in parameters or any(not f.init for f in declared)
                 or set(parameters) != {f.name for f in declared}
                 or not named_parameters <= set(parameters)):
