@@ -72,3 +72,43 @@ test('timeout is inconclusive and mobile preview stays usable', async ({page}) =
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({path: test.info().outputPath('mobile.png'), fullPage: true});
 });
+
+test('keyboard cell entry retains focus and black cells keep contrast on hover', async ({page}) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', {name: 'この組合せで生成する →'})).toBeEnabled();
+  await page.getByRole('button', {name: 'この組合せで生成する →'}).click();
+  await expect(page.locator('#status')).toContainText('生成しました');
+  const cell = page.locator('.cell:enabled').first();
+  await cell.focus();
+  await page.keyboard.press('Space');
+  await expect(cell).toHaveAttribute('data-value', '0');
+  await expect.soft(cell).toBeFocused();
+  // Re-focus even before the fix so the hover regression is independently exercised.
+  await cell.focus();
+  await page.keyboard.press('Enter');
+  await expect(cell).toHaveAttribute('data-value', '1');
+  await expect.soft(cell).toBeFocused();
+  await cell.hover();
+  await expect.soft(cell).toHaveCSS('background-color', 'rgb(33, 60, 51)');
+  await expect(cell).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.cell:enabled').nth(1)).toBeFocused();
+});
+
+test('all columns of a wide board are reachable at narrow desktop widths', async ({page}) => {
+  await page.setViewportSize({width: 800, height: 800});
+  await page.goto('/');
+  await expect(page.getByRole('button', {name: 'この組合せで生成する →'})).toBeEnabled();
+  await page.getByLabel('行数', {exact: true}).fill('1');
+  await page.getByLabel('列数', {exact: true}).fill('9');
+  await expect(page.locator('.cell')).toHaveCount(9);
+  const board = page.locator('#board');
+  const visible = await board.boundingBox();
+  await board.evaluate(el => {el.scrollLeft = 0;});
+  const first = await page.locator('.cell').first().boundingBox();
+  expect.soft(first.x).toBeGreaterThanOrEqual(visible.x);
+  await board.evaluate(el => {el.scrollLeft = el.scrollWidth;});
+  const last = await page.locator('.cell').last().boundingBox();
+  expect(last.x + last.width).toBeLessThanOrEqual(visible.x + visible.width + 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

@@ -91,12 +91,18 @@ function renderBoard(reveal = false) {
     for (let c = 0; c < plan.cols; c++) {
       const index = r * plan.cols + c;
       const value = reveal ? artifact.record.solution[r][c] : artifact ? input[index] : -1;
-      const button = node('button', value === -1 ? '?' : value === 0 ? '○' : '■', 'cell');
-      button.type = 'button'; button.dataset.value = value; button.disabled = !artifact || fixed.has(index) || reveal;
+      const button = node('button', undefined, 'cell');
+      button.type = 'button'; button.disabled = !artifact || fixed.has(index) || reveal;
       if (fixed.has(index) && artifact) button.classList.add('fixed');
-      button.setAttribute('aria-label', `${r + 1}行${c + 1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
+      const paint = value => {
+        button.textContent = value === -1 ? '?' : value === 0 ? '○' : '■';
+        button.dataset.value = value;
+        button.setAttribute('aria-label', `${r + 1}行${c + 1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
+      };
+      paint(value);
       button.addEventListener('click', () => {
-        input[index] = (input[index] + 2) % 3 - 1; $('answer-status').textContent = ''; renderBoard();
+        input[index] = (input[index] + 2) % 3 - 1; $('answer-status').textContent = '';
+        paint(input[index]); // Keep the actual focused button and Tab position.
       });
       const td = node('td'); td.append(button); tr.append(td);
     }

@@ -178,7 +178,7 @@ button {
   cursor:pointer;
 }
 
-button:hover:enabled {
+button:not(.cell):not(.primary):hover:enabled {
   background:#dfecde;
 }
 
@@ -224,13 +224,15 @@ button:disabled {
   padding:28px 0;
   min-height:230px;
   display:flex;
-  justify-content:center;
+  justify-content:flex-start;
   align-items:center;
 }
 
 table {
   border-collapse:separate;
   border-spacing:4px;
+  flex-shrink:0;
+  margin-inline:auto;
 }
 
 th {
