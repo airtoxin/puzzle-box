@@ -15,7 +15,7 @@ uv run --no-sync python examples/generate_shading.py verify puzzle.json
 Python 3.12.14 / OR-Tools 9.15.6755 でseed 6を使うと、行0の黒数1・行1の黒数2という
 2個のヒントだけが残り、答えは `.#./#.#/...` になります。唯一解と各ヒントの必要性を検証できます。
 
-採用済みの表示・解答確認で、`show puzzle.json` や `check puzzle.json --answer ...` も使えます。
+`show puzzle.json` や `check puzzle.json --answer ...` で[表示・解答確認](play-shading.md)もできます。
 生成時に `--quiet` を付けると、答えを含むJSONを画面へ出さずに保存できます。
 
 ## 探索から保存する
@@ -53,7 +53,7 @@ uv run --no-sync python examples/generate_shading.py verify puzzle.json
 | 形式 | 内容 | 読み込む操作 |
 | --- | --- | --- |
 | `shading-recipe-v1` | 寸法・ルール・候補ヒント形式。答えもヒント値も含まない。 | `generate --recipe FILE` |
-| `shading-v1` / `shading-v2` | 生成された問題・答え・seed・環境情報。 | `verify FILE`、#11の `show` / `check` |
+| `shading-v1` / `shading-v2` | 生成された問題・答え・seed・環境情報。 | `verify FILE`、`show` / `check` |
 | `shading-exploration-v1` | 全部分集合の比較結果・反例。 | 閲覧用。生成器への入力にはしない。 |
 
 表の形式には共通して `puzzle-box/` の接頭辞があります。
@@ -74,7 +74,8 @@ Pythonの式・クラス名・モジュールパスを実行する仕組みは�
 `--recipe` は `--rows`、`--cols`、`--rules`、`--hints`、`--black-count`、`--diagonal`、
 `--allow-empty-white` と併用できません。同じ値を指定してもエラーです。
 設定の変更はレシピを編集するか、別のレシピを保存して明示的に行います。
-`--seed`、`--output`、`--quiet`、`--selection` は併用できます。
+`--seed`、`--output`、`--quiet` は併用できます。
+`--selection finite` も同時に指定できます。
 
 レシピの入力と問題の出力、レシピ出力とレポート出力を同じファイルにはできません。
 解決済みパスや既存ファイルの別名でも検査します。通常の別の出力先は従来どおり上書きされます。
@@ -110,5 +111,5 @@ seedは盤面のルールではなく生成時の条件なので、レシピに�
 Pythonから独自ルールを使う既存の `ShadingRecipe` は維持しますが、ファイル化は正確に既存4型だけです。
 既存型のサブクラスも、追加の意味を失って保存しないよう拒否します。
 
-今回の範囲は「選択→保存→読込→生成→検証」の接続です。全パズルの共通レシピ、任意DSLの直列化、
-ルール・ヒントの同時最適化、人間向け難易度、探索の成功率向上には対応しません。
+この形式は「選択→保存→読込→生成→検証」を接続します。全パズルの共通レシピ、任意DSLの直列化、
+ルール・ヒントの同時最適化、人間向け難易度、任意の設定での生成成功は保証しません。
