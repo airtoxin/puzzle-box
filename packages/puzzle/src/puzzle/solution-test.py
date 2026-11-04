@@ -55,6 +55,23 @@ def test_existing_solution_remains_a_snapshot_after_model_changes():
     assert solution.value(x) == previous
 
 
+def test_projected_unique_solution_keeps_original_model_and_witness_snapshot():
+    p = Puzzle("projected snapshot")
+    values = p.int_var_map("v", ["answer", "witness"], 0, 1)
+    p.set_solution_vars([values["answer"]])
+    p.add(values["answer"] == 1)
+    p.add(unique())
+    solution = p.solve()
+    assert solution is not None
+    assert solution.value(values["answer"]) == 1
+    previous = solution.value(values["witness"])
+    p.add(values["witness"] != previous)
+    newer = p.solve()
+    assert newer is not None
+    assert newer.value(values["witness"]) != previous
+    assert solution.value(values["witness"]) == previous
+
+
 def test_reusing_a_low_level_solver_does_not_change_a_solution_snapshot():
     from ortools.sat.python import cp_model
 
