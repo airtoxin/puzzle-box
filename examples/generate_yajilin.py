@@ -14,6 +14,7 @@ from puzzle_defs import ArrowCountClue, ArrowSite, BlackCellClue, EdgeStateClue,
 from puzzle_defs.puzzles.yajilin_recipe import YAJILIN_CLUE_KINDS, YajilinClue
 from generate_slitherlink import edge_record, read_edge
 from edge_answers import edge_rows, edge_template, parse_edge_answer
+from json_records import load_json
 
 FORMAT = "puzzle-box/yajilin-v1"
 ARROWS = {"up": "^", "down": "v", "left": "<", "right": ">"}
@@ -73,8 +74,8 @@ def check_size(recipe: YajilinRecipe) -> None:
 
 
 def read_record(data: dict[str, Any]) -> tuple[YajilinRecipe, list[YajilinClue], YajilinAnswer]:
-    if data["format"] != FORMAT:
-        raise ValueError("Unsupported Yajilin puzzle format")
+    if not isinstance(data, dict) or data.get("format") != FORMAT:
+        raise ValueError(f"Unsupported Yajilin puzzle format; expected an object with format {FORMAT}")
     if "generation" in data:
         history = data["generation"]
         if not isinstance(history, dict) or set(history) != {"initial_seed", "attempt_limit", "attempts_used"}:
@@ -233,7 +234,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command in ("verify", "show", "check"):
-            data = json.loads(args.file.read_text(encoding="utf-8"))
+            data = load_json(args.file)
             if args.command == "check":
                 correct = check_answer(data, args.cells, args.edges)
                 print("Correct. All rules and clues are satisfied." if correct else

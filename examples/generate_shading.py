@@ -18,6 +18,7 @@ from puzzle_defs import (
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from shading_recipe import RULES, check_demo_size, check_distinct_paths, load_recipe, read_rule, rule_record
+from json_records import load_json
 
 FORMAT = "puzzle-box/shading-v1"
 MIXED_FORMAT = "puzzle-box/shading-v2"
@@ -55,8 +56,8 @@ def read_clue(data: Any, *, legacy: bool = False) -> Clue:
 
 
 def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[list[int]]]:
-    if data["format"] not in (FORMAT, MIXED_FORMAT):
-        raise ValueError("Unsupported puzzle format")
+    if not isinstance(data, dict) or data.get("format") not in (FORMAT, MIXED_FORMAT):
+        raise ValueError(f"Unsupported puzzle format; expected an object with format {FORMAT} or {MIXED_FORMAT}")
     legacy = data["format"] == FORMAT
     recipe = ShadingRecipe(data["rows"], data["cols"], tuple(read_rule(r) for r in data["rules"]),
                            ("cell",) if legacy else tuple(data["clue_kinds"]))
@@ -191,14 +192,14 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command == "verify":
-            result = verify(json.loads(args.file.read_text(encoding="utf-8")))
+            result = verify(load_json(args.file))
             print(json.dumps(result, sort_keys=True))
             return 0
         if args.command == "show":
-            print(show(json.loads(args.file.read_text(encoding="utf-8")), reveal=args.solution))
+            print(show(load_json(args.file), reveal=args.solution))
             return 0
         if args.command == "check":
-            correct = check_answer(json.loads(args.file.read_text(encoding="utf-8")), args.answer)
+            correct = check_answer(load_json(args.file), args.answer)
             print("Correct. All rules and clues are satisfied." if correct else
                   "Not correct. Check the rules and given clues.")
             return 0 if correct else 1

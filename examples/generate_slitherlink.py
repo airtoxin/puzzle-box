@@ -13,6 +13,7 @@ from puzzle import Cell, Edge, Vertex, unique
 from puzzle_defs import CellEdgeCountClue, EdgeStateClue, SlitherlinkRecipe
 from puzzle_defs.puzzles.slitherlink_recipe import LOOP_CLUE_KINDS, LoopClue
 from edge_answers import edge_template, parse_edge_answer
+from json_records import load_json
 
 FORMAT = "puzzle-box/slitherlink-v1"
 
@@ -49,8 +50,8 @@ def check_demo_size(recipe: SlitherlinkRecipe) -> None:
 
 
 def read_record(data: dict[str, Any]) -> tuple[SlitherlinkRecipe, list[LoopClue], set[Edge]]:
-    if data["format"] != FORMAT:
-        raise ValueError("Unsupported loop puzzle format")
+    if not isinstance(data, dict) or data.get("format") != FORMAT:
+        raise ValueError(f"Unsupported loop puzzle format; expected an object with format {FORMAT}")
     recipe = SlitherlinkRecipe(data["rows"], data["cols"], data["loop_length"], tuple(data["clue_kinds"]))
     check_demo_size(recipe)
     clues = [read_clue(c) for c in data["clues"]]
@@ -157,7 +158,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command in ("verify", "show", "check"):
-            data = json.loads(args.file.read_text(encoding="utf-8"))
+            data = load_json(args.file)
             if args.command == "check":
                 correct = check_answer(data, args.answer)
                 print("Correct. All rules and clues are satisfied." if correct else
