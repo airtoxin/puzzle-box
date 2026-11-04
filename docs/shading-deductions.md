@@ -58,7 +58,7 @@ Unresolved: 6 cells. The supported deductions are exhausted; no guesses were mad
 セルの直接ヒントは初期値であり、推論の手順数には含めません。白連結の推論は必須通過マスだけで、
 既知の白マスが２つ以上必要です。例えば白連結・非空だけで１マスが白になる問題は依然として未解決です。
 `rules_without_deductions` は推論が全くないルール番号（1始まり）を示し、既定4型では空です。
-[追加6断片](shading-fragments.md)、[部屋・行列・ピースの6断片](room-fragments.md)、[成分の形の2断片](component-shapes.md)、[固定数字](number-fragments.md)、[連続長上限](run-length.md)、[固定成分サイズ](component-size.md)、[白の可視数](white-visibility.md)、[外枠への接続](component-border.md)、[白い島の面積](white-island-areas.md)、[隣接黒数](adjacent-black-counts.md)、[黒成分の面積合計](black-component-sum.md)、[セルの道の2断片](cell-path-fragments.md)には推論手順がなく、この配列に番号を記録します。
+[追加6断片](shading-fragments.md)、[部屋・行列・ピースの6断片](room-fragments.md)、[成分の形の2断片](component-shapes.md)、[固定数字](number-fragments.md)、[連続長上限](run-length.md)、[固定成分サイズ](component-size.md)、[白の可視数](white-visibility.md)、[外枠への接続](component-border.md)、[白い島の面積](white-island-areas.md)、[隣接黒数](adjacent-black-counts.md)、[黒成分の面積合計](black-component-sum.md)、[セルの道の2断片](cell-path-fragments.md)、[部屋の単色と輪なしの2断片](room-uniform-forest.md)には推論手順がなく、この配列に番号を記録します。
 それらも事前の唯一解検証では適用しますが、手順の生成では使いません。
 対応済みのルール・ヒントだけで確定できないマスは未解決のままです。
 空であっても、そのルール型に関する全推論を網羅したことにはなりません。
@@ -129,7 +129,7 @@ JSONには `status`、`givens`、`steps`、`cells`、`unresolved_cells`、未実
 | 2 | 入力や保存問題の検証に失敗した |
 | 3 | 検証後の推論矛盾、保存解との不一致などの内部エラー |
 
-推論手順を持つのは既定４ルールです。入力には追加24断片も使えますが、その手順は未対応と報告します。
+推論手順を持つのは既定４ルールです。入力には追加26断片も使えますが、その手順は未対応と報告します。
 正確な組み込み型、９セル、８ルール出現、32ヒント出現までです。JSONは64 KiB以下です。
 白連結は必須通過マスだけが対象です。一般の背理法、場合分け、仮定探索、任意DSL、ループとの異種合成は説明しません。
 連結判定は各未知マスを１つ除いたグラフの到達可能性を調べます。全処理の上限を定めるものではありません。

@@ -1,0 +1,13 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 2,
+  "cols": 3,
+  "rules": [
+    {"type": "uniform-rooms", "rooms": [[0, 0, 1], [0, 1, 1]]},
+    {"type": "acyclic-color", "black": false},
+    {"type": "connected-white", "nonempty": true},
+    {"type": "no-black-2x2"},
+    {"type": "no-white-2x2"}
+  ],
+  "clue_kinds": ["cell"]
+}

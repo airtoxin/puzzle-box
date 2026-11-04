@@ -47,8 +47,11 @@ from puzzle_defs.puzzles.white_island_areas import WhiteIslandAreas
 from puzzle_defs.puzzles.adjacent_black_counts import AdjacentBlackCounts
 from puzzle_defs.puzzles.cell_path_fragments import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs.puzzles.adjacent_black_component_sum import AdjacentBlackComponentSum
+from puzzle_defs.puzzles.room_uniform_forest import UniformRooms, AcyclicColor
 
 __all__ = [
+    "UniformRooms",
+    "AcyclicColor",
     "AdjacentBlackComponentSum",
     "ColorDegreeRange",
     "ColorEndpointCount",
