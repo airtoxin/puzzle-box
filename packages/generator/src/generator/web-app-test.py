@@ -155,6 +155,40 @@ def send(server, path, body=None, *, origin=None, host=None, content_type="appli
     connection.close(); return result
 
 
+def test_server_close_waits_for_the_active_worker_to_be_reaped(monkeypatch):
+    original, processes, responses = subprocess.Popen, [], []
+    started, closed = threading.Event(), threading.Event()
+    def slow_worker(command, **kwargs):
+        process = original([sys.executable, "-c", "import time; time.sleep(60)"], **kwargs)
+        processes.append(process); started.set()
+        return process
+    monkeypatch.setattr(server_api.subprocess, "Popen", slow_worker)
+    server = server_api.LocalServer(0)
+    serving = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.01))
+    serving.start()
+    client = threading.Thread(target=lambda: responses.append(send(
+        server, "/api/generate", json.dumps({**request(), "budget_seconds": 2}), origin=server.origin)))
+    def close():
+        server.server_close(); closed.set()
+    closing = threading.Thread(target=close)
+    client.start()
+    try:
+        assert started.wait(3)
+        server.shutdown(); serving.join(timeout=3)
+        # The context manager used after Ctrl+C calls this same close path.
+        closing.start()
+        assert not closed.wait(0.05), "server closed before its active worker was reaped"
+        assert closed.wait(6)
+        client.join(timeout=3)
+        assert processes[0].poll() is not None
+        assert responses[0][0] == 200
+        assert json.loads(responses[0][2]) == {"status": "timeout", "budget_seconds": 2}
+    finally:
+        server.shutdown(); server.server_close()
+        client.join(timeout=6); serving.join(timeout=3)
+        if closing.ident is not None: closing.join(timeout=6)
+
+
 def test_http_catalog_static_allowlist_and_real_plan(local_server):
     status, headers, body = send(local_server, "/")
     assert status == 200 and b"app.js" in body and "frame-ancestors 'none'" in headers["Content-Security-Policy"]

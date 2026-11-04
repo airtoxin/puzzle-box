@@ -96,6 +96,7 @@ test('keyboard cell entry retains focus and black cells keep contrast on hover',
   const cell = page.locator('.cell:enabled').first();
   await expect.soft(await textContrast(cell)).toBeGreaterThanOrEqual(4.5);
   await expect.soft(await textContrast(page.locator('h2 span').first())).toBeGreaterThanOrEqual(4.5);
+  await expect.soft(await textContrast(page.locator('footer'))).toBeGreaterThanOrEqual(4.5);
   await expect(await textContrast(cell, 'borderTopColor')).toBeGreaterThanOrEqual(3);
   await expect(await textContrast(page.getByLabel('黒マス数', {exact: true}), 'borderTopColor')).toBeGreaterThanOrEqual(3);
   await cell.focus();

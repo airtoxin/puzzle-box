@@ -44,6 +44,10 @@ def run_generation(data: Any) -> dict[str, Any]:
 
 
 class LocalServer(ThreadingHTTPServer):
+    # Keep bounded generation requests alive through Ctrl+C/server_close so
+    # subprocess.run can enforce its timeout and reap the worker.
+    daemon_threads = False
+
     def __init__(self, port: int):
         self.generation_lock = threading.Lock()
         super().__init__(("127.0.0.1", port), Handler)
