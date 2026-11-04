@@ -7,7 +7,7 @@ const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid', 'run
 // Capabilities of these renderers, independent of what a newer server declares.
 const renderers = {
   shading: {topology: 'rectangular-cells', maxCells: 9, minSide: 1, required: ['answer'],
-    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts', 'island-areas': 'cell-island-areas', 'neighbor-counts': 'cell-neighbor-counts', 'component-counts': 'cell-component-counts', 'endpoint-markers': 'cell-endpoint-markers', 'black-runs': 'cell-black-runs'}},
+    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts', 'island-areas': 'cell-island-areas', 'neighbor-counts': 'cell-neighbor-counts', 'component-counts': 'cell-component-counts', 'endpoint-markers': 'cell-endpoint-markers', 'black-runs': 'cell-black-runs', 'component-areas': 'cell-component-areas'}},
   slitherlink: {topology: 'rectangular-cells', maxCells: 4, minSide: 1, required: ['answer'],
     channels: {answer: 'binary-edges', 'cell-counts': 'cell-edge-counts', 'edge-givens': 'edge-givens'}},
   coupled: {topology: 'rectangular-cell-centers', maxCells: 9, minSide: 2, required: ['answer-cells', 'answer-edges'],
@@ -68,7 +68,7 @@ function assertRenderablePlan(candidate, request) {
     if (requestedRooms.some(rooms => JSON.stringify(canonicalRooms(rooms, candidate.rows, candidate.cols)) !== shown)) throw new UnsupportedUiError();
   }
   for (const [parameter, channel, payload, maximum = 99, nullable = false] of [['numbers','numbers','numbers'],
-    ['counts','sight-counts','sight_counts'], ['areas','island-areas','island_areas'],
+    ['component_areas','component-areas','component_areas'], ['counts','sight-counts','sight_counts'], ['areas','island-areas','island_areas'],
     ['neighbor_counts','neighbor-counts','neighbor_counts',8,true], ['component_counts','component-counts','component_counts',99,true], ['markers','endpoint-markers','endpoint_markers',1]]) {
     const requested = request.rules.filter(r => Object.hasOwn(r.parameters, parameter)).map(r => r.parameters[parameter]);
     if (seen.has(channel) !== (requested.length > 0) || !seen.has(channel) && candidate[payload] !== undefined) throw new UnsupportedUiError();
@@ -156,8 +156,8 @@ async function refresh() {
     assertRenderablePlan(result.plan, request); plan = result.plan;
     $('shape').textContent = `${plan.rows} × ${plan.cols}`;
     $('plan-note').textContent = isCoupled() ? '線はマスの中心同士を結びます。黒白と辺は別々に入力し、両方の整合を確認します。' : '選択したルールとヒントが要求する盤面を表示しています。UIの適合は、問題の成立を保証しません。';
-    const numericLegend = [['numbers','中央の数字は固定ラベル'], ['sight_counts','丸数字は見える白数'],
-      ['island_areas','四角の数字は白い島の面積'], ['neighbor_counts','「隣n」は周囲の黒数（0もヒント）'],
+    const numericLegend = [['numbers','通常の数字は固定ラベル'], ['sight_counts','丸数字は見える白数'],
+      ['component_areas','「面n」は所属する同色成分の面積（数字セルの色は自由）'], ['island_areas','四角の数字は白い島の面積'], ['neighbor_counts','「隣n」は周囲の黒数（0もヒント）'],
       ['component_counts','「塊n」は接する黒成分の面積合計（同じ成分は1回）'],
       ['endpoint_markers','マス全体を囲む大きな丸は白の端点（白い隣接マスは1個）'], ['black_run_clues','「連1,2」等は周囲8マスの黒い連続長（順序不問、0もヒント）']]
       .filter(([key]) => plan[key] !== undefined).map(([,text]) => text);
@@ -185,6 +185,7 @@ function renderBoard(reveal = false) {
   if (channels.has('rooms')) table.classList.add('room-board');
   if (channels.has('endpoint-markers')) table.classList.add('endpoint-marker-board');
   if (channels.has('black-runs')) table.classList.add('black-run-board');
+  if (channels.has('component-areas')) table.classList.add('component-area-board');
   if (channels.has('neighbor-counts') && ['numbers','sight-counts','island-areas'].some(c => channels.has(c))) table.classList.add('multi-numeric-board');
   if (channels.has('component-counts') && ['numbers','sight-counts','island-areas','neighbor-counts'].some(c => channels.has(c))) table.classList.add('dense-numeric-board');
   const values = artifact?.clues || [];
@@ -230,15 +231,18 @@ function cellButton(index, r, c, value, reveal) {
     const mark = value === -1 ? '?' : value === 0 ? '○' : '■';
     const sight = plan.sight_counts?.[r][c] || 0;
     const area = plan.island_areas?.[r][c] || 0;
+    const componentArea = plan.component_areas?.[r][c] || 0;
+    button.classList.toggle('component-area-numbered', componentArea > 0);
     const neighbor = plan.neighbor_counts?.[r][c], hasNeighbor = neighbor != null;
     const component = plan.component_counts?.[r][c], hasComponent = component != null;
     const runs = plan.black_run_clues?.[r][c], hasRuns = runs != null;
     button.classList.toggle('black-run-numbered', hasRuns);
     button.classList.toggle('endpoint-length', plan.endpoint_markers?.[r][c] === 1 && sight > 0
-      && !plan.numbers && !area && !hasNeighbor && !hasComponent && !hasRuns);
-    if (plan.numbers || sight || area || hasNeighbor || hasComponent || hasRuns) {
+      && !plan.numbers && !area && !hasNeighbor && !hasComponent && !hasRuns && !componentArea);
+    if (plan.numbers || sight || area || hasNeighbor || hasComponent || hasRuns || componentArea) {
       button.classList.add('numbered-cell');
       const labels = [];
+      if (componentArea) labels.push(node('span', `面${componentArea}`, 'component-area-number'));
       if (hasRuns) labels.push(node('span', `連${runs.join(',')}`, 'run-number'));
       if (plan.numbers) labels.push(node('span', String(plan.numbers[r][c]), 'cell-number'));
       if (sight) labels.push(node('span', String(sight), 'sight-number'));
@@ -257,7 +261,7 @@ function cellButton(index, r, c, value, reveal) {
     } else button.textContent = mark;
     button.classList.toggle('endpoint-marked', plan.endpoint_markers?.[r][c] === 1);
     button.dataset.value = value;
-    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${sight ? `（見える白${sight}）` : ''}${area ? `（白い島の面積${area}）` : ''}${hasNeighbor ? `（隣接黒数${neighbor}）` : ''}${hasComponent ? `（接する黒成分の面積合計${component}）` : ''}${hasRuns ? `（周囲の黒い連続長${runs.join(',')}）` : ''}${plan.endpoint_markers?.[r][c] === 1 ? '（白の端点の丸）' : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
+    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${sight ? `（見える白${sight}）` : ''}${area ? `（白い島の面積${area}）` : ''}${hasNeighbor ? `（隣接黒数${neighbor}）` : ''}${hasComponent ? `（接する黒成分の面積合計${component}）` : ''}${componentArea ? `（所属成分の面積${componentArea}）` : ''}${hasRuns ? `（周囲の黒い連続長${runs.join(',')}）` : ''}${plan.endpoint_markers?.[r][c] === 1 ? '（白の端点の丸）' : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
   };
   paint(value);
   button.addEventListener('click', () => {
