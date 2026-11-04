@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import platform
+import sys
 from typing import Any
 
 import ortools
@@ -13,6 +14,7 @@ from puzzle import Cell, Edge, Vertex, unique
 from puzzle_defs import CellEdgeCountClue, EdgeStateClue, SlitherlinkRecipe
 from puzzle_defs.puzzles.slitherlink_recipe import LOOP_CLUE_KINDS, LoopClue
 from edge_answers import edge_template, parse_edge_answer
+from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/slitherlink-v1"
 
@@ -49,15 +51,16 @@ def check_demo_size(recipe: SlitherlinkRecipe) -> None:
 
 
 def read_record(data: dict[str, Any]) -> tuple[SlitherlinkRecipe, list[LoopClue], set[Edge]]:
-    if data["format"] != FORMAT:
-        raise ValueError("Unsupported loop puzzle format")
-    recipe = SlitherlinkRecipe(data["rows"], data["cols"], data["loop_length"], tuple(data["clue_kinds"]))
+    if not isinstance(data, dict) or data.get("format") != FORMAT:
+        raise ValueError(f"Unsupported loop puzzle format; expected an object with format {FORMAT}")
+    recipe = SlitherlinkRecipe(data["rows"], data["cols"], data["loop_length"],
+                              tuple(read_array(data["clue_kinds"], "clue_kinds")))
     check_demo_size(recipe)
-    clues = [read_clue(c) for c in data["clues"]]
+    clues = [read_clue(c) for c in read_array(data["clues"], "clues")]
     if any(("cell-count" if isinstance(c, CellEdgeCountClue) else "edge") not in recipe.clue_kinds
            for c in clues):
         raise ValueError("Stored clue type is not enabled by clue_kinds")
-    edges = [read_edge(e) for e in data["solution"]]
+    edges = [read_edge(e) for e in read_array(data["solution"], "solution")]
     if len(set(edges)) != len(edges):
         raise ValueError("Solution must not contain duplicate edges")
     if any(v.row > recipe.rows or v.col > recipe.cols for e in edges for v in e):
@@ -157,7 +160,7 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command in ("verify", "show", "check"):
-            data = json.loads(args.file.read_text(encoding="utf-8"))
+            data = load_json(args.file)
             if args.command == "check":
                 correct = check_answer(data, args.answer)
                 print("Correct. All rules and clues are satisfied." if correct else
@@ -188,11 +191,11 @@ def main() -> int:
                 "solution": [edge_record(e) for e in p.board.edges if e in answer],
                 "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
                                 "seeded_search_workers": 1}}
-        encoded = json.dumps(data, indent=2, sort_keys=True) + "\n"
+        encoded = encode_json(data)
         if args.output is not None:
-            args.output.write_text(encoded, encoding="utf-8")
+            args.output.write_bytes(encoded)
         if not args.quiet:
-            print(encoded, end="")
+            sys.stdout.buffer.write(encoded)
         return 0
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
         parser.error(str(exc))

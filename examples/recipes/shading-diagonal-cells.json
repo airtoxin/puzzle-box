@@ -1,0 +1,10 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 2,
+  "cols": 2,
+  "rules": [
+    {"type": "count", "count": 2},
+    {"type": "non-touching", "diagonal": false}
+  ],
+  "clue_kinds": ["cell", "row-count", "column-count"]
+}
