@@ -62,6 +62,17 @@ print(puzzle.result(solution))
 実装調査・課題・発展案は [プロジェクトレビュー](docs/project-review.md)、
 生成器の契約と使い方は [生成レシピ](docs/generation.md)を参照してください。
 
+## ルールとヒントの組合せを診断する
+
+9マス以下の黒白レシピでは、全配置を調べてルールの矛盾とヒント形式の不足を区別できます。
+
+```sh
+uv run --no-sync python examples/analyze_shading.py --seed-count 8
+```
+
+[小盤面の診断](docs/shading-diagnostics.md)に、同じ行列ヒントを持つ2つの答え、
+矛盾するルール集合、seedを変えたときの完成解の多様性をまとめています。
+
 ## 開発と検証
 
 ```sh
