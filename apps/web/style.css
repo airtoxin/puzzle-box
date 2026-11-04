@@ -403,3 +403,5 @@ footer {
     margin:auto;
   }
 }
+
+.cell.endpoint-marked::before {content:""; position:absolute; inset:2px; border:2px solid currentColor; border-radius:50%; pointer-events:none;}
