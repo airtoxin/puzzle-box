@@ -19,6 +19,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 隣接する異なる黒成分の面積を合計する | [クロットの黒成分合計](black-component-sum.md) |
 | 同色の隣接数・端点・連結を合わせて道にする | [セルの道の断片](cell-path-fragments.md) |
 | 部屋の単色と同色の輪なしを組み合わせる | [部屋の単色と森](room-uniform-forest.md) |
+| 長方形成分などを辺・角でつなぐ | [8近傍の連結](corner-connected-color.md) |
 | 同色の連続する長さを制限する | [連続長の上限](run-length.md) |
 | 黒・白の各連結成分を同じサイズにする | [固定成分サイズ](component-size.md) |
 | LITS の部屋ピースの同形接触を禁止する | [テトロミノの接触](tetromino-contact.md) |

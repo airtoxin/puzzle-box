@@ -20,6 +20,7 @@ from puzzle_defs import AdjacentBlackCounts
 from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor
+from puzzle_defs import CornerConnectedColor
 from puzzle_defs.puzzles.adjacent_black_component_sum import DEFAULT_COMPONENT_COUNTS
 from puzzle_defs.clue_layout import ClueGrid, clue_grid
 from puzzle_defs.puzzles.adjacent_black_counts import DEFAULT_NEIGHBOR_COUNTS
@@ -42,7 +43,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
-                      AdjacentBlackComponentSum, UniformRooms, AcyclicColor)
+                      AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -66,6 +67,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "white-island-areas": WhiteIslandAreas(DEFAULT_ISLAND_AREAS),
             "adjacent-black-counts": AdjacentBlackCounts(DEFAULT_NEIGHBOR_COUNTS),
             "color-degree-range": ColorDegreeRange(), "color-endpoint-count": ColorEndpointCount(),
+            "corner-connected-color": CornerConnectedColor(),
             "uniform-rooms": UniformRooms(DEFAULT_ROOMS), "acyclic-color": AcyclicColor(),
             "adjacent-black-component-sum": AdjacentBlackComponentSum(DEFAULT_COMPONENT_COUNTS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
@@ -99,6 +101,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "neighbor_counts": [list(row) for row in rule.neighbor_counts], "diagonal": rule.diagonal}
     if type(rule) is ColorDegreeRange:
         return {"type": rule.ui.identifier, "minimum": rule.minimum, "maximum": rule.maximum, "black": rule.black}
+    if type(rule) is CornerConnectedColor:
+        return {"type": rule.ui.identifier, "black": rule.black, "nonempty": rule.nonempty}
     if type(rule) is AcyclicColor:
         return {"type": rule.ui.identifier, "black": rule.black}
     if type(rule) is ColorEndpointCount:
@@ -149,6 +153,8 @@ def read_rule(data: Any) -> ShadingRule:
         return ColorDegreeRange(data["minimum"], data["maximum"], data["black"])
     if kind == "color-endpoint-count" and set(data) == {"type", "count", "black"}:
         return ColorEndpointCount(data["count"], data["black"])
+    if kind == "corner-connected-color" and set(data) == {"type", "black", "nonempty"}:
+        return CornerConnectedColor(data["black"], data["nonempty"])
     if kind == "acyclic-color" and set(data) == {"type", "black"}:
         return AcyclicColor(data["black"])
     if kind == "components-touch-border" and set(data) == {"type", "black"}:
