@@ -2,6 +2,7 @@
 
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
+from puzzle_defs.room_layout import RoomMap, room_map
 
 
 @dataclass(frozen=True)
@@ -23,12 +24,13 @@ class UiRequirements:
 class UiParameter:
     name: str
     label: str
-    kind: Literal["integer", "boolean"]
-    default: int | bool
+    kind: Literal["integer", "boolean", "region-map"]
+    default: int | bool | RoomMap
     minimum: int = 0
     maximum: int | Literal["area", "edges"] = "area"
 
-    def validate(self, value: Any, *, area: int, edges: int | None = None) -> None:
+    def validate(self, value: Any, *, area: int, edges: int | None = None,
+                 rows: int | None = None, cols: int | None = None) -> None:
         if self.kind == "boolean":
             if type(value) is not bool:
                 raise ValueError(f"{self.name} must be a boolean")
@@ -38,6 +40,11 @@ class UiParameter:
                 raise ValueError("An edge bound requires the number of grid edges")
             if type(value) is not int or not self.minimum <= value <= maximum:
                 raise ValueError(f"{self.name} must be an integer in {self.minimum}..{maximum}")
+        elif self.kind == "region-map":
+            if (rows is None or cols is None or type(value) is not list or len(value) != rows
+                    or any(type(row) is not list or len(row) != cols for row in value)):
+                raise ValueError("Room map must be an array matching the board dimensions")
+            room_map(value, rows=rows, cols=cols)
         else:
             raise ValueError(f"Unsupported parameter kind: {self.kind}")
 

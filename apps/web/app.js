@@ -6,13 +6,20 @@ const hints = new Map();
 // Capabilities of these renderers, independent of what a newer server declares.
 const renderers = {
   shading: {topology: 'rectangular-cells', maxCells: 9, minSide: 1, required: ['answer'],
-    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts'}},
+    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions'}},
   slitherlink: {topology: 'rectangular-cells', maxCells: 4, minSide: 1, required: ['answer'],
     channels: {answer: 'binary-edges', 'cell-counts': 'cell-edge-counts', 'edge-givens': 'edge-givens'}},
   coupled: {topology: 'rectangular-cell-centers', maxCells: 9, minSide: 2, required: ['answer-cells', 'answer-edges'],
     channels: {'answer-cells': 'binary-cells', 'answer-edges': 'binary-edges', givens: 'cell-givens', 'edge-givens': 'edge-givens'}},
 };
 class UnsupportedUiError extends Error {}
+class RoomInputError extends Error {}
+function canonicalRooms(value, rows, cols) {
+  if (!Array.isArray(value) || value.length !== rows || value.some(row => !Array.isArray(row)
+      || row.length !== cols || row.some(n => !Number.isInteger(n) || n < 0 || n >= rows * cols))) throw new UnsupportedUiError();
+  const labels = new Map();
+  return value.map(row => row.map(n => {if (!labels.has(n)) labels.set(n, labels.size); return labels.get(n);}));
+}
 function assertRenderablePlan(candidate, request) {
   const renderer = Object.hasOwn(renderers, request.family) && renderers[request.family];
   const requirements = candidate?.requirements;
@@ -32,6 +39,12 @@ function assertRenderablePlan(candidate, request) {
     seen.add(channel.name);
   }
   if (renderer.required.some(name => !seen.has(name))) throw new UnsupportedUiError();
+  const requestedRooms = request.rules.filter(r => Object.hasOwn(r.parameters, 'rooms')).map(r => r.parameters.rooms);
+  if (seen.has('rooms') !== (requestedRooms.length > 0) || !seen.has('rooms') && candidate.rooms !== undefined) throw new UnsupportedUiError();
+  if (seen.has('rooms')) {
+    const shown = JSON.stringify(canonicalRooms(candidate.rooms, candidate.rows, candidate.cols));
+    if (requestedRooms.some(rooms => JSON.stringify(canonicalRooms(rooms, candidate.rows, candidate.cols)) !== shown)) throw new UnsupportedUiError();
+  }
 }
 function rejectUnsupportedUi() {
   plan = undefined; clearArtifact(); $('board').replaceChildren(); $('generate').disabled = true;
@@ -55,8 +68,14 @@ function readRequest() {
     seed: Number($('seed').value), budget_seconds: Number($('budget').value),
     rules: [...selected].filter(([, s]) => s.toggle.checked).map(([id, s]) => ({id,
       parameters: Object.fromEntries([...s.parameters].map(([name, field]) =>
-        [name, field.type === 'checkbox' ? field.checked : Number(field.value)]))})),
+        [name, field.dataset.kind === 'region-map' ? readRooms(field) : field.type === 'checkbox' ? field.checked : Number(field.value)]))})),
     clue_kinds: [...hints].filter(([, toggle]) => toggle.checked).map(([id]) => id)};
+}
+function readRooms(field) {
+  const rows = field.value.trim().split(/\r?\n/).map(row => row.trim().split(/\s+/));
+  if (field.value.length > 512 || rows.some(row => row.some(n => !/^\d+$/.test(n))))
+    throw new RoomInputError('部屋配置は、各行に整数を空白で区切って入力してください。');
+  return rows.map(row => row.map(Number));
 }
 async function post(path, data) {
   const response = await fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
@@ -73,7 +92,7 @@ function syncParameters() {
     const state = selected.get(rule.identifier);
     for (const spec of rule.parameters) {
       const field = state.parameters.get(spec.name);
-      field.disabled = !state.toggle.checked;
+      field.disabled = ![...selected.values()].some(s => s.toggle.checked && [...s.parameters.values()].includes(field));
       if (spec.kind === 'integer') field.max = spec.maximum === 'area' ? area : spec.maximum === 'edges' ? edges : spec.maximum;
     }
   }
@@ -99,6 +118,7 @@ async function refresh() {
   } catch (error) {
     if (current === revision) {
       if (error instanceof UnsupportedUiError) rejectUnsupportedUi();
+      else if (error instanceof RoomInputError) {$('status').textContent = error.message; $('board').replaceChildren();}
       else $('status').textContent = 'ローカルサーバーに接続できません。起動状態を確認してください。';
     }
   }
@@ -112,6 +132,7 @@ function renderBoard(reveal = false) {
     renderLoop(reveal, channels); return;
   }
   const table = node('table'); table.setAttribute('aria-label', artifact ? '生成した問題' : '盤面プレビュー');
+  if (channels.has('rooms')) table.classList.add('room-board');
   const values = artifact?.clues || [];
   const rowCounts = new Map(values.filter(c => c.type === 'row-count').map(c => [c.row, c.count]));
   const colCounts = new Map(values.filter(c => c.type === 'column-count').map(c => [c.col, c.count]));
@@ -133,7 +154,13 @@ function renderBoard(reveal = false) {
     for (let c = 0; c < plan.cols; c++) {
       const index = r * plan.cols + c;
       const value = reveal ? artifact.record.solution[r][c] : artifact ? input[index] : -1;
-      const td = node('td'); td.append(cellButton(index, r, c, value, reveal)); tr.append(td);
+      const td = node('td'); td.append(cellButton(index, r, c, value, reveal));
+      if (channels.has('rooms')) {
+        const room = plan.rooms[r][c]; td.dataset.room = room;
+        for (const [side, dr, dc] of [['top', -1, 0], ['bottom', 1, 0], ['left', 0, -1], ['right', 0, 1]])
+          if (plan.rooms[r+dr]?.[c+dc] !== room) td.classList.add(`room-${side}`);
+      }
+      tr.append(td);
     }
     table.append(tr);
   }
@@ -147,7 +174,7 @@ function cellButton(index, r, c, value, reveal) {
   const paint = value => {
     button.textContent = value === -1 ? '?' : value === 0 ? '○' : '■';
     button.dataset.value = value;
-    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
+    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
   };
   paint(value);
   button.addEventListener('click', () => {
@@ -157,6 +184,7 @@ function cellButton(index, r, c, value, reveal) {
 }
 function buildControls() {
   selected.clear(); hints.clear(); $('rules').replaceChildren(); $('hints').replaceChildren();
+  let sharedRooms;
   for (const rule of profile.rules) {
     const card = node('div', undefined, 'rule-card'); const label = node('label', undefined, 'rule-title');
     const toggle = document.createElement('input'); toggle.type = 'checkbox';
@@ -164,11 +192,22 @@ function buildControls() {
     label.append(toggle, document.createTextNode(rule.label)); card.append(label, node('p', rule.summary));
     const parameters = new Map(), fields = node('div', undefined, 'parameters');
     for (const spec of rule.parameters) {
-      if (!['integer', 'boolean'].includes(spec.kind)) throw new Error('Unsupported parameter kind');
-      const field = document.createElement('input'); field.type = spec.kind === 'boolean' ? 'checkbox' : 'number';
+      if (!['integer', 'boolean', 'region-map'].includes(spec.kind)) throw new Error('Unsupported parameter kind');
+      if (spec.kind === 'region-map' && sharedRooms) {parameters.set(spec.name, sharedRooms); continue;}
+      const field = document.createElement(spec.kind === 'region-map' ? 'textarea' : 'input'); field.dataset.kind = spec.kind;
+      if (spec.kind !== 'region-map') field.type = spec.kind === 'boolean' ? 'checkbox' : 'number';
       if (spec.kind === 'boolean') field.checked = spec.default;
+      else if (spec.kind === 'region-map') {
+        field.value = spec.default.map(row => row.join(' ')).join('\n'); field.rows = 3; field.maxLength = 512; field.required = true;
+        sharedRooms = field;
+      }
       else {field.value = spec.default; field.min = spec.minimum; field.step = '1'; field.required = true;}
-      const wrapper = node('label', spec.label, 'parameter'); wrapper.append(field); fields.append(wrapper); parameters.set(spec.name, field);
+      const wrapper = node('label', spec.label, 'parameter'); wrapper.append(field); parameters.set(spec.name, field);
+      if (spec.kind === 'region-map') {
+        const common = node('div', undefined, 'shared-parameters'); common.append(wrapper,
+          node('p', '部屋を使うルールで共有します。盤面と同じ行・列数で、0以上の整数を空白区切りで入力します。各部屋は上下左右でつながる必要があります。'));
+        $('rules').prepend(common);
+      } else fields.append(wrapper);
     }
     card.append(fields); $('rules').append(card); selected.set(rule.identifier, {toggle, parameters});
   }

@@ -15,7 +15,7 @@ from composed_shading_recipe import (
 )
 from generate_shading import _parse_answer, _render_puzzle, _rule_text, clue_record, read_clue
 from json_records import encode_json
-from shading_recipe import check_distinct_paths, load_json
+from shading_recipe import check_distinct_paths, load_json, shared_rooms
 
 FORMAT = "puzzle-box/composed-shading-v1"
 
@@ -108,7 +108,7 @@ def show(data: Any, *, reveal: bool = False, registry: ComponentRegistry = BUILT
     base = cast(ShadingRecipe, recipe.base)  # read_recipe constructs this exact base type.
     rules = [_rule_text(rule) for rule in base.rules]
     rules.extend(_component_text(component, registry) for component in recipe.builders)
-    return _render_puzzle(base.rows, base.cols, clues, answer, rules, reveal=reveal)
+    return _render_puzzle(base.rows, base.cols, clues, answer, rules, reveal=reveal, rooms=shared_rooms(base))
 
 
 def check_answer(data: Any, text: str, *, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> bool:

@@ -9,14 +9,14 @@ from puzzle_defs.puzzles.shading import CLUE_UI, ClueKind
 from puzzle_defs.puzzles.slitherlink_recipe import LoopClueKind
 from puzzle_defs.puzzles.yajilin_recipe import YajilinClueKind
 from puzzle_defs.ui import merge_requirements
-from shading_recipe import BUILT_IN_RULE_TYPES, MAX_RECIPE_RULES
+from shading_recipe import BUILT_IN_RULE_TYPES, MAX_RECIPE_RULES, shared_rooms
 
 FORMAT = "puzzle-box/web-request-v1"
 PROFILE_FORMAT = "puzzle-box/web-request-v2"
 RULE_TYPES = BUILT_IN_RULE_TYPES
 CATALOG = {kind.ui.identifier: kind for kind in RULE_TYPES}
 RENDERERS = {"answer": "binary-cells", "givens": "cell-givens",
-             "row-counts": "row-counts", "column-counts": "column-counts"}
+             "row-counts": "row-counts", "column-counts": "column-counts", "rooms": "cell-regions"}
 LOOP_RENDERERS = {"answer": "binary-edges", "cell-counts": "cell-edge-counts", "edge-givens": "edge-givens"}
 LOOP_CLUES = (CellEdgeCountClue.ui, EdgeStateClue.ui)
 COUPLED_RENDERERS = {"answer-cells": "binary-cells", "answer-edges": "binary-edges",
@@ -97,7 +97,7 @@ def _read_shading(data: Any) -> Request:
         if type(params) is not dict or set(params) != {p.name for p in kind.ui.parameters}:
             raise ValueError(f"Invalid parameters for {identifier}")
         for parameter in kind.ui.parameters:
-            parameter.validate(params[parameter.name], area=rows*cols)
+            parameter.validate(params[parameter.name], area=rows*cols, rows=rows, cols=cols)
         rules.append(kind(**params))
         requirements.append(kind.ui.requirements)
         seen.add(identifier)
@@ -113,6 +113,8 @@ def _read_shading(data: Any) -> Request:
     recipe = ShadingRecipe(rows, cols, tuple(rules), tuple(cast(ClueKind, h) for h in hints))
     plan = {"format": "puzzle-box/web-plan-v1", "rows": rows, "cols": cols,
             "requirements": asdict(merged), "rules": raw, "clue_kinds": hints}
+    if (rooms := shared_rooms(recipe)) is not None:
+        plan["rooms"] = [list(row) for row in rooms]
     return Request(recipe, seed, budget, plan)
 
 

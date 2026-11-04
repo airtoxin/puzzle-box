@@ -17,10 +17,12 @@ from puzzle_defs import (
     BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2,
     ColumnCountClue, RowCountClue, ShadingRecipe,
     BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines, NoBlack2x2, NoThreeConsecutive,
+    RoomBlackCount, RoomConnectedBlack, LineBlackCount,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
+from puzzle_defs.room_layout import RoomMap
 from shading_recipe import (RULES, DEFAULT_RULES, rule_choices, check_demo_size, check_distinct_paths,
-                            load_recipe, read_rule, rule_record)
+                            load_recipe, read_rule, rule_record, shared_rooms)
 from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/shading-v1"
@@ -52,6 +54,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     if selection not in ("solver", "finite"):
         raise ValueError("Unknown completion selection")
     rules = [rule_record(rule) for rule in recipe.rules]
+    shared_rooms(recipe)
     _check_clue_kinds(recipe, clues)
     legacy = recipe.clue_kinds == ("cell",)
     encoded_clues = [clue_record(clue, legacy=legacy) for clue in clues]
@@ -127,6 +130,7 @@ def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[
                            tuple(read_rule(r) for r in read_array(data["rules"], "rules")),
                            ("cell",) if legacy else tuple(read_array(data["clue_kinds"], "clue_kinds")))
     check_demo_size(recipe)
+    shared_rooms(recipe)
     clues = [read_clue(clue, legacy=legacy) for clue in read_array(data["clues"], "clues")]
     _check_clue_kinds(recipe, clues)
     answer = data["solution"]
@@ -175,6 +179,13 @@ def _rule_text(rule: ShadingRule) -> str:
         return "Every row and column contains equal numbers of black and white cells."
     if type(rule) is DistinctLines:
         return "Rows differ from other rows, and columns from other columns; a row may equal a column."
+    if type(rule) is RoomBlackCount:
+        return f"Every room contains exactly {rule.count} black cells."
+    if type(rule) is RoomConnectedBlack:
+        empty = "at least one per room" if rule.nonempty else "empty rooms allowed"
+        return f"Black cells connect inside each room without leaving it; {empty}."
+    if type(rule) is LineBlackCount:
+        return f"Every row and every column contains exactly {rule.count} black cells."
     raise ValueError("Cannot display an unknown rule")
 
 
@@ -184,11 +195,11 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
     verify(data)
     recipe, clues, answer = _read_record(data)
     return _render_puzzle(recipe.rows, recipe.cols, clues, answer,
-                          [_rule_text(rule) for rule in recipe.rules], reveal=reveal)
+                          [_rule_text(rule) for rule in recipe.rules], reveal=reveal, rooms=shared_rooms(recipe))
 
 
 def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[int]],
-                   rules: list[str], *, reveal: bool = False) -> str:
+                   rules: list[str], *, reveal: bool = False, rooms: RoomMap | None = None) -> str:
     """Presentation only: each format's caller must verify its full recipe first."""
     cells = [["?" for _ in range(cols)] for _ in range(rows)]
     row_counts: dict[int, int] = {}
@@ -220,6 +231,9 @@ def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[in
     if not reveal:
         lines.extend(["Answer template: " + "/".join("".join(row) for row in cells),
                       'Replace every ? with . or #, then use check FILE --answer "ROWS".'])
+    if rooms is not None:
+        lines.extend(["", "Fixed rooms (same label = same room; not answer values):"])
+        lines.extend(" ".join(str(n) for n in row) for row in rooms)
     return "\n".join(lines)
 
 

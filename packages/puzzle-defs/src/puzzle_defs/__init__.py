@@ -36,8 +36,12 @@ from puzzle_defs.puzzles.shading import (
 from puzzle_defs.puzzles.shading_fragments import (
     BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines, NoBlack2x2, NoThreeConsecutive,
 )
+from puzzle_defs.puzzles.room_fragments import RoomBlackCount, RoomConnectedBlack, LineBlackCount
 
 __all__ = [
+    "RoomBlackCount",
+    "RoomConnectedBlack",
+    "LineBlackCount",
     "BalancedLines",
     "BlackDominoes",
     "ConnectedBlack",

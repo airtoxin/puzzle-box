@@ -81,7 +81,8 @@ def test_per_instance_lock_is_shared_by_generate_and_check_and_released_on_timeo
     assert call("generate")[1]["status"] == "timeout" and not hosted.JOB_LOCK.locked()
 
 
-def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path):
+@pytest.mark.parametrize("room_rules", [False, True])
+def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, room_rules):
     output = tmp_path / "artifact"
     payload = prepare.export(output)
     assert set(name for name in payload if name.startswith("public/")) == {"public/index.html", "public/app.js", "public/style.css"}
@@ -116,7 +117,11 @@ body = b''.join(entry.app({'REQUEST_METHOD':'POST','QUERY_STRING':'operation=gen
 assert reply == ['200 OK'] and json.loads(body)['status'] == 'ok', body
 print('artifact generation passed')
 """
+    data = request()
+    if room_rules:
+        data["rules"] = [{"id": "room-black-count", "parameters": {"rooms": [[0,0,0], [1,1,1]], "count": 2}},
+                         {"id": "black-dominoes", "parameters": {}}]
     result = subprocess.run([sys.executable, "-c", script], cwd=output, capture_output=True, text=True,
-                            env={**os.environ, "PYTHONPATH": "", "PUZZLE_TEST_REQUEST": json.dumps(request()),
+                            env={**os.environ, "PYTHONPATH": "", "PUZZLE_TEST_REQUEST": json.dumps(data),
                                  "PUZZLE_TEST_VENDOR": str(vendor)}, timeout=20)
     assert result.returncode == 0, result.stdout + result.stderr
