@@ -100,11 +100,16 @@ uv run --no-sync python examples/explore_shading.py --rows 3 --cols 3 --black-co
 
 ```sh
 uv run --no-sync python examples/explore_shading.py --rows 3 --cols 3 --black-counts 3 --candidates count non-touching --hints cell row-count column-count --explain 1 2 --export-recipe chosen.json
-uv run --no-sync python examples/generate_shading.py generate --recipe chosen.json --seed 6 --output puzzle.json
+uv run --no-sync python examples/generate_shading.py generate --recipe chosen.json --seed 6 --output puzzle.json --quiet
+uv run --no-sync python examples/generate_shading.py show puzzle.json
 uv run --no-sync python examples/generate_shading.py verify puzzle.json
 ```
 
 設定・問題・探索レポートの区別、入力検証、再現性は [レシピの保存と読込](docs/shading-recipe-files.md) を参照してください。
+
+探索で出題可能な完成解が見つかっても、通常生成が曖昧な別の完成解を選ぶことがあります。
+黒白4ルール・9セル以下なら `generate --selection finite` で、一意に出題できる候補を先に列挙して選べます。
+[選定から生成・表示・検証までの実例](docs/finite-shading-generation.md)に、行ヒントだけで出題する手順と限界をまとめています。
 
 ## 保存した問題でルールを診断する
 
