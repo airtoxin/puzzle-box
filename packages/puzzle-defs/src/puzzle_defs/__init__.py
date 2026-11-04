@@ -40,8 +40,10 @@ from puzzle_defs.puzzles.room_fragments import RoomBlackCount, RoomConnectedBlac
 from puzzle_defs.puzzles.component_shapes import RectangularComponents, NonRectangularComponents
 from puzzle_defs.puzzles.number_fragments import DistinctWhiteNumbers
 from puzzle_defs.puzzles.component_size import ColorComponentSize
+from puzzle_defs.puzzles.room_shapes import NoTouchingEqualTetrominoes
 
 __all__ = [
+    "NoTouchingEqualTetrominoes",
     "ColorComponentSize",
     "RoomRotationalSymmetry",
     "RunLengthLimit",
