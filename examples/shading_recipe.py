@@ -6,7 +6,7 @@ from typing import Any
 from puzzle_defs import (BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2, ShadingRecipe,
                          BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines,
                          NoBlack2x2, NoThreeConsecutive)
-from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount
+from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms
 from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs.room_layout import DEFAULT_ROOMS, RoomMap, room_map
 from puzzle_defs.puzzles.shading import CLUE_KINDS, ShadingRule
@@ -20,7 +20,7 @@ PARAMETERLESS_RULE_TYPES = (NoWhite2x2, NoBlack2x2, BlackDominoes, NoThreeConsec
 BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
-                      RectangularComponents, NonRectangularComponents)
+                      RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -33,6 +33,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "nonrectangular-components": NonRectangularComponents(),
             "room-black-count": RoomBlackCount(DEFAULT_ROOMS),
             "room-connected-black": RoomConnectedBlack(DEFAULT_ROOMS), "line-black-count": LineBlackCount(),
+            "no-white-across-three-rooms": NoWhiteAcrossThreeRooms(DEFAULT_ROOMS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -52,6 +53,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": "room-connected-black", "rooms": [list(row) for row in rule.rooms], "nonempty": rule.nonempty}
     if type(rule) is LineBlackCount:
         return {"type": "line-black-count", "count": rule.count}
+    if type(rule) is NoWhiteAcrossThreeRooms:
+        return {"type": rule.ui.identifier, "rooms": [list(row) for row in rule.rooms]}
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         return {"type": rule.ui.identifier, "black": rule.black}
     for kind in PARAMETERLESS_RULE_TYPES:
@@ -82,6 +85,11 @@ def read_rule(data: Any) -> ShadingRule:
         return RoomConnectedBlack(tuple(tuple(row) for row in data["rooms"]), data["nonempty"])
     if kind == "line-black-count" and set(data) == {"type", "count"}:
         return LineBlackCount(data["count"])
+    if kind == "no-white-across-three-rooms":
+        if (set(data) != {"type", "rooms"} or type(data["rooms"]) is not list
+                or any(type(row) is not list for row in data["rooms"])):
+            raise ValueError("Invalid room rule parameters; rooms must be an array of arrays")
+        return NoWhiteAcrossThreeRooms(tuple(tuple(row) for row in data["rooms"]))
     for shape_rule in (RectangularComponents, NonRectangularComponents):
         if kind == shape_rule.ui.identifier and set(data) == {"type", "black"}:
             return shape_rule(data["black"])
@@ -98,7 +106,7 @@ def check_demo_size(recipe: ShadingRecipe) -> None:
 
 def shared_rooms(recipe: ShadingRecipe) -> RoomMap | None:
     layouts = [rule.rooms for rule in recipe.rules
-               if type(rule) is RoomBlackCount or type(rule) is RoomConnectedBlack]
+               if type(rule) is RoomBlackCount or type(rule) is RoomConnectedBlack or type(rule) is NoWhiteAcrossThreeRooms]
     for layout in layouts:
         room_map(layout, rows=recipe.rows, cols=recipe.cols)
     if layouts and any(layout != layouts[0] for layout in layouts):

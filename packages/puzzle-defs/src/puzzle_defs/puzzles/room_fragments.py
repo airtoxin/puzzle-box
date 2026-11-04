@@ -82,3 +82,30 @@ class LineBlackCount:
             raise ValueError("Black count cannot exceed the board area")
         for cells in board.rows() + board.cols():
             puzzle.add(sum_expr(black[c] for c in cells) == self.count)
+
+
+@dataclass(frozen=True)
+class NoWhiteAcrossThreeRooms:
+    """Every straight white run stays within at most two consecutive room segments.
+
+    On rectangular rooms this is Heyawake's three-room rule. With arbitrary
+    connected rooms, leaving and re-entering a room counts as another segment.
+    """
+
+    ui: ClassVar[RuleUi] = RuleUi("no-white-across-three-rooms", "白い直線の3部屋またぎを禁止",
+        "白い直線で部屋の境界を2回越えないようにします。同じ部屋に戻る場合も数えます。",
+        (ROOM_PARAMETER,), ROOM_UI)
+    rooms: RoomMap
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "rooms", room_map(self.rooms))
+
+    def apply(self, puzzle: Puzzle, board: SquareGrid, black: VarMap) -> None:
+        room_map(self.rooms, rows=len(board.rows()), cols=len(board.cols()))
+        for line in board.rows() + board.cols():
+            labels = [self.rooms[c.row][c.col] for c in line]
+            boundaries = [i for i in range(len(line)-1) if labels[i] != labels[i+1]]
+            # Every pair of consecutive boundaries gives a shortest interval
+            # spanning three segments. A black cell must interrupt that interval.
+            for first, second in zip(boundaries, boundaries[1:]):
+                puzzle.add(at_least_one(black[c] for c in line[first:second+2]))

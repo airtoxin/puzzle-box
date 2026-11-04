@@ -17,7 +17,7 @@ from puzzle_defs import (
     BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2,
     ColumnCountClue, RowCountClue, ShadingRecipe,
     BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines, NoBlack2x2, NoThreeConsecutive,
-    RoomBlackCount, RoomConnectedBlack, LineBlackCount,
+    RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms,
     RectangularComponents, NonRectangularComponents,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
@@ -187,6 +187,8 @@ def _rule_text(rule: ShadingRule) -> str:
         return f"Black cells connect inside each room without leaving it; {empty}."
     if type(rule) is LineBlackCount:
         return f"Every row and every column contains exactly {rule.count} black cells."
+    if type(rule) is NoWhiteAcrossThreeRooms:
+        return "A straight white run cannot cross two room boundaries; re-entering a room counts again."
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         color = "black" if rule.black else "white"
         shape = "a filled rectangle" if type(rule) is RectangularComponents else "nonrectangular"
