@@ -16,6 +16,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 黒・白の各成分から外枠へ到達させる | [成分と外枠の接続](component-border.md) |
 | 数字ごとに白い島の面積を指定する | [ぬりかべの島](white-island-areas.md) |
 | 0と数字なしを区別して隣接黒数を指定する | [マインスイーパーの隣接黒数](adjacent-black-counts.md) |
+| 隣接する異なる黒成分の面積を合計する | [クロットの黒成分合計](black-component-sum.md) |
 | 同色の隣接数・端点・連結を合わせて道にする | [セルの道の断片](cell-path-fragments.md) |
 | 同色の連続する長さを制限する | [連続長の上限](run-length.md) |
 | 黒・白の各連結成分を同じサイズにする | [固定成分サイズ](component-size.md) |
