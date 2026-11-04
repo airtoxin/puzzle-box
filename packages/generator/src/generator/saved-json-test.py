@@ -72,19 +72,25 @@ def test_invalid_saved_files_fail_cleanly(tmp_path, script, sample, answer, dama
 @pytest.mark.parametrize("script,sample", [(script, sample) for script, sample, _ in CASES] + [
     ("generate_shading.py", "shading-mixed-sample.json"),
 ])
-def test_current_formats_and_exact_byte_limit_remain_compatible(tmp_path, script, sample):
+@pytest.mark.parametrize("metadata", [None, {"ratio": 1.25, "label": "日本語"}],
+                         ids=["no-metadata", "environment-metadata"])
+def test_current_formats_and_exact_byte_limit_remain_compatible(tmp_path, script, sample, metadata):
     data = json.loads((EXAMPLES / sample).read_text(encoding="utf-8"))
-    # Optional historical metadata remains optional. Finite metadata may be ignored.
+    # Metadata is optional. Additional notes belong in the known metadata field,
+    # not in unknown top-level fields which could instead represent new rules.
     data.pop("seed", None)
     data.pop("environment", None)
-    data["extra_metadata"] = {"ratio": 1.25, "label": "日本語"}
+    if metadata is not None:
+        data["environment"] = metadata
     raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
     path = tmp_path / "boundary.json"
-    path.write_bytes(raw + b" " * (65536-len(raw)))
+    padded = raw + b" " * (65536-len(raw))
+    path.write_bytes(padded)
     result = _cli(script, "verify", path)
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
     assert report["valid"] and report["unique"] and report["irreducible"]
+    assert path.read_bytes() == padded
 
 
 @pytest.mark.parametrize("module,name", [("shading_recipe", "load_json"), ("coupled_records", "load_puzzle")])
