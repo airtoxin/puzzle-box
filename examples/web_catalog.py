@@ -10,7 +10,7 @@ from puzzle_defs.puzzles.slitherlink_recipe import LoopClueKind
 from puzzle_defs.puzzles.yajilin_recipe import YajilinClueKind
 from puzzle_defs.ui import merge_requirements
 from shading_recipe import (BUILT_IN_RULE_TYPES, MAX_RECIPE_RULES, shared_rooms, shared_numbers,
-                            shared_sight_counts, shared_island_areas, shared_neighbor_counts, shared_component_counts)
+                            shared_sight_counts, shared_island_areas, shared_neighbor_counts, shared_component_counts, shared_endpoint_markers)
 
 FORMAT = "puzzle-box/web-request-v1"
 PROFILE_FORMAT = "puzzle-box/web-request-v2"
@@ -19,7 +19,7 @@ CATALOG = {kind.ui.identifier: kind for kind in RULE_TYPES}
 RENDERERS = {"answer": "binary-cells", "givens": "cell-givens",
              "row-counts": "row-counts", "column-counts": "column-counts", "rooms": "cell-regions", "numbers": "cell-numbers",
              "sight-counts": "cell-sight-counts", "island-areas": "cell-island-areas", "neighbor-counts": "cell-neighbor-counts",
-             "component-counts": "cell-component-counts"}
+             "component-counts": "cell-component-counts", "endpoint-markers": "cell-endpoint-markers"}
 LOOP_RENDERERS = {"answer": "binary-edges", "cell-counts": "cell-edge-counts", "edge-givens": "edge-givens"}
 LOOP_CLUES = (CellEdgeCountClue.ui, EdgeStateClue.ui)
 COUPLED_RENDERERS = {"answer-cells": "binary-cells", "answer-edges": "binary-edges",
@@ -128,6 +128,8 @@ def _read_shading(data: Any) -> Request:
         plan["neighbor_counts"] = [list(row) for row in neighbors]
     if (components := shared_component_counts(recipe)) is not None:
         plan["component_counts"] = [list(row) for row in components]
+    if (markers := shared_endpoint_markers(recipe)) is not None:
+        plan["endpoint_markers"] = [list(row) for row in markers]
     return Request(recipe, seed, budget, plan)
 
 

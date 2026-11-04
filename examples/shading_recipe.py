@@ -20,7 +20,8 @@ from puzzle_defs import AdjacentBlackCounts
 from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor
-from puzzle_defs import CornerConnectedColor
+from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers
+from puzzle_defs.marker_layout import DEFAULT_ENDPOINT_MARKERS, MarkerGrid, marker_grid
 from puzzle_defs.puzzles.adjacent_black_component_sum import DEFAULT_COMPONENT_COUNTS
 from puzzle_defs.clue_layout import ClueGrid, clue_grid
 from puzzle_defs.puzzles.adjacent_black_counts import DEFAULT_NEIGHBOR_COUNTS
@@ -43,7 +44,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
-                      AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues)
+                      AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues, WhiteEndpointMarkers)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -68,6 +69,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "white-island-areas": WhiteIslandAreas(DEFAULT_ISLAND_AREAS),
             "adjacent-black-counts": AdjacentBlackCounts(DEFAULT_NEIGHBOR_COUNTS),
             "color-degree-range": ColorDegreeRange(), "color-endpoint-count": ColorEndpointCount(),
+            "white-endpoint-markers": WhiteEndpointMarkers(DEFAULT_ENDPOINT_MARKERS),
             "corner-connected-color": CornerConnectedColor(),
             "uniform-rooms": UniformRooms(DEFAULT_ROOMS), "acyclic-color": AcyclicColor(),
             "adjacent-black-component-sum": AdjacentBlackComponentSum(DEFAULT_COMPONENT_COUNTS),
@@ -102,6 +104,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "neighbor_counts": [list(row) for row in rule.neighbor_counts], "diagonal": rule.diagonal}
     if type(rule) is ColorDegreeRange:
         return {"type": rule.ui.identifier, "minimum": rule.minimum, "maximum": rule.maximum, "black": rule.black}
+    if type(rule) is WhiteEndpointMarkers:
+        return {"type": rule.ui.identifier, "markers": [list(row) for row in rule.markers]}
     if type(rule) is CornerConnectedColor:
         return {"type": rule.ui.identifier, "black": rule.black, "nonempty": rule.nonempty}
     if type(rule) is AcyclicColor:
@@ -179,6 +183,11 @@ def read_rule(data: Any) -> ShadingRule:
                 or any(type(row) is not list for row in data["counts"])):
             raise ValueError("Sight counts must be an array of arrays")
         return WhiteVisibilityCounts(tuple(tuple(row) for row in data["counts"]))
+    if kind == "white-endpoint-markers":
+        if (set(data) != {"type", "markers"} or type(data["markers"]) is not list
+                or any(type(row) is not list for row in data["markers"])):
+            raise ValueError("Endpoint markers must be an array of arrays")
+        return WhiteEndpointMarkers(tuple(tuple(row) for row in data["markers"]))
     if kind in ("white-island-areas", "white-area-clues"):
         if (set(data) != {"type", "areas"} or type(data["areas"]) is not list
                 or any(type(row) is not list for row in data["areas"])):
@@ -244,6 +253,7 @@ def read_recipe(data: Any) -> ShadingRecipe:
     shared_numbers(recipe)
     shared_sight_counts(recipe)
     shared_island_areas(recipe)
+    shared_endpoint_markers(recipe)
     shared_neighbor_counts(recipe)
     shared_component_counts(recipe)
     if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
@@ -320,3 +330,12 @@ def load_recipe(path: Path) -> ShadingRecipe:
 def check_distinct_paths(first: Path, second: Path) -> None:
     if first.resolve() == second.resolve() or (first.exists() and second.exists() and first.samefile(second)):
         raise ValueError("Input and output must use different files")
+
+
+def shared_endpoint_markers(recipe: ShadingRecipe) -> MarkerGrid | None:
+    grids = [rule.markers for rule in recipe.rules if type(rule) is WhiteEndpointMarkers]
+    for grid in grids:
+        marker_grid(grid, rows=recipe.rows, cols=recipe.cols)
+    if grids and any(grid != grids[0] for grid in grids):
+        raise ValueError("Endpoint rules must share the same markers for this file/UI format")
+    return grids[0] if grids else None

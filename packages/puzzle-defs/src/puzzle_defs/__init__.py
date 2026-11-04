@@ -49,8 +49,10 @@ from puzzle_defs.puzzles.cell_path_fragments import ColorDegreeRange, ColorEndpo
 from puzzle_defs.puzzles.adjacent_black_component_sum import AdjacentBlackComponentSum
 from puzzle_defs.puzzles.room_uniform_forest import UniformRooms, AcyclicColor
 from puzzle_defs.puzzles.corner_connected_color import CornerConnectedColor
+from puzzle_defs.puzzles.white_endpoint_markers import WhiteEndpointMarkers
 
 __all__ = [
+    "WhiteEndpointMarkers",
     "WhiteAreaClues",
     "CornerConnectedColor",
     "UniformRooms",

@@ -403,3 +403,7 @@ footer {
     margin:auto;
   }
 }
+
+.cell.endpoint-marked {position:relative;}
+.cell.endpoint-marked::before {content:""; position:absolute; inset:2px; border:2px solid currentColor; border-radius:50%; pointer-events:none;}
+.endpoint-marker-board .cell {min-width:48px; min-height:48px;}
