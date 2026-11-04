@@ -46,8 +46,10 @@ from puzzle_defs.puzzles.component_border import ComponentsTouchBorder
 from puzzle_defs.puzzles.white_island_areas import WhiteIslandAreas
 from puzzle_defs.puzzles.adjacent_black_counts import AdjacentBlackCounts
 from puzzle_defs.puzzles.cell_path_fragments import ColorDegreeRange, ColorEndpointCount
+from puzzle_defs.puzzles.adjacent_black_component_sum import AdjacentBlackComponentSum
 
 __all__ = [
+    "AdjacentBlackComponentSum",
     "ColorDegreeRange",
     "ColorEndpointCount",
     "AdjacentBlackCounts",
