@@ -17,6 +17,9 @@ uv run --no-sync python examples/explore_coupled.py --json > coupled-report.json
 JSON はこの実験の比較レポートで、`generate_yajilin.py` が読み込むパズル形式ではありません。
 入力ファイル、任意コード、式の文字列評価は使いません。
 
+保存した1問題の削減後ヒントに対する寄与は、[保存問題のルール診断](coupled-stored-diagnostics.md)で
+調べられます。全候補ヒントに対する本実験の結果とは区別して比較します。
+
 ## 比較する規則とヒント
 
 各辺はセル中心を結びます。矢印セルは黒にもループにも使えず、配置と方向は全構成で固定です。
