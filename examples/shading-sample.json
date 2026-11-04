@@ -1,0 +1,57 @@
+{
+  "clues": [
+    [
+      2,
+      0,
+      0
+    ],
+    [
+      2,
+      2,
+      1
+    ]
+  ],
+  "cols": 3,
+  "environment": {
+    "ortools": "9.15.6755",
+    "python": "3.12.14",
+    "seeded_search_workers": 1
+  },
+  "format": "puzzle-box/shading-v1",
+  "rows": 3,
+  "rules": [
+    {
+      "count": 3,
+      "type": "count"
+    },
+    {
+      "diagonal": false,
+      "type": "non-touching"
+    },
+    {
+      "nonempty": true,
+      "type": "connected-white"
+    },
+    {
+      "type": "no-white-2x2"
+    }
+  ],
+  "seed": 17,
+  "solution": [
+    [
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      1
+    ]
+  ]
+}

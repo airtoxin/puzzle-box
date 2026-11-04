@@ -18,6 +18,8 @@ from puzzle_defs.puzzles import (
     TilingPuzzle,
     YajilinPuzzle,
 )
+from puzzle_defs.puzzles.slitherlink_recipe import CellEdgeCountClue, EdgeStateClue, SlitherlinkRecipe
+from puzzle_defs.puzzles.yajilin_recipe import ArrowCountClue, ArrowSite, BlackCellClue, YajilinAnswer, YajilinRecipe
 from puzzle_defs.regions import (
     Region,
     enumerate_connected_regions,
@@ -27,8 +29,21 @@ from puzzle_defs.regions import (
     filter_same_number_combination,
 )
 from puzzle_defs.shikaku import ShikakuRect, enumerate_shikaku_rectangles
+from puzzle_defs.puzzles.shading import (
+    BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2,
+    ColumnCountClue, RowCountClue, ShadingPuzzle, ShadingRecipe, ShadingRule,
+)
 
 __all__ = [
+    "BlackCount",
+    "ConnectedWhite",
+    "NonTouchingBlack",
+    "NoWhite2x2",
+    "ColumnCountClue",
+    "RowCountClue",
+    "ShadingPuzzle",
+    "ShadingRecipe",
+    "ShadingRule",
     "HitoriPuzzle",
     "NurikabePuzzle",
     "Placement",
@@ -37,10 +52,18 @@ __all__ = [
     "ShikakuPuzzle",
     "ShikakuRect",
     "SlitherlinkPuzzle",
+    "SlitherlinkRecipe",
+    "CellEdgeCountClue",
+    "EdgeStateClue",
     "SudokuPuzzle",
     "TentsPuzzle",
     "TilingPuzzle",
     "YajilinPuzzle",
+    "YajilinRecipe",
+    "YajilinAnswer",
+    "ArrowSite",
+    "ArrowCountClue",
+    "BlackCellClue",
     "all_adjacent_different_shape",
     "different_shape_across",
     "enumerate_connected_regions",

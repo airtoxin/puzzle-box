@@ -15,6 +15,14 @@ from puzzle import Puzzle, Solution
 from puzzle.constraints import UniqueConstraint
 
 
+class InitialCluesNotUniqueError(ValueError):
+    """Initial clues failed the uniqueness check (not a solver status).
+
+    This includes inconsistent clues or a failure to prove uniqueness. Other
+    input and recipe errors remain their original exceptions.
+    """
+
+
 class GeneratablePuzzle[P: Puzzle, C](Protocol):
     """A typed puzzle class or recipe with fixed dimensions and base rules.
 
@@ -39,7 +47,8 @@ def generate[P: Puzzle, C](
     2. Extract all clues from the solution
     3. Validate uniqueness, then reduce clues while maintaining it
 
-    Raises ValueError if the extracted clues do not determine a unique answer.
+    Raises InitialCluesNotUniqueError (a ValueError) if the extracted clues
+    do not pass the uniqueness check.
     This does not guarantee the globally smallest clue set or human difficulty.
     """
     empty = puzzle_class.create_empty()
@@ -63,13 +72,13 @@ def reduce_clues[P: Puzzle, C](
     list is not modified. Under the recipe's monotonicity contract, the result is
     irreducible: no single remaining clue can be removed while keeping uniqueness.
 
-    Raises ValueError if the initial clues are not uniquely solvable, including
-    an empty clue list with multiple solutions or no solution.
+    Raises InitialCluesNotUniqueError (a ValueError) if the initial clues fail
+    the uniqueness check, including multiple solutions or no solution.
     """
     initial = puzzle_class.build_from_clues(list(clues))
     initial.add(UniqueConstraint())
     if initial.solve() is None:
-        raise ValueError("Initial clues must define a uniquely solvable puzzle")
+        raise InitialCluesNotUniqueError("Initial clues must define a uniquely solvable puzzle")
 
     rng = random.Random(seed)
     indices = list(range(len(clues)))
@@ -87,4 +96,4 @@ def reduce_clues[P: Puzzle, C](
     return [clues[i] for i in remaining]
 
 
-__all__ = ["GeneratablePuzzle", "generate", "reduce_clues"]
+__all__ = ["GeneratablePuzzle", "InitialCluesNotUniqueError", "generate", "reduce_clues"]
