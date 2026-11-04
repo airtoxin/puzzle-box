@@ -4,6 +4,7 @@ import argparse
 from itertools import combinations
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
 from puzzle_defs import BlackCount, ColumnCountClue, ConnectedWhite, NonTouchingBlack, NoWhite2x2, RowCountClue, ShadingRecipe
@@ -145,13 +146,18 @@ def _propagate(recipe: ShadingRecipe, clues: list[Clue]) -> dict[str, Any]:
 def explain_puzzle(data: Any) -> dict[str, Any]:
     recipe, clues, answer = _read_puzzle(data)
     validation = verify(data)  # Separate artifact check; never passed into propagation.
-    trace = _propagate(recipe, clues)
-    if any(value is not None and value != answer[r][c]
-           for r, row in enumerate(trace["cells"]) for c, value in enumerate(row)):
-        raise RuntimeError("A deduction disagrees with the independently verified answer")
-    return {"format": "puzzle-box/shading-deduction-trace-v1", "rows": recipe.rows, "cols": recipe.cols,
-            "artifact_verification": validation, "status": "stalled" if trace["unresolved_cells"] else "solved",
-            **trace}
+    try:
+        trace = _propagate(recipe, clues)
+        if any(value is not None and value != answer[r][c]
+               for r, row in enumerate(trace["cells"]) for c, value in enumerate(row)):
+            raise RuntimeError("A deduction disagrees with the independently verified answer")
+        return {"format": "puzzle-box/shading-deduction-trace-v1", "rows": recipe.rows, "cols": recipe.cols,
+                "artifact_verification": validation, "status": "stalled" if trace["unresolved_cells"] else "solved",
+                **trace}
+    except (ValueError, TypeError, KeyError) as exc:
+        # Input validation already succeeded. A contradictory deduction or broken
+        # trace is an internal error, never evidence that the candidate is invalid.
+        raise RuntimeError(f"Deduction failed after puzzle verification: {exc}") from exc
 
 
 def explain(report: dict[str, Any]) -> str:
@@ -183,7 +189,10 @@ def main() -> int:
         report = explain_puzzle(load_json(args.file, label="Puzzle"))
         print(json.dumps(report, indent=2, sort_keys=True) if args.json else explain(report))
         return 0 if report["status"] == "solved" else 1
-    except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+    except RuntimeError as exc:
+        print(f"Internal error: {exc}", file=sys.stderr)
+        return 3
+    except (ValueError, TypeError, KeyError, OSError) as exc:
         parser.error(str(exc))
 
 
