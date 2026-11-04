@@ -1,0 +1,69 @@
+{
+  "clue_kinds": [
+    "cell",
+    "row-count",
+    "column-count"
+  ],
+  "clues": [
+    {
+      "col": 1,
+      "row": 0,
+      "type": "cell",
+      "value": 1
+    },
+    {
+      "count": 2,
+      "row": 0,
+      "type": "row-count"
+    },
+    {
+      "count": 1,
+      "row": 1,
+      "type": "row-count"
+    },
+    {
+      "col": 0,
+      "count": 1,
+      "type": "column-count"
+    }
+  ],
+  "cols": 4,
+  "environment": {
+    "ortools": "9.15.6755",
+    "python": "3.12.14",
+    "seeded_search_workers": 1
+  },
+  "format": "puzzle-box/shading-v2",
+  "rows": 3,
+  "rules": [
+    {
+      "count": 3,
+      "type": "count"
+    },
+    {
+      "diagonal": false,
+      "type": "non-touching"
+    }
+  ],
+  "seed": 0,
+  "solution": [
+    [
+      0,
+      1,
+      0,
+      1
+    ],
+    [
+      1,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0
+    ]
+  ]
+}

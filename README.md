@@ -24,6 +24,16 @@ uv run --no-sync python examples/generate_shading.py verify shading.json
 実際の盤面、Python API、再現性の範囲は [ルール合成の実例](docs/composable-shading.md)を参照してください。
 最初の1次元の例 [compose_binary.py](examples/compose_binary.py)も残しています。
 
+セルの色に行・列の黒マス数ヒントを混ぜることもできます。
+
+```sh
+uv run --no-sync python examples/generate_shading.py generate --rows 3 --cols 4 --rules count non-touching --black-count 3 --hints cell row-count column-count --seed 0 --output mixed.json
+uv run --no-sync python examples/generate_shading.py verify mixed.json
+```
+
+個数だけでは曖昧な場合も、必要なセルヒントを残します。
+例題と成立条件は [複数のヒント形式](docs/mixed-shading-clues.md)にまとめています。
+
 既存の数独生成は次の通りです。
 
 ```python

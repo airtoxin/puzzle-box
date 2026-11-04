@@ -13,11 +13,13 @@ import ortools
 from generator import generate
 from puzzle import Cell, unique
 from puzzle_defs import (
-    BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2, ShadingRecipe,
+    BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2,
+    ColumnCountClue, RowCountClue, ShadingRecipe,
 )
-from puzzle_defs.puzzles.shading import Clue, ShadingRule
+from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 
 FORMAT = "puzzle-box/shading-v1"
+MIXED_FORMAT = "puzzle-box/shading-v2"
 RULES = ("count", "non-touching", "connected-white", "no-white-2x2")
 
 
@@ -53,16 +55,50 @@ def check_demo_size(recipe: ShadingRecipe) -> None:
         raise ValueError("This small-board demo supports at most 25 cells")
 
 
+def clue_record(clue: Clue, *, legacy: bool = False) -> dict[str, Any] | list[int]:
+    if isinstance(clue, tuple):
+        cell, value = clue
+        if legacy:
+            return [cell.row, cell.col, value]
+        return {"type": "cell", "row": cell.row, "col": cell.col, "value": value}
+    if legacy:
+        raise ValueError("The v1 format supports cell clues only")
+    if isinstance(clue, RowCountClue):
+        return {"type": "row-count", "row": clue.row, "count": clue.count}
+    return {"type": "column-count", "col": clue.col, "count": clue.count}
+
+
+def read_clue(data: Any, *, legacy: bool = False) -> Clue:
+    if legacy:
+        row, col, value = data
+    elif isinstance(data, dict):
+        if data.get("type") == "row-count" and set(data) == {"type", "row", "count"}:
+            return RowCountClue(data["row"], data["count"])
+        if data.get("type") == "column-count" and set(data) == {"type", "col", "count"}:
+            return ColumnCountClue(data["col"], data["count"])
+        if data.get("type") != "cell" or set(data) != {"type", "row", "col", "value"}:
+            raise ValueError("Unknown clue type or invalid clue fields")
+        row, col, value = data["row"], data["col"], data["value"]
+    else:
+        raise ValueError("A v2 clue must be an object")
+    if type(row) is not int or type(col) is not int:
+        raise ValueError("Clue coordinates must be integers")
+    return (Cell(row, col), value)
+
+
 def verify(data: dict[str, Any]) -> dict[str, Any]:
-    if data["format"] != FORMAT:
+    if data["format"] not in (FORMAT, MIXED_FORMAT):
         raise ValueError("Unsupported puzzle format")
-    recipe = ShadingRecipe(data["rows"], data["cols"], tuple(read_rule(r) for r in data["rules"]))
+    legacy = data["format"] == FORMAT
+    recipe = ShadingRecipe(data["rows"], data["cols"], tuple(read_rule(r) for r in data["rules"]),
+                           ("cell",) if legacy else tuple(data["clue_kinds"]))
     check_demo_size(recipe)
-    clues: list[Clue] = []
-    for row, col, value in data["clues"]:
-        if type(row) is not int or type(col) is not int:
-            raise ValueError("Clue coordinates must be integers")
-        clues.append((Cell(row, col), value))
+    clues = [read_clue(clue, legacy=legacy) for clue in data["clues"]]
+    for clue in clues:
+        kind = "row-count" if isinstance(clue, RowCountClue) else (
+            "column-count" if isinstance(clue, ColumnCountClue) else "cell")
+        if kind not in recipe.clue_kinds:
+            raise ValueError("Stored clue type is not enabled by clue_kinds")
     answer = data["solution"]
     if (not isinstance(answer, list) or len(answer) != recipe.rows
             or any(not isinstance(row, list) or len(row) != recipe.cols
@@ -90,6 +126,8 @@ def main() -> None:
     make.add_argument("--rows", type=int, default=3)
     make.add_argument("--cols", type=int, default=3)
     make.add_argument("--rules", nargs="+", choices=RULES, default=list(RULES))
+    make.add_argument("--hints", nargs="+", choices=CLUE_KINDS, default=["cell"],
+                      help="Candidate clue kinds; include cell to disambiguate count clues")
     make.add_argument("--black-count", type=int, default=3)
     make.add_argument("--diagonal", action="store_true")
     make.add_argument("--allow-empty-white", action="store_true")
@@ -111,22 +149,33 @@ def main() -> None:
             "connected-white": ConnectedWhite(nonempty=not args.allow_empty_white),
             "no-white-2x2": NoWhite2x2(),
         }
-        recipe = ShadingRecipe(args.rows, args.cols, tuple(choices[name] for name in args.rules))
+        recipe = ShadingRecipe(args.rows, args.cols, tuple(choices[name] for name in args.rules),
+                               tuple(args.hints))
         check_demo_size(recipe)
-        clues = generate(recipe, seed=args.seed)
+        try:
+            clues = generate(recipe, seed=args.seed)
+        except ValueError as exc:
+            if "cell" not in recipe.clue_kinds:
+                raise ValueError(f"{exc}. For ambiguous count clues, include cell in --hints "
+                                 "to retain disambiguating clues") from exc
+            raise
         puzzle = recipe.build_from_clues(clues)
         puzzle.add(unique())
         solution = puzzle.solve()
         if solution is None:
             raise ValueError("Generated clues did not determine a unique answer")
+        legacy = recipe.clue_kinds == ("cell",)
         record = {
-            "format": FORMAT, "rows": recipe.rows, "cols": recipe.cols,
+            "format": FORMAT if legacy else MIXED_FORMAT,
+            "rows": recipe.rows, "cols": recipe.cols,
             "rules": [rule_record(rule) for rule in recipe.rules], "seed": args.seed,
-            "clues": [[cell.row, cell.col, value] for cell, value in clues],
+            "clues": [clue_record(clue, legacy=legacy) for clue in clues],
             "solution": puzzle.result(solution),
             "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
                             "seeded_search_workers": 1},
         }
+        if not legacy:
+            record["clue_kinds"] = list(recipe.clue_kinds)
         encoded = json.dumps(record, indent=2, sort_keys=True) + "\n"
         if args.output is not None:
             args.output.write_text(encoded, encoding="utf-8")
