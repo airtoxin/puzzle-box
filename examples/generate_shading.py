@@ -28,6 +28,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     """Serialize generated clues only after proving their unique visible answer."""
     if type(recipe) is not ShadingRecipe:
         raise ValueError("This format requires an exact ShadingRecipe; composed recipes and subclasses need their own codec")
+    check_demo_size(recipe)
     if selection not in ("solver", "finite"):
         raise ValueError("Unknown completion selection")
     rules = [rule_record(rule) for rule in recipe.rules]
