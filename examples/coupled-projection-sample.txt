@@ -1,0 +1,32 @@
+Coupled rule experiment (full candidate hints; joint cell + edge answers)
+Mask bits: 1=coupling, 2=non_touching, 4=single_cycle
+Fixed: arrow obstacles, nonempty edges, degree 0 or 2. '-' means no hints.
+Each hint column: uniquely determined joint groups / all clue signatures.
+mask  answers  black  edge     -       A       B      AB       E      AE      BE     ABE
+   0     1792    256     7     0/1     0/1   0/256   0/256     0/7     0/7 1792/1792 1792/1792
+   1        7      6     7     0/1     0/1     5/6     5/6     7/7     7/7     7/7     7/7
+   2      287     41     7     0/1     0/1    0/41    0/41     0/7     0/7 287/287 287/287
+   3        2      1     2     0/1     0/1     0/1     0/1     2/2     2/2     2/2     2/2
+   4     1536    256     6     0/1     0/1   0/256   0/256     0/6     0/6 1536/1536 1536/1536
+   5        6      6     6     0/1     0/1     6/6     6/6     6/6     6/6     6/6     6/6
+   6      246     41     6     0/1     0/1    0/41    0/41     0/6     0/6 246/246 246/246
+   7        1      1     1     1/1     1/1     1/1     1/1     1/1     1/1     1/1     1/1
+Model/oracle comparison: verified
+
+Mask 3: coupling, non_touching
+Minimal conflict on this layout: False
+Hints: black; false black-only unique groups: 1
+Unique groups lost by removing a rule: {'coupling': 0, 'non_touching': 0}
+Same clues and black cells, different edges (# black, . white, arrows blocked):
+Clues: [{"black": 0, "cell": [0, 0], "type": "black"}, {"black": 0, "cell": [0, 1], "type": "black"}, {"black": 0, "cell": [0, 2], "type": "black"}, {"black": 0, "cell": [0, 3], "type": "black"}, {"black": 0, "cell": [1, 0], "type": "black"}, {"black": 0, "cell": [1, 1], "type": "black"}, {"black": 0, "cell": [1, 2], "type": "black"}, {"black": 0, "cell": [1, 3], "type": "black"}]
+Answer 1:
+.---.---.---.
+|           |
+.---.---.---.
+Answer 2:
+.---.   .---.
+|   |   |   |
+.---.   .---.
+Remove coupling: 285 extra answers; redundant=False
+Remove non_touching: 5 extra answers; redundant=False
+These finite-layout observations do not establish general rule redundancy or human difficulty.

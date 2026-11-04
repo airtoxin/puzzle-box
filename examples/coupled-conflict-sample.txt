@@ -1,0 +1,30 @@
+Coupled rule experiment (full candidate hints; joint cell + edge answers)
+Mask bits: 1=coupling, 2=non_touching, 4=single_cycle
+Fixed: arrow obstacles, nonempty edges, degree 0 or 2. '-' means no hints.
+Each hint column: uniquely determined joint groups / all clue signatures.
+mask  answers  black  edge     -       A       B      AB       E      AE      BE     ABE
+   0      128    128     1     0/1     0/2 128/128 128/128     0/1     0/2 128/128 128/128
+   1        1      1     1     1/1     1/1     1/1     1/1     1/1     1/1     1/1     1/1
+   2       31     31     1     0/1     0/2   31/31   31/31     0/1     0/2   31/31   31/31
+   3        0      0     0     0/0     0/0     0/0     0/0     0/0     0/0     0/0     0/0
+   4      128    128     1     0/1     0/2 128/128 128/128     0/1     0/2 128/128 128/128
+   5        1      1     1     1/1     1/1     1/1     1/1     1/1     1/1     1/1     1/1
+   6       31     31     1     0/1     0/2   31/31   31/31     0/1     0/2   31/31   31/31
+   7        0      0     0     0/0     0/0     0/0     0/0     0/0     0/0     0/0     0/0
+Model/oracle comparison: verified
+
+Mask 3: coupling, non_touching
+Minimal conflict on this layout: True
+Hints: arrow; false black-only unique groups: 0
+Unique groups lost by removing a rule: {'coupling': 0, 'non_touching': 0}
+Remove coupling: 31 extra answers; redundant=False
+Feasible after this removal:
+.   v   .---.
+        |   |
+.   .   .---.
+Remove non_touching: 1 extra answers; redundant=False
+Feasible after this removal:
+#   v   .---.
+        |   |
+#   #   .---.
+These finite-layout observations do not establish general rule redundancy or human difficulty.
