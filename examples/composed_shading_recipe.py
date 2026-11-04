@@ -1,13 +1,14 @@
-"""Closed, versioned data encoding for two fixed shading constraint builders."""
+"""Versioned shading components resolved only by an explicit trusted registry."""
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from generator import ConstrainedRecipe, with_constraints
 from puzzle import Constraint, at_least_one, connected, sum_expr
 from puzzle_defs import ShadingPuzzle, ShadingRecipe
 from puzzle_defs.puzzles.shading import Clue
+from component_registry import BoolParam, ChoiceParam, ComponentRegistry, IntParam
 from shading_recipe import load_json, read_recipe as read_base, recipe_record as base_record
 
 FORMAT = "puzzle-box/composed-shading-recipe-v1"
@@ -59,17 +60,15 @@ class ConnectedCells:
         return result
 
 
-def _read_component(data: Any) -> CellCount | ConnectedCells:
-    if not isinstance(data, dict):
-        raise ValueError("A component must be an object")
-    if data.get("id") == "cell-count/v1" and set(data) == {"id", "color", "count"}:
-        return CellCount(data["color"], data["count"])
-    if data.get("id") == "connected-cells/v1" and set(data) == {"id", "color", "nonempty"}:
-        return ConnectedCells(data["color"], data["nonempty"])
-    raise ValueError("Unknown component ID/version or invalid component fields")
+BUILTIN_COMPONENTS = (ComponentRegistry()
+    .with_component("cell-count/v1", CellCount,
+                    color=ChoiceParam(("black", "white")), count=IntParam(0, MAX_CELLS))
+    .with_component("connected-cells/v1", ConnectedCells,
+                    color=ChoiceParam(("black", "white")), nonempty=BoolParam()))
 
 
-def read_recipe(data: Any) -> Recipe:
+def read_recipe(data: Any, *, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> Recipe:
+    registry.require_base(BUILTIN_COMPONENTS)
     if not isinstance(data, dict) or set(data) != {"format", "base", "components"}:
         raise ValueError("Composed recipe must contain exactly format, base and components")
     if data["format"] != FORMAT:
@@ -80,31 +79,23 @@ def read_recipe(data: Any) -> Recipe:
     raw = data["components"]
     if not isinstance(raw, list) or len(raw) > MAX_COMPONENTS:
         raise ValueError("Components must be an array of at most 8 occurrences")
-    components = tuple(_read_component(item) for item in raw)
+    components = tuple(registry.decode(item) for item in raw)
     if any(type(c) is CellCount and c.count > base.rows * base.cols for c in components):
         raise ValueError("Component count cannot exceed the board area")
     return with_constraints(base, *components)
 
 
-def recipe_record(recipe: Recipe) -> dict[str, Any]:
+def recipe_record(recipe: Recipe, *, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> dict[str, Any]:
+    registry.require_base(BUILTIN_COMPONENTS)
     # Do not call unknown builders or inspect their names/closures. Subclasses can
     # change behavior, so exact types are part of the serialization contract.
     if type(recipe) is not ConstrainedRecipe or type(recipe.base) is not ShadingRecipe:
         raise ValueError("Only an exact ConstrainedRecipe with a ShadingRecipe base can be saved")
-    components = []
-    for builder in recipe.builders:
-        if type(builder) is CellCount:
-            count = cast(CellCount, builder)
-            components.append({"id": "cell-count/v1", "color": count.color, "count": count.count})
-        elif type(builder) is ConnectedCells:
-            group = cast(ConnectedCells, builder)
-            components.append({"id": "connected-cells/v1", "color": group.color, "nonempty": group.nonempty})
-        else:
-            raise ValueError("Cannot save arbitrary Python builders or component subclasses")
+    components = [registry.encode(builder) for builder in recipe.builders]
     record = {"format": FORMAT, "base": base_record(recipe.base), "components": components}
-    read_recipe(record)  # Apply identical schema/bounds on export, without solving.
+    read_recipe(record, registry=registry)  # Apply identical schema/bounds on export, without solving.
     return record
 
 
-def load_recipe(path: Path) -> Recipe:
-    return read_recipe(load_json(path, label="Composed recipe"))
+def load_recipe(path: Path, *, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> Recipe:
+    return read_recipe(load_json(path, label="Composed recipe"), registry=registry)

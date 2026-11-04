@@ -8,8 +8,10 @@ from typing import Any
 from generator import generate
 from puzzle import unique
 from puzzle_defs.puzzles.shading import ColumnCountClue, RowCountClue
-from composed_shading_recipe import load_recipe, read_recipe, recipe_record
+from component_registry import ComponentRegistry
+from composed_shading_recipe import BUILTIN_COMPONENTS, load_recipe, read_recipe, recipe_record
 from generate_shading import clue_record, read_clue
+from json_records import encode_json
 from shading_recipe import check_distinct_paths, load_json
 
 FORMAT = "puzzle-box/composed-shading-v1"
@@ -20,8 +22,8 @@ def _seed(value: Any) -> None:
         raise ValueError("Seed must be an integer between 0 and 2147483647")
 
 
-def generate_record(data: Any, *, seed: int = 0) -> dict[str, Any]:
-    recipe = read_recipe(data)
+def generate_record(data: Any, *, seed: int = 0, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> dict[str, Any]:
+    recipe = read_recipe(data, registry=registry)
     _seed(seed)
     clues = generate(recipe, seed=seed)
     puzzle = recipe.build_from_clues(clues)
@@ -29,16 +31,16 @@ def generate_record(data: Any, *, seed: int = 0) -> dict[str, Any]:
     solution = puzzle.solve()
     if solution is None:
         raise ValueError("Generated clues did not determine a unique answer")
-    return {"format": FORMAT, "recipe": recipe_record(recipe), "seed": seed,
+    return {"format": FORMAT, "recipe": recipe_record(recipe, registry=registry), "seed": seed,
             "clues": [clue_record(clue) for clue in clues], "solution": puzzle.result(solution)}
 
 
-def verify(data: Any) -> dict[str, Any]:
+def verify(data: Any, *, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> dict[str, Any]:
     if not isinstance(data, dict) or set(data) != {"format", "recipe", "seed", "clues", "solution"}:
         raise ValueError("Composed puzzle must contain exactly format, recipe, seed, clues and solution")
     if data["format"] != FORMAT:
         raise ValueError("Unsupported composed puzzle format/version")
-    recipe = read_recipe(data["recipe"])
+    recipe = read_recipe(data["recipe"], registry=registry)
     _seed(data["seed"])
     # read_recipe validates these dimensions and clue kinds; no stored validity
     # flags or stored answers are used as evidence of satisfiability/uniqueness.
@@ -73,7 +75,7 @@ def verify(data: Any) -> dict[str, Any]:
     return {"valid": True, "unique": True, "irreducible": True, "clue_count": len(clues)}
 
 
-def main() -> int:
+def main(*, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     make = commands.add_parser("generate")
@@ -85,16 +87,18 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command == "verify":
-            print(json.dumps(verify(load_json(args.file, label="Composed puzzle")), sort_keys=True))
+            print(json.dumps(verify(load_json(args.file, label="Composed puzzle"), registry=registry), sort_keys=True))
         else:
             check_distinct_paths(args.recipe, args.output)
             if args.output.exists():
                 raise ValueError("Output already exists; choose a new file")
-            recipe = load_recipe(args.recipe)
-            record = generate_record(recipe_record(recipe), seed=args.seed)
+            recipe = load_recipe(args.recipe, registry=registry)
+            record = generate_record(recipe_record(recipe, registry=registry), seed=args.seed, registry=registry)
+            encoded = encode_json(record, label="Generated composed puzzle")
             # Exclusive creation also covers a file appearing while solving.
-            with args.output.open("x", encoding="utf-8") as stream:
-                stream.write(json.dumps(record, sort_keys=True, indent=2) + "\n")
+            # Write exactly the checked bytes, without newline expansion.
+            with args.output.open("xb") as stream:
+                stream.write(encoded)
             print("Saved composed puzzle. Use verify to check it; the JSON contains its answer.")
         return 0
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
