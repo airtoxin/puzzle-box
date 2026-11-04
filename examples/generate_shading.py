@@ -49,18 +49,22 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
         raise ValueError("Unknown completion selection")
     rules = [rule_record(rule) for rule in recipe.rules]
     _check_clue_kinds(recipe, clues)
+    legacy = recipe.clue_kinds == ("cell",)
+    encoded_clues = [clue_record(clue, legacy=legacy) for clue in clues]
+    # Validate the exact saved representation before solving. Python considers
+    # bool/float coordinates equal to ints, but the file format rejects them.
+    clues = [read_clue(clue, legacy=legacy) for clue in encoded_clues]
     puzzle = recipe.build_from_clues(clues)
     puzzle.add(unique())
     solution = puzzle.solve()
     if solution is None:
         raise ValueError("Generated clues did not determine a unique answer")
     _check_irreducible(recipe, clues)
-    legacy = recipe.clue_kinds == ("cell",)
     record = {
         "format": FORMAT if legacy else MIXED_FORMAT,
         "rows": recipe.rows, "cols": recipe.cols,
         "rules": rules, "seed": seed,
-        "clues": [clue_record(clue, legacy=legacy) for clue in clues],
+        "clues": encoded_clues,
         "solution": puzzle.result(solution),
         "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
                         "seeded_search_workers": 1},

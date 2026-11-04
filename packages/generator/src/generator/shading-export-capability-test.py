@@ -84,3 +84,13 @@ def test_export_and_reader_agree_on_each_enabled_clue_kind(kind, clue, enabled, 
 def test_export_rejects_redundant_clues_just_like_verification(rules, clues):
     with pytest.raises(ValueError, match="not irreducible"):
         display.puzzle_record(ShadingRecipe(1, 1, rules), clues, seed=0)
+
+
+@pytest.mark.parametrize("row,col", [(False, 0), (0, False), (0.0, 0), (0, 0.0)])
+@pytest.mark.parametrize("kinds", [("cell",), ("cell", "row-count")])
+def test_export_uses_reader_coordinate_types_before_building(row, col, kinds, monkeypatch):
+    recipe = ShadingRecipe(1, 1, (), kinds)
+    monkeypatch.setattr(ShadingRecipe, "build_from_clues",
+                        lambda *a, **k: pytest.fail("Reject invalid serialized clues before building"))
+    with pytest.raises(ValueError, match="coordinates must be integers"):
+        display.puzzle_record(recipe, [(Cell(row, col), 1)], seed=0)
