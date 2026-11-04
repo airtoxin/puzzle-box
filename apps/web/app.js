@@ -139,6 +139,7 @@ async function refresh() {
       ['endpoint_markers','マス全体を囲む大きな丸は白の端点（白い隣接マスは1個）']]
       .filter(([key]) => plan[key] !== undefined).map(([,text]) => text);
     if (numericLegend.length) $('plan-note').textContent += ` ${numericLegend.join('、')}。`;
+    if (plan.endpoint_markers && plan.sight_counts) $('plan-note').textContent += ' 端点上の可視数は丸自身を含む直線長です。';
     $('status').textContent = '生成前のプレビューです。';
     renderBoard(); $('generate').disabled = false;
   } catch (error) {
@@ -207,6 +208,8 @@ function cellButton(index, r, c, value, reveal) {
     const area = plan.island_areas?.[r][c] || 0;
     const neighbor = plan.neighbor_counts?.[r][c], hasNeighbor = neighbor != null;
     const component = plan.component_counts?.[r][c], hasComponent = component != null;
+    button.classList.toggle('endpoint-length', plan.endpoint_markers?.[r][c] === 1 && sight > 0
+      && !plan.numbers && !area && !hasNeighbor && !hasComponent);
     if (plan.numbers || sight || area || hasNeighbor || hasComponent) {
       button.classList.add('numbered-cell');
       const labels = [];

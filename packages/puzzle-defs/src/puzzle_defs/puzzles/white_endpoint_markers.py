@@ -18,7 +18,7 @@ class WhiteEndpointMarkers:
 
     ui: ClassVar[RuleUi] = RuleUi(
         "white-endpoint-markers", "丸を白の端点と一致させる",
-        "丸は白で、上下左右の白い隣接マスが1個。丸なしの白マスは端点になれません。孤立白は端点ではなく、数字の直線長は未対応です。",
+        "丸は白で、上下左右の白い隣接マスが1個。丸なしの白マスは端点になれません。孤立白は端点ではなく、数字の直線長は可視数ルールと組み合わせます。",
         (UiParameter("markers", "端点の丸（0は丸なし、1は丸あり）", "marker-grid", DEFAULT_ENDPOINT_MARKERS, maximum=1),),
         UiRequirements(channels=(UiChannel("answer", "binary-cells"), UiChannel("endpoint-markers", "cell-endpoint-markers"))),
     )
