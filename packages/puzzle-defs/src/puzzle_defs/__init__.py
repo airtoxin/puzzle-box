@@ -36,11 +36,12 @@ from puzzle_defs.puzzles.shading import (
 from puzzle_defs.puzzles.shading_fragments import (
     BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines, NoBlack2x2, NoThreeConsecutive, RunLengthLimit,
 )
-from puzzle_defs.puzzles.room_fragments import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms
+from puzzle_defs.puzzles.room_fragments import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms, RoomRotationalSymmetry
 from puzzle_defs.puzzles.component_shapes import RectangularComponents, NonRectangularComponents
 from puzzle_defs.puzzles.number_fragments import DistinctWhiteNumbers
 
 __all__ = [
+    "RoomRotationalSymmetry",
     "RunLengthLimit",
     "DistinctWhiteNumbers",
     "NoWhiteAcrossThreeRooms",
