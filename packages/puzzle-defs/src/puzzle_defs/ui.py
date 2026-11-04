@@ -6,6 +6,7 @@ from puzzle_defs.room_layout import room_map
 from puzzle_defs.number_layout import number_grid
 from puzzle_defs.clue_layout import clue_grid
 from puzzle_defs.marker_layout import marker_grid
+from puzzle_defs.run_clue_layout import RunClueGrid, run_clue_grid
 
 
 @dataclass(frozen=True)
@@ -27,8 +28,8 @@ class UiRequirements:
 class UiParameter:
     name: str
     label: str
-    kind: Literal["integer", "boolean", "region-map", "number-grid", "clue-grid", "marker-grid"]
-    default: int | bool | tuple[tuple[int | None, ...], ...]
+    kind: Literal["integer", "boolean", "region-map", "number-grid", "clue-grid", "marker-grid", "run-clue-grid"]
+    default: int | bool | tuple[tuple[int | None, ...], ...] | RunClueGrid
     minimum: int = 0
     maximum: int | Literal["area", "edges"] = "area"
 
@@ -43,7 +44,7 @@ class UiParameter:
                 raise ValueError("An edge bound requires the number of grid edges")
             if type(value) is not int or not self.minimum <= value <= maximum:
                 raise ValueError(f"{self.name} must be an integer in {self.minimum}..{maximum}")
-        elif self.kind in ("region-map","number-grid","clue-grid","marker-grid"):
+        elif self.kind in ("region-map","number-grid","clue-grid","marker-grid","run-clue-grid"):
             if (rows is None or cols is None or type(value) is not list or len(value) != rows
                     or any(type(row) is not list or len(row) != cols for row in value)):
                 label = "Room map" if self.kind == "region-map" else "Number grid"
@@ -52,6 +53,10 @@ class UiParameter:
                 room_map(value, rows=rows, cols=cols)
             elif self.kind == "marker-grid":
                 marker_grid(value, rows=rows, cols=cols)
+            elif self.kind == "run-clue-grid":
+                if any(clue is not None and type(clue) is not list for row in value for clue in row):
+                    raise ValueError("Run clues must be arrays or null")
+                run_clue_grid(value, rows=rows, cols=cols)
             elif self.kind == "clue-grid":
                 maximum = area if self.maximum == "area" else edges if self.maximum == "edges" else self.maximum
                 if maximum is None:

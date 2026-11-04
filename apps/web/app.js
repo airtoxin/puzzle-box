@@ -3,11 +3,11 @@ const form = $('recipe-form');
 let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, timer;
 const selected = new Map();
 const hints = new Map();
-const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid'];
+const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid', 'run-clue-grid'];
 // Capabilities of these renderers, independent of what a newer server declares.
 const renderers = {
   shading: {topology: 'rectangular-cells', maxCells: 9, minSide: 1, required: ['answer'],
-    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts', 'island-areas': 'cell-island-areas', 'neighbor-counts': 'cell-neighbor-counts', 'component-counts': 'cell-component-counts', 'endpoint-markers': 'cell-endpoint-markers'}},
+    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts', 'island-areas': 'cell-island-areas', 'neighbor-counts': 'cell-neighbor-counts', 'component-counts': 'cell-component-counts', 'endpoint-markers': 'cell-endpoint-markers', 'black-runs': 'cell-black-runs'}},
   slitherlink: {topology: 'rectangular-cells', maxCells: 4, minSide: 1, required: ['answer'],
     channels: {answer: 'binary-edges', 'cell-counts': 'cell-edge-counts', 'edge-givens': 'edge-givens'}},
   coupled: {topology: 'rectangular-cell-centers', maxCells: 9, minSide: 2, required: ['answer-cells', 'answer-edges'],
@@ -19,6 +19,17 @@ function checkedGrid(value, rows, cols, maximum, nullable = false) {
   if (!Array.isArray(value) || value.length !== rows || value.some(row => !Array.isArray(row)
       || row.length !== cols || row.some(n => !(nullable && n === null) && (!Number.isInteger(n) || n < 0 || n > maximum)))) throw new UnsupportedUiError();
   return value;
+}
+function canonicalRunClues(value, rows, cols) {
+  if (!Array.isArray(value) || value.length !== rows || value.some(row => !Array.isArray(row) || row.length !== cols)) throw new UnsupportedUiError();
+  return value.map(row => row.map(clue => {
+    if (clue === null) return null;
+    if (!Array.isArray(clue) || clue.length < 1 || clue.length > 4
+        || clue.some(n => !Number.isInteger(n) || n < 0 || n > 8)
+        || clue.includes(0) && !(clue.length === 1 && clue[0] === 0)
+        || clue.length > 1 && clue.reduce((a,b) => a+b,0)+clue.length > 8) throw new UnsupportedUiError();
+    return [...clue].sort((a,b) => a-b);
+  }));
 }
 function canonicalRooms(value, rows, cols) {
   checkedGrid(value, rows, cols, rows * cols - 1);
@@ -44,6 +55,12 @@ function assertRenderablePlan(candidate, request) {
     seen.add(channel.name);
   }
   if (renderer.required.some(name => !seen.has(name))) throw new UnsupportedUiError();
+  const requestedRuns = request.rules.filter(r => Object.hasOwn(r.parameters,'run_clues')).map(r => r.parameters.run_clues);
+  if (seen.has('black-runs') !== (requestedRuns.length > 0) || !seen.has('black-runs') && candidate.black_run_clues !== undefined) throw new UnsupportedUiError();
+  if (seen.has('black-runs')) {
+    const shown = JSON.stringify(canonicalRunClues(candidate.black_run_clues,candidate.rows,candidate.cols));
+    if (requestedRuns.some(g => JSON.stringify(canonicalRunClues(g,candidate.rows,candidate.cols)) !== shown)) throw new UnsupportedUiError();
+  }
   const requestedRooms = request.rules.filter(r => Object.hasOwn(r.parameters, 'rooms')).map(r => r.parameters.rooms);
   if (seen.has('rooms') !== (requestedRooms.length > 0) || !seen.has('rooms') && candidate.rooms !== undefined) throw new UnsupportedUiError();
   if (seen.has('rooms')) {
@@ -88,6 +105,12 @@ function readRequest() {
 }
 function readGrid(field) {
   const rows = field.value.trim().split(/\r?\n/).map(row => row.trim().split(/\s+/));
+  if (field.dataset.kind === 'run-clue-grid') {
+    try {
+      if (field.value.length > 512 || rows.some(row => row.some(n => n !== '.' && !/^\d+(,\d+)*$/.test(n)))) throw new UnsupportedUiError();
+      return canonicalRunClues(rows.map(row => row.map(n => n === '.' ? null : n.split(',').map(Number))),Number($('rows').value),Number($('cols').value));
+    } catch {throw new GridInputError(`${field.dataset.label}は .、0、または1,2のように、白い区切りを含め8マス以内の連続長を入力してください。`);}
+  }
   const nullable = field.dataset.kind === 'clue-grid';
   if (field.value.length > 512 || rows.some(row => row.some(n => !/^\d+$/.test(n) && !(nullable && n === '.'))))
     throw new GridInputError(`${field.dataset.label}は、各行に整数を空白で区切って入力してください。`);
@@ -136,7 +159,7 @@ async function refresh() {
     const numericLegend = [['numbers','中央の数字は固定ラベル'], ['sight_counts','丸数字は見える白数'],
       ['island_areas','四角の数字は白い島の面積'], ['neighbor_counts','「隣n」は周囲の黒数（0もヒント）'],
       ['component_counts','「塊n」は接する黒成分の面積合計（同じ成分は1回）'],
-      ['endpoint_markers','マス全体を囲む大きな丸は白の端点（白い隣接マスは1個）']]
+      ['endpoint_markers','マス全体を囲む大きな丸は白の端点（白い隣接マスは1個）'], ['black_run_clues','「連1,2」等は周囲8マスの黒い連続長（順序不問、0もヒント）']]
       .filter(([key]) => plan[key] !== undefined).map(([,text]) => text);
     if (numericLegend.length) $('plan-note').textContent += ` ${numericLegend.join('、')}。`;
     if (plan.endpoint_markers && plan.sight_counts) $('plan-note').textContent += ' 端点上の可視数は丸自身を含む直線長です。';
@@ -161,6 +184,7 @@ function renderBoard(reveal = false) {
   const table = node('table'); table.setAttribute('aria-label', artifact ? '生成した問題' : '盤面プレビュー');
   if (channels.has('rooms')) table.classList.add('room-board');
   if (channels.has('endpoint-markers')) table.classList.add('endpoint-marker-board');
+  if (channels.has('black-runs')) table.classList.add('black-run-board');
   if (channels.has('neighbor-counts') && ['numbers','sight-counts','island-areas'].some(c => channels.has(c))) table.classList.add('multi-numeric-board');
   if (channels.has('component-counts') && ['numbers','sight-counts','island-areas','neighbor-counts'].some(c => channels.has(c))) table.classList.add('dense-numeric-board');
   const values = artifact?.clues || [];
@@ -183,7 +207,7 @@ function renderBoard(reveal = false) {
     }
     for (let c = 0; c < plan.cols; c++) {
       const index = r * plan.cols + c;
-      const givenWhite = plan.sight_counts?.[r][c] > 0 || plan.island_areas?.[r][c] > 0 || plan.endpoint_markers?.[r][c] === 1 || plan.neighbor_counts?.[r][c] != null || plan.component_counts?.[r][c] != null;
+      const givenWhite = plan.sight_counts?.[r][c] > 0 || plan.island_areas?.[r][c] > 0 || plan.endpoint_markers?.[r][c] === 1 || plan.black_run_clues?.[r][c] != null || plan.neighbor_counts?.[r][c] != null || plan.component_counts?.[r][c] != null;
       const value = reveal ? artifact.record.solution[r][c] : artifact ? input[index] : givenWhite ? 0 : -1;
       const td = node('td'); td.append(cellButton(index, r, c, value, reveal));
       if (channels.has('rooms')) {
@@ -208,11 +232,14 @@ function cellButton(index, r, c, value, reveal) {
     const area = plan.island_areas?.[r][c] || 0;
     const neighbor = plan.neighbor_counts?.[r][c], hasNeighbor = neighbor != null;
     const component = plan.component_counts?.[r][c], hasComponent = component != null;
+    const runs = plan.black_run_clues?.[r][c], hasRuns = runs != null;
+    button.classList.toggle('black-run-numbered', hasRuns);
     button.classList.toggle('endpoint-length', plan.endpoint_markers?.[r][c] === 1 && sight > 0
-      && !plan.numbers && !area && !hasNeighbor && !hasComponent);
-    if (plan.numbers || sight || area || hasNeighbor || hasComponent) {
+      && !plan.numbers && !area && !hasNeighbor && !hasComponent && !hasRuns);
+    if (plan.numbers || sight || area || hasNeighbor || hasComponent || hasRuns) {
       button.classList.add('numbered-cell');
       const labels = [];
+      if (hasRuns) labels.push(node('span', `連${runs.join(',')}`, 'run-number'));
       if (plan.numbers) labels.push(node('span', String(plan.numbers[r][c]), 'cell-number'));
       if (sight) labels.push(node('span', String(sight), 'sight-number'));
       if (area) labels.push(node('span', String(area), 'area-number'));
@@ -230,7 +257,7 @@ function cellButton(index, r, c, value, reveal) {
     } else button.textContent = mark;
     button.classList.toggle('endpoint-marked', plan.endpoint_markers?.[r][c] === 1);
     button.dataset.value = value;
-    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${sight ? `（見える白${sight}）` : ''}${area ? `（白い島の面積${area}）` : ''}${hasNeighbor ? `（隣接黒数${neighbor}）` : ''}${hasComponent ? `（接する黒成分の面積合計${component}）` : ''}${plan.endpoint_markers?.[r][c] === 1 ? '（白の端点の丸）' : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
+    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${sight ? `（見える白${sight}）` : ''}${area ? `（白い島の面積${area}）` : ''}${hasNeighbor ? `（隣接黒数${neighbor}）` : ''}${hasComponent ? `（接する黒成分の面積合計${component}）` : ''}${hasRuns ? `（周囲の黒い連続長${runs.join(',')}）` : ''}${plan.endpoint_markers?.[r][c] === 1 ? '（白の端点の丸）' : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
   };
   paint(value);
   button.addEventListener('click', () => {
@@ -257,7 +284,7 @@ function buildControls() {
       if (!grid) field.type = spec.kind === 'boolean' ? 'checkbox' : 'number';
       if (spec.kind === 'boolean') field.checked = spec.default;
       else if (grid) {
-        field.value = spec.default.map(row => row.map(n => n === null ? '.' : n).join(' ')).join('\n'); field.rows = 3; field.maxLength = 512; field.required = true;
+        field.value = spec.default.map(row => row.map(n => n === null ? '.' : Array.isArray(n) ? n.join(',') : n).join(' ')).join('\n'); field.rows = 3; field.maxLength = 512; field.required = true;
         sharedGrids.set(sharedKey, field);
       }
       else {field.value = spec.default; field.min = spec.minimum; field.step = '1'; field.required = true;}
@@ -266,6 +293,7 @@ function buildControls() {
         const common = node('div', undefined, 'shared-parameters'); common.append(wrapper,
           node('p', spec.kind === 'region-map'
             ? '部屋を使うルールで共有します。盤面と同じ行・列数で、0以上の整数を空白区切りで入力します。各部屋は上下左右でつながる必要があります。'
+            : spec.kind === 'run-clue-grid' ? 'セルを空白で区切り、. はヒントなし、0は黒なし、1,2は別々の黒い連続区間です。順序は問いません。'
             : spec.kind === 'marker-grid' ? '盤面と同じ行・列数で0（丸なし）か1（白の端点の丸）を入力します。数字の直線長ではありません。'
             : spec.kind === 'clue-grid' ? '数字を空白区切りで入力します。0も数字ヒントで、数字なしは . です。数字マスは白として固定します。'
             : '盤面と同じ行・列数で、0〜99の整数を空白区切りで入力します。数字は問題に固定されます。0の意味は各ルールの説明を確認してください。'));
@@ -380,7 +408,7 @@ form.addEventListener('submit', async event => {
       for (const grid of [plan.sight_counts, plan.island_areas, plan.endpoint_markers]) if (grid) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
         if (grid[r][c] > 0) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
       }
-      for (const grid of [plan.neighbor_counts,plan.component_counts]) if (grid) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
+      for (const grid of [plan.neighbor_counts,plan.component_counts,plan.black_run_clues]) if (grid) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
         if (grid[r][c] !== null) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
       }
       for (const clue of result.clues) {

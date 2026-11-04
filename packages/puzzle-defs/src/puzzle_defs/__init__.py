@@ -51,8 +51,10 @@ from puzzle_defs.puzzles.room_uniform_forest import UniformRooms, AcyclicColor
 from puzzle_defs.puzzles.corner_connected_color import CornerConnectedColor
 from puzzle_defs.puzzles.white_endpoint_markers import WhiteEndpointMarkers
 from puzzle_defs.puzzles.numbered_white_endpoints import numbered_white_endpoints
+from puzzle_defs.puzzles.adjacent_black_runs import AdjacentBlackRuns
 
 __all__ = [
+    "AdjacentBlackRuns",
     "numbered_white_endpoints",
     "WhiteEndpointMarkers",
     "WhiteAreaClues",
