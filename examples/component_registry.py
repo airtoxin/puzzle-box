@@ -95,10 +95,15 @@ class ComponentRegistry:
                 or not any("__call__" in t.__dict__ for t in builder_type.__mro__)):
             raise ValueError("Component type must be a frozen callable dataclass")
         declared = fields(builder_type)
+        constructor = signature(builder_type)
         if ("id" in parameters or any(not f.init for f in declared)
                 or set(parameters) != {f.name for f in declared}
-                or set(signature(builder_type).parameters) != set(parameters)):
+                or set(constructor.parameters) != set(parameters)):
             raise ValueError("Parameters must match all dataclass constructor fields; id is reserved")
+        try:
+            constructor.bind(**dict.fromkeys(parameters))
+        except TypeError as exc:
+            raise ValueError("Component constructor must accept parameter fields as keywords") from exc
         if any(type(p) not in (IntParam, ChoiceParam, BoolParam) for p in parameters.values()):
             raise ValueError("Use only IntParam, ChoiceParam or BoolParam validators")
         entry = _Entry(identifier, builder_type, tuple(parameters.items()))

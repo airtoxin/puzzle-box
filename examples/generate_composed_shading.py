@@ -11,7 +11,7 @@ from puzzle_defs.puzzles.shading import ColumnCountClue, RowCountClue
 from component_registry import ComponentRegistry
 from composed_shading_recipe import BUILTIN_COMPONENTS, load_recipe, read_recipe, recipe_record
 from generate_shading import clue_record, read_clue
-from shading_recipe import check_distinct_paths, load_json
+from shading_recipe import MAX_RECIPE_BYTES, check_distinct_paths, load_json
 
 FORMAT = "puzzle-box/composed-shading-v1"
 
@@ -93,9 +93,13 @@ def main(*, registry: ComponentRegistry = BUILTIN_COMPONENTS) -> int:
                 raise ValueError("Output already exists; choose a new file")
             recipe = load_recipe(args.recipe, registry=registry)
             record = generate_record(recipe_record(recipe, registry=registry), seed=args.seed, registry=registry)
+            encoded = (json.dumps(record, sort_keys=True, indent=2) + "\n").encode("utf-8")
+            if len(encoded) > MAX_RECIPE_BYTES:
+                raise ValueError(f"Generated puzzle exceeds {MAX_RECIPE_BYTES} bytes; shorten component parameters")
             # Exclusive creation also covers a file appearing while solving.
-            with args.output.open("x", encoding="utf-8") as stream:
-                stream.write(json.dumps(record, sort_keys=True, indent=2) + "\n")
+            # Write exactly the bytes checked above, without newline expansion.
+            with args.output.open("xb") as stream:
+                stream.write(encoded)
             print("Saved composed puzzle. Use verify to check it; the JSON contains its answer.")
         return 0
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
