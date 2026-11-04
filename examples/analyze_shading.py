@@ -15,7 +15,7 @@ from puzzle_defs import (BlackCount, ColumnCountClue, ConnectedWhite, NonTouchin
                          NoWhite2x2, RowCountClue, ShadingPuzzle, ShadingRecipe,
                          BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines,
                          NoBlack2x2, NoThreeConsecutive)
-from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount
+from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms
 from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
@@ -76,6 +76,23 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
                     return False
             elif len(_components(selected)) > 1 or not selected and rule.nonempty:
                 return False
+        return True
+    if type(rule) is NoWhiteAcrossThreeRooms:
+        # Scan maximal white runs and count room entries, independently of the
+        # encoder's minimal intervals between consecutive boundary positions.
+        lines = [[(r,c) for c in range(cols)] for r in range(rows)] + [[(r,c) for r in range(rows)] for c in range(cols)]
+        for line in lines:
+            previous, segments = None, 0
+            for r,c in line:
+                if (r,c) in black:
+                    previous, segments = None, 0
+                else:
+                    label = rule.rooms[r][c]
+                    if label != previous:
+                        segments += 1
+                    if segments >= 3:
+                        return False
+                    previous = label
         return True
     row_lines = [bits[r*cols:(r+1)*cols] for r in range(rows)]
     col_lines = [bits[c::cols] for c in range(cols)]
