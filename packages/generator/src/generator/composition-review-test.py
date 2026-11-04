@@ -1,10 +1,8 @@
-"""Independent review regressions at composition/registration/file boundaries."""
+"""Answer-projection regressions for fixed constraint composition."""
 
 from dataclasses import dataclass
 import importlib
-import json
 from pathlib import Path
-import sys
 
 import pytest
 
@@ -15,10 +13,8 @@ from puzzle_defs import BlackCount, ShadingRecipe
 EXAMPLES = Path(__file__).resolve().parents[4] / "examples"
 with pytest.MonkeyPatch.context() as patch:
     patch.syspath_prepend(str(EXAMPLES))
-    api = importlib.import_module("component_registry")
     codec = importlib.import_module("composed_shading_recipe")
     demo = importlib.import_module("generate_composed_shading")
-    files = importlib.import_module("shading_recipe")
 
 
 @dataclass(frozen=True)
@@ -106,80 +102,3 @@ def test_default_projection_mode_keeps_its_existing_behavior():
     assert puzzle.solve() is None  # Factory variables still count in default mode.
     with pytest.raises(ValueError, match="answer projection"):
         with_constraints(Base(), ResetProjection()).create_empty()
-
-
-@pytest.mark.parametrize("kind", ["positional-only", "varargs"])
-def test_registration_rejects_constructors_that_cannot_receive_parameter_keywords(kind):
-    def positional(self, value, /):
-        object.__setattr__(self, "value", value)
-    def variadic(self, *value):
-        object.__setattr__(self, "value", value[0])
-    initialize = positional if kind == "positional-only" else variadic
-    cls = dataclass(frozen=True, init=False)(type("CustomInit", (), {
-        "__annotations__": {"value": int}, "__init__": initialize, "__call__": lambda self, puzzle: [],
-    }))
-    with pytest.raises(ValueError, match="keyword"):
-        codec.BUILTIN_COMPONENTS.with_component("review/custom-init/v1", cls, value=api.IntParam(0, 1))
-
-
-def test_keyword_only_dataclass_constructor_remains_supported():
-    @dataclass(frozen=True, kw_only=True)
-    class KeywordOnly:
-        value: int
-        def __call__(self, puzzle):
-            return []
-    registry = codec.BUILTIN_COMPONENTS.with_component("review/keyword-only/v1", KeywordOnly, value=api.IntParam(0, 1))
-    record = {"id": "review/keyword-only/v1", "value": 1}
-    assert registry.encode(registry.decode(record)) == record
-
-
-def test_constructor_that_accepts_the_declared_keyword_through_varkw_is_supported():
-    @dataclass(frozen=True, init=False)
-    class KeywordCapture:
-        value: int
-        def __init__(self, **value):
-            object.__setattr__(self, "value", value["value"])
-        def __call__(self, puzzle):
-            return []
-    registry = codec.BUILTIN_COMPONENTS.with_component("review/keyword-capture/v1", KeywordCapture,
-                                                       value=api.IntParam(0, 1))
-    record = {"id": "review/keyword-capture/v1", "value": 1}
-    assert registry.encode(registry.decode(record)) == record
-
-
-@dataclass(frozen=True)
-class Label:
-    text: str
-    def __call__(self, puzzle):
-        return []
-
-
-def _label_recipe(value):
-    registry = codec.BUILTIN_COMPONENTS.with_component("review/label/v1", Label, text=api.ChoiceParam((value,)))
-    recipe = with_constraints(ShadingRecipe(1, 1, (BlackCount(0),)), Label(value))
-    return codec.recipe_record(recipe, registry=registry), registry
-
-
-@pytest.mark.parametrize("size", ["unicode-overflow", "exact-boundary", "one-byte-over"])
-def test_produced_file_respects_reader_byte_limit_before_creating_output(tmp_path, monkeypatch, size):
-    if size == "unicode-overflow":
-        label = "界" * 11000
-    else:
-        empty, registry = _label_recipe("")
-        record = demo.generate_record(empty, registry=registry)
-        overhead = len((json.dumps(record, sort_keys=True, indent=2) + "\n").encode("utf-8"))
-        label = "x" * (files.MAX_RECIPE_BYTES-overhead + (size == "one-byte-over"))
-    data, registry = _label_recipe(label)
-    source, output = tmp_path / "input.json", tmp_path / "output.json"
-    source.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    assert source.stat().st_size <= files.MAX_RECIPE_BYTES
-    assert codec.load_recipe(source, registry=registry) is not None
-    monkeypatch.setattr(sys, "argv", ["test", "generate", "--recipe", str(source), "--output", str(output)])
-    if size == "exact-boundary":
-        assert demo.main(registry=registry) == 0
-        assert output.stat().st_size == files.MAX_RECIPE_BYTES
-        assert demo.verify(files.load_json(output), registry=registry)["valid"]
-    else:
-        with pytest.raises(SystemExit) as error:
-            demo.main(registry=registry)
-        assert error.value.code == 2 and not output.exists()

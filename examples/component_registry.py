@@ -82,7 +82,7 @@ class ComponentRegistry:
         if any(entry not in self._entries for entry in baseline._entries):
             raise ValueError("Registry must preserve all built-in component IDs, types and parameter schemas")
 
-    def with_component(self, identifier: str, builder_type: type, **parameters: Parameter) -> ComponentRegistry:
+    def with_component(self, identifier: str, builder_type: type, /, **parameters: Parameter) -> ComponentRegistry:
         if (type(identifier) is not str
                 or re.fullmatch(r"[a-z][a-z0-9-]*(?:/[a-z][a-z0-9-]*)*/v[1-9][0-9]*", identifier) is None):
             raise ValueError("Component ID must be a lowercase path ending in /vN, for example acme/row-band/v1")
@@ -106,7 +106,7 @@ class ComponentRegistry:
             raise ValueError("Component constructor must accept parameter fields as keywords") from exc
         if any(type(p) not in (IntParam, ChoiceParam, BoolParam) for p in parameters.values()):
             raise ValueError("Use only IntParam, ChoiceParam or BoolParam validators")
-        entry = _Entry(identifier, builder_type, tuple(parameters.items()))
+        entry = _Entry(identifier, builder_type, tuple((f.name, parameters[f.name]) for f in declared))
         extended = ComponentRegistry()
         object.__setattr__(extended, "_entries", (*self._entries, entry))
         return extended
