@@ -1,0 +1,14 @@
+{
+  "format": "puzzle-box/composed-shading-recipe-v1",
+  "base": {
+    "format": "puzzle-box/shading-recipe-v1",
+    "rows": 2,
+    "cols": 3,
+    "rules": [{"type": "connected-white", "nonempty": true}],
+    "clue_kinds": ["cell", "row-count", "column-count"]
+  },
+  "components": [
+    {"id": "cell-count/v1", "color": "black", "count": 2},
+    {"id": "example/row-black-band/v1", "minimum": 0, "maximum": 1}
+  ]
+}
