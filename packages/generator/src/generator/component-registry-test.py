@@ -107,6 +107,19 @@ def test_extensions_are_explicit_immutable_and_do_not_change_builtins():
         codec.recipe_record(with_constraints(ShadingRecipe(1, 1, ()), custom.RowBlackBand(0, 1)))
 
 
+def test_saved_custom_rule_is_necessary_for_a_concrete_two_clue_problem():
+    record = {"format": demo.FORMAT, "recipe": _record(), "seed": 0,
+              "clues": [{"type": "cell", "row": 0, "col": 0, "value": 1},
+                        {"type": "column-count", "col": 2, "count": 1}],
+              "solution": [[1, 0, 0], [0, 0, 1]]}
+    assert demo.verify(record, registry=custom.COMPONENTS)["unique"]
+    record["recipe"]["components"].pop()
+    # Without RowBlackBand, #.#/... is a second answer. This is a logical
+    # witness, independent of which clues a seeded generator happens to retain.
+    with pytest.raises(ValueError, match="not uniquely"):
+        demo.verify(record, registry=custom.COMPONENTS)
+
+
 def test_application_rejects_missing_replaced_or_weakened_builtin_schemas():
     empty = api.ComponentRegistry()
     replaced = empty.with_component("cell-count/v1", custom.RowBlackBand,
