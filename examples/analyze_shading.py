@@ -12,7 +12,7 @@ import ortools
 
 from puzzle import Cell
 from puzzle_defs import (BlackCount, ColumnCountClue, ConnectedWhite, NonTouchingBlack,
-                         NoWhite2x2, RowCountClue, ShadingRecipe)
+                         NoWhite2x2, RowCountClue, ShadingPuzzle, ShadingRecipe)
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 
@@ -59,19 +59,25 @@ def full_clues(recipe: ShadingRecipe, bits: Bits) -> tuple[Clue, ...]:
     return tuple(clues)
 
 
-def analyze(recipe: ShadingRecipe, *, seed_start: int = 0, seed_count: int = 0) -> dict[str, Any]:
+def finite_space(recipe: ShadingRecipe) -> tuple[ShadingPuzzle, list[Bits], list[set[int]]]:
+    """Validate once and cache which finite boards satisfy each rule occurrence."""
     if recipe.rows * recipe.cols > 9 or len(recipe.rules) > 8:
         raise ValueError("Diagnostics support at most 9 cells and 8 rule occurrences")
     if any(type(rule) not in BUILT_INS for rule in recipe.rules):
         raise ValueError("Diagnostics support exact built-in rule types only, not custom rules or subclasses")
-    if (type(seed_count) is not int or not 0 <= seed_count <= 32
-            or type(seed_start) is not int or not 0 <= seed_start <= 2**31 - max(seed_count, 1)):
-        raise ValueError("Use 0..32 seeds, all between 0 and 2147483647")
     # Validate the recipe with the real builder, including count <= area.
     puzzle = recipe.create_empty()
     boards = list(product([0, 1], repeat=recipe.rows * recipe.cols))
     masks = [{i for i, bits in enumerate(boards) if accepts(rule, bits, recipe.rows, recipe.cols)}
              for rule in recipe.rules]
+    return puzzle, boards, masks
+
+
+def analyze(recipe: ShadingRecipe, *, seed_start: int = 0, seed_count: int = 0) -> dict[str, Any]:
+    puzzle, boards, masks = finite_space(recipe)
+    if (type(seed_count) is not int or not 0 <= seed_count <= 32
+            or type(seed_start) is not int or not 0 <= seed_start <= 2**31 - max(seed_count, 1)):
+        raise ValueError("Use 0..32 seeds, all between 0 and 2147483647")
 
     def allowed(indices: Iterable[int]) -> set[int]:
         result = set(range(len(boards)))
