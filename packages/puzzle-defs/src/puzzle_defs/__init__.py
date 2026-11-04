@@ -41,8 +41,10 @@ from puzzle_defs.puzzles.component_shapes import RectangularComponents, NonRecta
 from puzzle_defs.puzzles.number_fragments import DistinctWhiteNumbers
 from puzzle_defs.puzzles.component_size import ColorComponentSize
 from puzzle_defs.puzzles.room_shapes import NoTouchingEqualTetrominoes
+from puzzle_defs.puzzles.white_visibility import WhiteVisibilityCounts
 
 __all__ = [
+    "WhiteVisibilityCounts",
     "NoTouchingEqualTetrominoes",
     "ColorComponentSize",
     "RoomRotationalSymmetry",

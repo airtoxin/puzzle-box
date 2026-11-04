@@ -6,7 +6,7 @@ const hints = new Map();
 // Capabilities of these renderers, independent of what a newer server declares.
 const renderers = {
   shading: {topology: 'rectangular-cells', maxCells: 9, minSide: 1, required: ['answer'],
-    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers'}},
+    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts'}},
   slitherlink: {topology: 'rectangular-cells', maxCells: 4, minSide: 1, required: ['answer'],
     channels: {answer: 'binary-edges', 'cell-counts': 'cell-edge-counts', 'edge-givens': 'edge-givens'}},
   coupled: {topology: 'rectangular-cell-centers', maxCells: 9, minSide: 2, required: ['answer-cells', 'answer-edges'],
@@ -55,6 +55,12 @@ function assertRenderablePlan(candidate, request) {
     const shown = JSON.stringify(checkedGrid(candidate.numbers, candidate.rows, candidate.cols, 99));
     if (requestedNumbers.some(numbers => JSON.stringify(checkedGrid(numbers, candidate.rows, candidate.cols, 99)) !== shown)) throw new UnsupportedUiError();
   }
+  const requestedCounts = request.rules.filter(r => Object.hasOwn(r.parameters, 'counts')).map(r => r.parameters.counts);
+  if (seen.has('sight-counts') !== (requestedCounts.length > 0) || !seen.has('sight-counts') && candidate.sight_counts !== undefined) throw new UnsupportedUiError();
+  if (seen.has('sight-counts')) {
+    const shown = JSON.stringify(checkedGrid(candidate.sight_counts, candidate.rows, candidate.cols, 99));
+    if (requestedCounts.some(counts => JSON.stringify(checkedGrid(counts, candidate.rows, candidate.cols, 99)) !== shown)) throw new UnsupportedUiError();
+  }
 }
 function rejectUnsupportedUi() {
   plan = undefined; clearArtifact(); $('board').replaceChildren(); $('generate').disabled = true;
@@ -84,7 +90,7 @@ function readRequest() {
 function readGrid(field) {
   const rows = field.value.trim().split(/\r?\n/).map(row => row.trim().split(/\s+/));
   if (field.value.length > 512 || rows.some(row => row.some(n => !/^\d+$/.test(n))))
-    throw new GridInputError(`${field.dataset.kind === 'region-map' ? '部屋配置' : '固定数字'}は、各行に整数を空白で区切って入力してください。`);
+    throw new GridInputError(`${field.dataset.label}は、各行に整数を空白で区切って入力してください。`);
   return rows.map(row => row.map(Number));
 }
 async function post(path, data) {
@@ -164,7 +170,7 @@ function renderBoard(reveal = false) {
     }
     for (let c = 0; c < plan.cols; c++) {
       const index = r * plan.cols + c;
-      const value = reveal ? artifact.record.solution[r][c] : artifact ? input[index] : -1;
+      const value = reveal ? artifact.record.solution[r][c] : artifact ? input[index] : plan.sight_counts?.[r][c] > 0 ? 0 : -1;
       const td = node('td'); td.append(cellButton(index, r, c, value, reveal));
       if (channels.has('rooms')) {
         const room = plan.rooms[r][c]; td.dataset.room = room;
@@ -184,12 +190,17 @@ function cellButton(index, r, c, value, reveal) {
   if (fixed.has(index) && artifact) button.classList.add('fixed');
   const paint = value => {
     const mark = value === -1 ? '?' : value === 0 ? '○' : '■';
-    if (plan.numbers) {
+    const sight = plan.sight_counts?.[r][c] || 0;
+    if (plan.numbers || sight) {
       button.classList.add('numbered-cell');
-      button.replaceChildren(node('span', String(plan.numbers[r][c]), 'cell-number'), node('span', mark, 'cell-mark'));
+      const labels = [];
+      if (plan.numbers) labels.push(node('span', String(plan.numbers[r][c]), 'cell-number'));
+      if (sight) labels.push(node('span', String(sight), 'sight-number'));
+      if (plan.numbers && sight) button.classList.add('dual-numbered');
+      button.replaceChildren(...labels, node('span', mark, 'cell-mark'));
     } else button.textContent = mark;
     button.dataset.value = value;
-    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
+    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${sight ? `（見える白${sight}）` : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
   };
   paint(value);
   button.addEventListener('click', () => {
@@ -209,13 +220,15 @@ function buildControls() {
     for (const spec of rule.parameters) {
       if (!['integer', 'boolean', 'region-map', 'number-grid'].includes(spec.kind)) throw new Error('Unsupported parameter kind');
       const grid = ['region-map', 'number-grid'].includes(spec.kind);
-      if (grid && sharedGrids.has(spec.kind)) {parameters.set(spec.name, sharedGrids.get(spec.kind)); continue;}
-      const field = document.createElement(grid ? 'textarea' : 'input'); field.dataset.kind = spec.kind;
+      // Input syntax alone does not make two data sets the same parameter.
+      const sharedKey = `${spec.kind}:${spec.name}`;
+      if (grid && sharedGrids.has(sharedKey)) {parameters.set(spec.name, sharedGrids.get(sharedKey)); continue;}
+      const field = document.createElement(grid ? 'textarea' : 'input'); field.dataset.kind = spec.kind; field.dataset.label = spec.label;
       if (!grid) field.type = spec.kind === 'boolean' ? 'checkbox' : 'number';
       if (spec.kind === 'boolean') field.checked = spec.default;
       else if (grid) {
         field.value = spec.default.map(row => row.join(' ')).join('\n'); field.rows = 3; field.maxLength = 512; field.required = true;
-        sharedGrids.set(spec.kind, field);
+        sharedGrids.set(sharedKey, field);
       }
       else {field.value = spec.default; field.min = spec.minimum; field.step = '1'; field.required = true;}
       const wrapper = node('label', spec.label, 'parameter'); wrapper.append(field); parameters.set(spec.name, field);
@@ -223,7 +236,7 @@ function buildControls() {
         const common = node('div', undefined, 'shared-parameters'); common.append(wrapper,
           node('p', spec.kind === 'region-map'
             ? '部屋を使うルールで共有します。盤面と同じ行・列数で、0以上の整数を空白区切りで入力します。各部屋は上下左右でつながる必要があります。'
-            : '盤面と同じ行・列数で、0〜99の整数を空白区切りで入力します。数字は問題に固定され、黒く塗っても表示します。'));
+            : '盤面と同じ行・列数で、0〜99の整数を空白区切りで入力します。数字は問題に固定されます。0の意味は各ルールの説明を確認してください。'));
         $('rules').prepend(common);
       } else fields.append(wrapper);
     }
@@ -332,6 +345,9 @@ form.addEventListener('submit', async event => {
       const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
       const area = plan.rows * plan.cols;
       input = Array(isCoupled() ? area + loopEdges().length : isLoop ? loopEdges().length : area).fill(-1);
+      if (plan.sight_counts) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
+        if (plan.sight_counts[r][c] > 0) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
+      }
       for (const clue of result.clues) {
         let index, value;
         if (clue.type === 'edge' && (isLoop || isCoupled())) {
