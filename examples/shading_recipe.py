@@ -64,6 +64,8 @@ def read_recipe(data: Any) -> ShadingRecipe:
 
 
 def recipe_record(recipe: ShadingRecipe) -> dict[str, Any]:
+    if type(recipe) is not ShadingRecipe:
+        raise ValueError("This format requires an exact ShadingRecipe; composed recipes and subclasses need their own codec")
     record = {"format": RECIPE_FORMAT, "rows": recipe.rows, "cols": recipe.cols,
               "rules": [rule_record(r) for r in recipe.rules], "clue_kinds": list(recipe.clue_kinds)}
     read_recipe(record)  # Enforce the same bounds for export and import.

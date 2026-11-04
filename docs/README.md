@@ -11,9 +11,12 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | セルと行・列の黒数ヒントを混ぜる | [複数のヒント形式](mixed-shading-clues.md) |
 | 保存問題を表示し、完成した解答を確認する | [端末で遊ぶ](play-shading.md) |
 | 保存JSONの形式・読込エラー・互換性を確認する | [保存問題ファイル](saved-puzzle-files.md) |
+| 限定した推論の根拠と、未解決で止まる箇所を確認する | [黒白の推論説明](shading-deductions.md) |
+| 生成した複数候補の推論による進み方を比較する | [黒白候補の推論比較](shading-deduction-comparison.md) |
 | ルールの矛盾・ヒント不足・seedによる多様性を調べる | [小盤面診断](shading-diagnostics.md) |
 | ルールの部分集合・冗長性を比較する | [黒白の組合せ探索](shading-exploration.md) |
 | 選んだレシピを保存し、生成へ渡す | [レシピの保存と読込](shading-recipe-files.md) |
+| 固定レシピを時間予算付きで生成・検証して測る | [生成ベンチマーク](generation-benchmark.md) |
 | 実際に残ったヒントでルールの必要性を調べる | [黒白の保存ヒント診断](stored-clue-rule-diagnostics.md) |
 | 辺を回答とするパズルを生成する | [Slitherlink](slitherlink-composition.md) |
 | 黒セルとループを接続して生成する | [ヤジリン](yajilin-composition.md) |

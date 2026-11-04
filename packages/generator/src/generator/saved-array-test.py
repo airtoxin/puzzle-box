@@ -63,6 +63,21 @@ def test_nonempty_object_keys_are_not_interpreted_as_enabled_hint_types(monkeypa
         _reader(_app(case, monkeypatch))(record)
 
 
+@pytest.mark.parametrize("clue,kinds", [
+    ({"type": "cell", "row": 0, "col": 0, "value": 1}, ["row-count"]),
+    ({"type": "row-count", "row": 0, "count": 1}, ["cell"]),
+    ({"type": "column-count", "col": 0, "count": 1}, ["cell"]),
+])
+def test_valid_arrays_still_reject_disabled_clue_types_before_solving(monkeypatch, clue, kinds):
+    app = _app("shading-v2", monkeypatch)
+    record = deepcopy(RECORDS["shading-v2"])
+    record.update(clues=[clue], clue_kinds=kinds)
+    monkeypatch.setattr(app.ShadingRecipe, "build_from_clues",
+                        lambda *a, **k: pytest.fail("Reject disabled clues before solving"))
+    with pytest.raises(ValueError, match="not enabled by clue_kinds"):
+        app.verify(record)
+
+
 @pytest.mark.parametrize("case", RECORDS)
 def test_valid_arrays_and_allowed_empty_lists_keep_their_meaning(monkeypatch, case):
     record = json.loads(json.dumps(RECORDS[case]))
