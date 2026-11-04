@@ -10,7 +10,7 @@ from typing import Any
 
 import ortools
 
-from generator import generate
+from generator import InitialCluesNotUniqueError, generate
 from puzzle import Cell, unique
 from puzzle_defs import (
     BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2,
@@ -176,6 +176,8 @@ def main() -> int:
     make.add_argument("--diagonal", action="store_true", default=None)
     make.add_argument("--allow-empty-white", action="store_true", default=None)
     make.add_argument("--seed", type=int, default=42)
+    make.add_argument("--selection", choices=("solver", "finite"), default="solver",
+                      help="Starting answer: solver (default), or identifiable finite pool (at most 9 cells)")
     make.add_argument("--output", type=Path)
     make.add_argument("--quiet", action="store_true", help="Save with --output without printing the answer JSON")
     audit = commands.add_parser("verify", help="Verify a generated puzzle artifact")
@@ -223,8 +225,14 @@ def main() -> int:
                                    tuple(args.hints or ["cell"]))
         check_demo_size(recipe)
         try:
-            clues = generate(recipe, seed=args.seed)
-        except ValueError as exc:
+            if args.selection == "finite":
+                # The finite checker imports the example's clue codec. Import
+                # it only when requested, after this module is initialized.
+                from finite_shading import generate_finite
+                clues = generate_finite(recipe, seed=args.seed)
+            else:
+                clues = generate(recipe, seed=args.seed)
+        except InitialCluesNotUniqueError as exc:
             if "cell" not in recipe.clue_kinds:
                 hint = "the recipe clue_kinds" if args.recipe is not None else "--hints"
                 raise ValueError(f"{exc}. For ambiguous count clues, include cell in {hint} "
@@ -247,6 +255,9 @@ def main() -> int:
         }
         if not legacy:
             record["clue_kinds"] = list(recipe.clue_kinds)
+        if args.selection == "finite":
+            from finite_shading import SELECTION
+            record["environment"]["completion_selection"] = SELECTION
         encoded = json.dumps(record, indent=2, sort_keys=True) + "\n"
         if args.output is not None:
             args.output.write_text(encoded, encoding="utf-8")

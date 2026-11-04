@@ -70,7 +70,7 @@ print(puzzle.result(solution))
 | `generator` | ヒント抽出と一意性を保つ削減 | `generate`, `reduce_clues`, `GeneratablePuzzle` |
 
 構造の詳細は [ARCHITECTURE.md](ARCHITECTURE.md)、
-実装調査・課題・発展案は [プロジェクトレビュー](docs/project-review.md)、
+ルール・ヒント・回答の接続は [合成の設計](docs/composition-design.md)、
 生成器の契約と使い方は [生成レシピ](docs/generation.md)を参照してください。
 
 ## ルールとヒントの組合せを診断する
@@ -100,11 +100,16 @@ uv run --no-sync python examples/explore_shading.py --rows 3 --cols 3 --black-co
 
 ```sh
 uv run --no-sync python examples/explore_shading.py --rows 3 --cols 3 --black-counts 3 --candidates count non-touching --hints cell row-count column-count --explain 1 2 --export-recipe chosen.json
-uv run --no-sync python examples/generate_shading.py generate --recipe chosen.json --seed 6 --output puzzle.json
+uv run --no-sync python examples/generate_shading.py generate --recipe chosen.json --seed 6 --output puzzle.json --quiet
+uv run --no-sync python examples/generate_shading.py show puzzle.json
 uv run --no-sync python examples/generate_shading.py verify puzzle.json
 ```
 
 設定・問題・探索レポートの区別、入力検証、再現性は [レシピの保存と読込](docs/shading-recipe-files.md) を参照してください。
+
+探索で出題可能な完成解が見つかっても、通常生成が曖昧な別の完成解を選ぶことがあります。
+黒白4ルール・9セル以下なら `generate --selection finite` で、一意に出題できる候補を先に列挙して選べます。
+[選定から生成・表示・検証までの実例](docs/finite-shading-generation.md)に、行ヒントだけで出題する手順と限界をまとめています。
 
 ## 保存した問題でルールを診断する
 
@@ -134,7 +139,7 @@ CI は Ubuntu / Windows、Python 3.12 / 3.13 で同じテスト・型検査・�
 
 生成結果は一意性と1ヒントずつの削除に対する既約性を確認します。
 最少ヒント数、均一なランダム分布、人間にとっての面白さは保証しません。
-現状と修正中の既知の制限はプロジェクトレビューに整理しています。
+機能ごとの仕様・実行手順・制限は [ドキュメント一覧](docs/README.md)から参照できます。
 
 ## 辺に描くループでも試す
 
@@ -149,6 +154,7 @@ uv run --no-sync python examples/generate_slitherlink.py verify loop.json
 
 数字だけでは2解になる反例、API、合成できる範囲と未対応の接続は
 [ループのレシピ](docs/slitherlink-composition.md)を参照してください。
+表示したテンプレートから完成した辺を入力し、[解答の正誤確認](docs/play-slitherlink.md)もできます。
 
 ## 黒マスとループを同時に生成する
 
@@ -162,3 +168,4 @@ uv run --no-sync python examples/generate_yajilin.py verify examples/yajilin-sam
 
 [異種合成の例](docs/yajilin-composition.md)に、生成方法、数字を消しても残す矢印マス、
 黒白が同じでも2種類のループになる反例、合成の限界をまとめています。
+生成した問題はヒントだけを表示し、[黒マスと線を入力して正誤確認](docs/play-yajilin.md)できます。
