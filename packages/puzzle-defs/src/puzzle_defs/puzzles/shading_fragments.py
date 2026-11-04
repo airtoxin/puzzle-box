@@ -8,6 +8,16 @@ from puzzle import Puzzle, SquareGrid, VarMap, at_least_one, connected, sum_expr
 from puzzle_defs.ui import RuleUi, UiParameter
 
 
+def _limit_runs(puzzle: Puzzle, board: SquareGrid, black: VarMap, maximum: int) -> None:
+    if maximum >= max(len(board.rows()), len(board.cols())):
+        return  # Also keeps arbitrarily large, redundant limits out of CP-SAT bounds.
+    for shape in ((1, maximum + 1), (maximum + 1, 1)):
+        for window in board.windows(*shape):
+            count = sum_expr(black[c] for c in window)
+            puzzle.add(count >= 1)
+            puzzle.add(count <= maximum)
+
+
 @dataclass(frozen=True)
 class ConnectedBlack:
     """Black cells form one orthogonal component; empty is opt-in."""
@@ -64,11 +74,24 @@ class NoThreeConsecutive:
         "各行・列で黒または白が3マス連続しないようにします。斜めは対象外です。")
 
     def apply(self, puzzle: Puzzle, board: SquareGrid, black: VarMap) -> None:
-        for shape in ((1, 3), (3, 1)):
-            for window in board.windows(*shape):
-                count = sum_expr(black[c] for c in window)
-                puzzle.add(count >= 1)
-                puzzle.add(count <= 2)
+        _limit_runs(puzzle, board, black, 2)
+
+
+@dataclass(frozen=True)
+class RunLengthLimit:
+    """Both colors have horizontal/vertical runs of at most max_length cells."""
+
+    ui: ClassVar[RuleUi] = RuleUi("run-length-limit", "同色の連続長に上限を付ける",
+        "黒・白それぞれの横・縦の連続長を制限します。斜めや曲がる経路は数えません。",
+        (UiParameter("max_length", "同色の最大連続長", "integer", 3, minimum=1, maximum=25),))
+    max_length: int = 3
+
+    def __post_init__(self) -> None:
+        if type(self.max_length) is not int or self.max_length < 1:
+            raise ValueError("max_length must be a positive integer")
+
+    def apply(self, puzzle: Puzzle, board: SquareGrid, black: VarMap) -> None:
+        _limit_runs(puzzle, board, black, self.max_length)
 
 
 @dataclass(frozen=True)

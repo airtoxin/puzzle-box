@@ -2,7 +2,7 @@
 
 import argparse
 from collections.abc import Iterable
-from itertools import combinations, product
+from itertools import combinations, product, groupby
 import json
 from pathlib import Path
 import platform
@@ -18,6 +18,7 @@ from puzzle_defs import (BlackCount, ColumnCountClue, ConnectedWhite, NonTouchin
 from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms
 from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
+from puzzle_defs import RunLengthLimit
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -103,6 +104,9 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
         return True
     row_lines = [bits[r*cols:(r+1)*cols] for r in range(rows)]
     col_lines = [bits[c::cols] for c in range(cols)]
+    if type(rule) is RunLengthLimit:
+        return all(sum(1 for _ in group) <= rule.max_length
+                   for line in row_lines + col_lines for _,group in groupby(line))
     if type(rule) is NoThreeConsecutive:
         return all(len(set(line[i:i+3])) > 1 for line in row_lines + col_lines for i in range(len(line)-2))
     if type(rule) is BalancedLines:
