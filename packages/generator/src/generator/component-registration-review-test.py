@@ -127,3 +127,34 @@ def test_equivalent_builtin_schemas_in_different_keyword_order_round_trip_and_ge
     assert codec.recipe_record(restored, registry=registry) == data
     puzzle = demo.generate_record(data, seed=0, registry=registry)
     assert demo.verify(puzzle, registry=registry)["valid"]
+
+
+def test_multiple_fields_can_be_received_by_a_differently_named_keyword_capture():
+    @dataclass(frozen=True, init=False)
+    class KeywordBand:
+        minimum: int
+        maximum: int
+        def __init__(self, **kwargs):
+            object.__setattr__(self, "minimum", kwargs["minimum"])
+            object.__setattr__(self, "maximum", kwargs["maximum"])
+        def __call__(self, puzzle):
+            return []
+    registry = codec.BUILTIN_COMPONENTS.with_component(
+        "review/keyword-band/v1", KeywordBand, minimum=api.IntParam(0, 2), maximum=api.IntParam(0, 2))
+    record = {"id": "review/keyword-band/v1", "minimum": 0, "maximum": 2}
+    assert registry.encode(registry.decode(record)) == record
+    for invalid in (dict(record, extra=1), {k: v for k, v in record.items() if k != "maximum"}):
+        with pytest.raises(ValueError, match="fields"):
+            registry.decode(invalid)
+
+
+def test_keyword_capture_does_not_allow_an_extra_named_constructor_parameter():
+    @dataclass(frozen=True, init=False)
+    class ExtraParameter:
+        value: int
+        def __init__(self, hidden=1, **kwargs):
+            object.__setattr__(self, "value", kwargs["value"])
+        def __call__(self, puzzle):
+            return []
+    with pytest.raises(ValueError, match="fields"):
+        codec.BUILTIN_COMPONENTS.with_component("review/extra-parameter/v1", ExtraParameter, value=api.IntParam(0, 1))
