@@ -7,6 +7,8 @@ from ortools.sat.python import cp_model
 from puzzle.grid import Cell
 
 
+# Package-internal helpers shared by expression construction and Puzzle's
+# constraint compilation. They are not part of the public puzzle DSL API.
 def _check_same_model(
     variables: Iterable[cp_model.IntVar], model: cp_model.CpModel | None = None
 ) -> None:
