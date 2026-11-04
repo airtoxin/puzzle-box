@@ -25,6 +25,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 部屋の単色と同色の輪なしを組み合わせる | [部屋の単色と森](room-uniform-forest.md) |
 | 部屋を下から水平に満たし、行列の黒数を付ける | [Aquarium 型の水位](room-fill-levels.md) |
 | 部屋をまたぐ接触と隣接部屋の個数を組み合わせる | [島国型の部屋間条件](room-neighbors.md) |
+| 部屋内の成分数と成分の面積を組み合わせる | [ぬりツイン型の部屋内成分](room-components.md) |
 | 長方形成分などを辺・角でつなぐ | [8近傍の連結](corner-connected-color.md) |
 | 同色の連続する長さを制限する | [連続長の上限](run-length.md) |
 | 黒・白の各連結成分を同じサイズにする | [固定成分サイズ](component-size.md) |

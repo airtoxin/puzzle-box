@@ -21,6 +21,7 @@ from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
 from puzzle_defs import NoColorAcrossRooms, AdjacentRoomCountsDiffer
+from puzzle_defs import RoomComponentCount, EqualRoomComponentSizes
 from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
 from puzzle_defs.marker_layout import DEFAULT_ENDPOINT_MARKERS, MarkerGrid, marker_grid
 from puzzle_defs.run_clue_layout import DEFAULT_BLACK_RUN_CLUES, RunClueGrid, run_clue_grid
@@ -47,7 +48,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
                       AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues, WhiteEndpointMarkers, AdjacentBlackRuns, RoomFillLevels,
-                      NoColorAcrossRooms, AdjacentRoomCountsDiffer)
+                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -79,13 +80,17 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "room-fill-levels": RoomFillLevels(DEFAULT_ROOMS),
             "no-color-across-rooms": NoColorAcrossRooms(DEFAULT_ROOMS),
             "adjacent-room-counts-differ": AdjacentRoomCountsDiffer(DEFAULT_ROOMS),
+            "room-component-count": RoomComponentCount(DEFAULT_ROOMS),
+            "equal-room-component-sizes": EqualRoomComponentSizes(DEFAULT_ROOMS),
             "adjacent-black-component-sum": AdjacentBlackComponentSum(DEFAULT_COMPONENT_COUNTS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
 def rule_record(rule: ShadingRule) -> dict[str, Any]:
     # A subclass may change apply(); serializing only its parent would lose rules.
-    if type(rule) is RoomFillLevels or type(rule) is NoColorAcrossRooms or type(rule) is AdjacentRoomCountsDiffer:
+    if type(rule) is RoomComponentCount:
+        return {"type":rule.ui.identifier,"rooms":[list(row) for row in rule.rooms],"count":rule.count,"black":rule.black}
+    if type(rule) is RoomFillLevels or type(rule) is NoColorAcrossRooms or type(rule) is AdjacentRoomCountsDiffer or type(rule) is EqualRoomComponentSizes:
         return {"type": rule.ui.identifier, "rooms": [list(row) for row in rule.rooms], "black": rule.black}
     if type(rule) is BlackCount:
         return {"type": "count", "count": rule.count}
@@ -175,12 +180,17 @@ def read_rule(data: Any) -> ShadingRule:
         return AcyclicColor(data["black"])
     if kind == "components-touch-border" and set(data) == {"type", "black"}:
         return ComponentsTouchBorder(data["black"])
-    if kind in ("room-fill-levels","no-color-across-rooms","adjacent-room-counts-differ"):
+    if kind == "room-component-count":
+        if (set(data) != {"type","rooms","count","black"} or type(data["rooms"]) is not list
+                or any(type(row) is not list for row in data["rooms"])):
+            raise ValueError("Room component count requires rooms, count and color")
+        return RoomComponentCount(room_map(data["rooms"]),data["count"],data["black"])
+    if kind in ("room-fill-levels","no-color-across-rooms","adjacent-room-counts-differ","equal-room-component-sizes"):
         if (set(data) != {"type", "rooms", "black"} or type(data["rooms"]) is not list
                 or any(type(row) is not list for row in data["rooms"])):
             raise ValueError("This room rule requires rooms and a color")
         constructor = {"room-fill-levels":RoomFillLevels,"no-color-across-rooms":NoColorAcrossRooms,
-                       "adjacent-room-counts-differ":AdjacentRoomCountsDiffer}[kind]
+                       "adjacent-room-counts-differ":AdjacentRoomCountsDiffer,"equal-room-component-sizes":EqualRoomComponentSizes}[kind]
         return constructor(room_map(data["rooms"]), data["black"])
     if kind in ("no-white-across-three-rooms","room-rotational-symmetry","no-touching-equal-tetrominoes","uniform-rooms"):
         if (set(data) != {"type", "rooms"} or type(data["rooms"]) is not list
@@ -247,7 +257,8 @@ def shared_rooms(recipe: ShadingRecipe) -> RoomMap | None:
                if type(rule) is RoomBlackCount or type(rule) is RoomConnectedBlack
                or type(rule) is NoWhiteAcrossThreeRooms or type(rule) is RoomRotationalSymmetry
                or type(rule) is NoTouchingEqualTetrominoes or type(rule) is UniformRooms or type(rule) is RoomFillLevels
-               or type(rule) is NoColorAcrossRooms or type(rule) is AdjacentRoomCountsDiffer]
+               or type(rule) is NoColorAcrossRooms or type(rule) is AdjacentRoomCountsDiffer
+               or type(rule) is RoomComponentCount or type(rule) is EqualRoomComponentSizes]
     for layout in layouts:
         room_map(layout, rows=recipe.rows, cols=recipe.cols)
     if layouts and any(layout != layouts[0] for layout in layouts):
