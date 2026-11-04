@@ -35,7 +35,7 @@ jobs:
       - name: Install locked workspace
         run: uv sync --all-packages --group dev --locked
       - name: Test
-        run: uv run --no-sync python -m pytest -q
+        run: uv run --no-sync python -m pytest -q --durations=10
       - name: Type check
         run: uv run --no-sync pyright
       - name: Build distributions
