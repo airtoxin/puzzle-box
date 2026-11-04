@@ -14,6 +14,7 @@ from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs import WhiteVisibilityCounts
+from puzzle_defs import ComponentsTouchBorder
 from puzzle_defs.puzzles.white_visibility import DEFAULT_SIGHT_COUNTS
 from puzzle_defs.puzzles.component_size import MAX_COMPONENT_CELLS
 from puzzle_defs.number_layout import DEFAULT_NUMBERS, NumberGrid, number_grid
@@ -30,7 +31,8 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
                       RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
-                      RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts)
+                      RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
+                      ComponentsTouchBorder)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -50,6 +52,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "color-component-size": ColorComponentSize(3),
             "no-touching-equal-tetrominoes": NoTouchingEqualTetrominoes(DEFAULT_ROOMS),
             "white-visibility-counts": WhiteVisibilityCounts(DEFAULT_SIGHT_COUNTS),
+            "components-touch-border": ComponentsTouchBorder(),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -79,6 +82,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "max_length": rule.max_length}
     if type(rule) is ColorComponentSize:
         return {"type": rule.ui.identifier, "size": rule.size, "black": rule.black}
+    if type(rule) is ComponentsTouchBorder:
+        return {"type": rule.ui.identifier, "black": rule.black}
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         return {"type": rule.ui.identifier, "black": rule.black}
     for kind in PARAMETERLESS_RULE_TYPES:
@@ -113,6 +118,8 @@ def read_rule(data: Any) -> ShadingRule:
         return RunLengthLimit(data["max_length"])
     if kind == "color-component-size" and set(data) == {"type","size","black"}:
         return ColorComponentSize(data["size"],data["black"])
+    if kind == "components-touch-border" and set(data) == {"type", "black"}:
+        return ComponentsTouchBorder(data["black"])
     if kind in ("no-white-across-three-rooms","room-rotational-symmetry","no-touching-equal-tetrominoes"):
         if (set(data) != {"type", "rooms"} or type(data["rooms"]) is not list
                 or any(type(row) is not list for row in data["rooms"])):

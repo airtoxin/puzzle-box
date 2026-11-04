@@ -25,6 +25,7 @@ from puzzle_defs import (
     ColorComponentSize,
     NoTouchingEqualTetrominoes,
     WhiteVisibilityCounts,
+    ComponentsTouchBorder,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -204,6 +205,9 @@ def _rule_text(rule: ShadingRule) -> str:
         return "No row or column contains equal fixed numbers on two white cells."
     if type(rule) is WhiteVisibilityCounts:
         return "Positive sight counts require white cells and count visible white cells in four straight directions, including themselves once, stopping before black cells or the border; zero is no requirement."
+    if type(rule) is ComponentsTouchBorder:
+        color = "black" if rule.black else "white"
+        return f"Every edge-connected {color} component reaches the board boundary through {color} cells; separate border components and absence of {color} cells are allowed."
     if type(rule) is RunLengthLimit:
         return f"Each horizontal or vertical run of black or white cells has length at most {rule.max_length}."
     if type(rule) is RoomRotationalSymmetry:

@@ -1,0 +1,11 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 3,
+  "cols": 3,
+  "rules": [
+    {"type": "white-visibility-counts", "counts": [[5, 3, 5], [0, 0, 0], [0, 0, 0]]},
+    {"type": "connected-white", "nonempty": true},
+    {"type": "components-touch-border", "black": true}
+  ],
+  "clue_kinds": ["cell"]
+}

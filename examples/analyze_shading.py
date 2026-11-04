@@ -23,6 +23,7 @@ from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs import WhiteVisibilityCounts
+from puzzle_defs import ComponentsTouchBorder
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -51,6 +52,9 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is ComponentsTouchBorder:
+        chosen = black if rule.black else {(r,c) for r in range(rows) for c in range(cols)} - black
+        return all(any(r in (0,rows-1) or c in (0,cols-1) for r,c in group) for group in _components(chosen))
     if type(rule) is WhiteVisibilityCounts:
         for r in range(rows):
             for c in range(cols):

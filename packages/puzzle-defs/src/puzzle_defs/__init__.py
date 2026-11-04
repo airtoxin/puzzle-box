@@ -42,8 +42,10 @@ from puzzle_defs.puzzles.number_fragments import DistinctWhiteNumbers
 from puzzle_defs.puzzles.component_size import ColorComponentSize
 from puzzle_defs.puzzles.room_shapes import NoTouchingEqualTetrominoes
 from puzzle_defs.puzzles.white_visibility import WhiteVisibilityCounts
+from puzzle_defs.puzzles.component_border import ComponentsTouchBorder
 
 __all__ = [
+    "ComponentsTouchBorder",
     "WhiteVisibilityCounts",
     "NoTouchingEqualTetrominoes",
     "ColorComponentSize",
