@@ -81,7 +81,7 @@ def test_per_instance_lock_is_shared_by_generate_and_check_and_released_on_timeo
     assert call("generate")[1]["status"] == "timeout" and not hosted.JOB_LOCK.locked()
 
 
-@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border", "island-areas", "neighbor-counts", "cell-path", "component-sum", "room-forest", "corner-connected", "white-area-clues", "white-endpoints", "numbered-endpoints"])
+@pytest.mark.parametrize("rule_group", ["basic", "rooms", "component-shapes", "room-runs", "numbers", "run-length", "room-symmetry", "component-size", "tetromino-contact", "white-visibility", "component-border", "island-areas", "neighbor-counts", "cell-path", "component-sum", "room-forest", "corner-connected", "white-area-clues", "white-endpoints", "numbered-endpoints", "black-runs"])
 def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, rule_group):
     output = tmp_path / "artifact"
     payload = prepare.export(output)
@@ -169,6 +169,11 @@ print('artifact generation passed')
         data["rules"] = [{"id": "connected-black", "parameters": {"nonempty": True}},
                          {"id": "color-degree-range", "parameters": {"minimum": 1, "maximum": 2, "black": True}},
                          {"id": "color-endpoint-count", "parameters": {"count": 2, "black": True}}]
+    elif rule_group == "black-runs":
+        data["rows"],data["cols"] = 3,3
+        data["rules"] = [{"id": "adjacent-black-runs", "parameters": {"run_clues": [[None,[1,2],None],[None,[6],None],[None,None,None]]}},
+                         {"id": "connected-black", "parameters": {"nonempty": True}},
+                         {"id": "no-black-2x2", "parameters": {}}]
     elif rule_group == "numbered-endpoints":
         data["rules"] = [{"id": "white-endpoint-markers", "parameters": {"markers": [[1,0,0],[0,0,1]]}},
                          {"id": "white-visibility-counts", "parameters": {"counts": [[3,0,0],[0,0,2]]}},

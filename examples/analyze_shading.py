@@ -29,7 +29,7 @@ from puzzle_defs import AdjacentBlackCounts
 from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor
-from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers
+from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -58,6 +58,31 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is AdjacentBlackRuns:
+        for r in range(rows):
+            for c in range(cols):
+                clue = rule.run_clues[r][c]
+                if clue is None:
+                    continue
+                if (r,c) in black:
+                    return False
+                # Build components of occupied positions in a fixed eight-cycle,
+                # including outside positions as unoccupied separating gaps.
+                coords = [(r-1,c),(r-1,c+1),(r,c+1),(r+1,c+1),(r+1,c),(r+1,c-1),(r,c-1),(r-1,c-1)]
+                remaining = {i for i,p in enumerate(coords) if p in black}
+                sizes = []
+                while remaining:
+                    pending,group = [min(remaining)],set()
+                    while pending:
+                        i = pending.pop()
+                        if i not in remaining:
+                            continue
+                        remaining.remove(i); group.add(i)
+                        pending.extend([(i-1)%8,(i+1)%8])
+                    sizes.append(len(group))
+                if tuple(sorted(sizes)) != (() if clue == (0,) else clue):
+                    return False
+        return True
     if type(rule) is WhiteEndpointMarkers:
         for r in range(rows):
             for c in range(cols):

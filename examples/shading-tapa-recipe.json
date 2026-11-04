@@ -1,0 +1,11 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 3,
+  "cols": 3,
+  "rules": [
+    {"type": "adjacent-black-runs", "run_clues": [[null, [1, 2], null], [null, [6], null], [null, null, null]]},
+    {"type": "connected-black", "nonempty": true},
+    {"type": "no-black-2x2"}
+  ],
+  "clue_kinds": ["cell"]
+}

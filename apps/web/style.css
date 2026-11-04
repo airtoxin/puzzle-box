@@ -409,3 +409,8 @@ footer {
 .endpoint-marker-board .cell {min-width:48px; min-height:48px;}
 .endpoint-length .sight-number {position:static; border:0; padding:0; font-size:1rem;}
 .endpoint-length .cell-mark {display:none;}
+
+.black-run-board .cell {min-width:72px; min-height:72px;}
+.black-run-numbered .run-number {position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:.7rem; line-height:1.2; white-space:nowrap;}
+.black-run-numbered .cell-number {position:absolute; left:50%; top:6px; transform:translateX(-50%); font-size:.75rem; line-height:1.2;}
+.black-run-numbered .cell-mark {display:none;}
