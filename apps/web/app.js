@@ -3,10 +3,11 @@ const form = $('recipe-form');
 let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, timer;
 const selected = new Map();
 const hints = new Map();
+const gridKinds = ['region-map', 'number-grid', 'clue-grid'];
 // Capabilities of these renderers, independent of what a newer server declares.
 const renderers = {
   shading: {topology: 'rectangular-cells', maxCells: 9, minSide: 1, required: ['answer'],
-    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts', 'island-areas': 'cell-island-areas'}},
+    channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts', 'island-areas': 'cell-island-areas', 'neighbor-counts': 'cell-neighbor-counts'}},
   slitherlink: {topology: 'rectangular-cells', maxCells: 4, minSide: 1, required: ['answer'],
     channels: {answer: 'binary-edges', 'cell-counts': 'cell-edge-counts', 'edge-givens': 'edge-givens'}},
   coupled: {topology: 'rectangular-cell-centers', maxCells: 9, minSide: 2, required: ['answer-cells', 'answer-edges'],
@@ -14,9 +15,9 @@ const renderers = {
 };
 class UnsupportedUiError extends Error {}
 class GridInputError extends Error {}
-function checkedGrid(value, rows, cols, maximum) {
+function checkedGrid(value, rows, cols, maximum, nullable = false) {
   if (!Array.isArray(value) || value.length !== rows || value.some(row => !Array.isArray(row)
-      || row.length !== cols || row.some(n => !Number.isInteger(n) || n < 0 || n > maximum))) throw new UnsupportedUiError();
+      || row.length !== cols || row.some(n => !(nullable && n === null) && (!Number.isInteger(n) || n < 0 || n > maximum)))) throw new UnsupportedUiError();
   return value;
 }
 function canonicalRooms(value, rows, cols) {
@@ -49,13 +50,14 @@ function assertRenderablePlan(candidate, request) {
     const shown = JSON.stringify(canonicalRooms(candidate.rooms, candidate.rows, candidate.cols));
     if (requestedRooms.some(rooms => JSON.stringify(canonicalRooms(rooms, candidate.rows, candidate.cols)) !== shown)) throw new UnsupportedUiError();
   }
-  for (const [parameter, channel, payload] of [['numbers','numbers','numbers'],
-    ['counts','sight-counts','sight_counts'], ['areas','island-areas','island_areas']]) {
+  for (const [parameter, channel, payload, maximum = 99, nullable = false] of [['numbers','numbers','numbers'],
+    ['counts','sight-counts','sight_counts'], ['areas','island-areas','island_areas'],
+    ['neighbor_counts','neighbor-counts','neighbor_counts',8,true]]) {
     const requested = request.rules.filter(r => Object.hasOwn(r.parameters, parameter)).map(r => r.parameters[parameter]);
     if (seen.has(channel) !== (requested.length > 0) || !seen.has(channel) && candidate[payload] !== undefined) throw new UnsupportedUiError();
     if (seen.has(channel)) {
-      const shown = JSON.stringify(checkedGrid(candidate[payload], candidate.rows, candidate.cols, 99));
-      if (requested.some(grid => JSON.stringify(checkedGrid(grid, candidate.rows, candidate.cols, 99)) !== shown)) throw new UnsupportedUiError();
+      const shown = JSON.stringify(checkedGrid(candidate[payload], candidate.rows, candidate.cols, maximum, nullable));
+      if (requested.some(grid => JSON.stringify(checkedGrid(grid, candidate.rows, candidate.cols, maximum, nullable)) !== shown)) throw new UnsupportedUiError();
     }
   }
 }
@@ -81,14 +83,15 @@ function readRequest() {
     seed: Number($('seed').value), budget_seconds: Number($('budget').value),
     rules: [...selected].filter(([, s]) => s.toggle.checked).map(([id, s]) => ({id,
       parameters: Object.fromEntries([...s.parameters].map(([name, field]) =>
-        [name, ['region-map', 'number-grid'].includes(field.dataset.kind) ? readGrid(field) : field.type === 'checkbox' ? field.checked : Number(field.value)]))})),
+        [name, gridKinds.includes(field.dataset.kind) ? readGrid(field) : field.type === 'checkbox' ? field.checked : Number(field.value)]))})),
     clue_kinds: [...hints].filter(([, toggle]) => toggle.checked).map(([id]) => id)};
 }
 function readGrid(field) {
   const rows = field.value.trim().split(/\r?\n/).map(row => row.trim().split(/\s+/));
-  if (field.value.length > 512 || rows.some(row => row.some(n => !/^\d+$/.test(n))))
+  const nullable = field.dataset.kind === 'clue-grid';
+  if (field.value.length > 512 || rows.some(row => row.some(n => !/^\d+$/.test(n) && !(nullable && n === '.'))))
     throw new GridInputError(`${field.dataset.label}は、各行に整数を空白で区切って入力してください。`);
-  return rows.map(row => row.map(Number));
+  return rows.map(row => row.map(n => n === '.' ? null : Number(n)));
 }
 async function post(path, data) {
   const response = await fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
@@ -106,7 +109,7 @@ function syncParameters() {
     for (const spec of rule.parameters) {
       const field = state.parameters.get(spec.name);
       field.disabled = ![...selected.values()].some(s => s.toggle.checked && [...s.parameters.values()].includes(field));
-      if (['region-map', 'number-grid'].includes(spec.kind)) field.closest('.shared-parameters').hidden = field.disabled;
+      if (gridKinds.includes(spec.kind)) field.closest('.shared-parameters').hidden = field.disabled;
       if (spec.kind === 'integer') field.max = spec.maximum === 'area' ? area : spec.maximum === 'edges' ? edges : spec.maximum;
     }
   }
@@ -127,6 +130,10 @@ async function refresh() {
     assertRenderablePlan(result.plan, request); plan = result.plan;
     $('shape').textContent = `${plan.rows} × ${plan.cols}`;
     $('plan-note').textContent = isCoupled() ? '線はマスの中心同士を結びます。黒白と辺は別々に入力し、両方の整合を確認します。' : '選択したルールとヒントが要求する盤面を表示しています。UIの適合は、問題の成立を保証しません。';
+    const numericLegend = [['numbers','中央の数字は固定ラベル'], ['sight_counts','丸数字は見える白数'],
+      ['island_areas','四角の数字は白い島の面積'], ['neighbor_counts','「隣n」は周囲の黒数（0もヒント）']]
+      .filter(([key]) => plan[key] !== undefined).map(([,text]) => text);
+    if (numericLegend.length) $('plan-note').textContent += ` ${numericLegend.join('、')}。`;
     $('status').textContent = '生成前のプレビューです。';
     renderBoard(); $('generate').disabled = false;
   } catch (error) {
@@ -147,6 +154,7 @@ function renderBoard(reveal = false) {
   }
   const table = node('table'); table.setAttribute('aria-label', artifact ? '生成した問題' : '盤面プレビュー');
   if (channels.has('rooms')) table.classList.add('room-board');
+  if (channels.has('neighbor-counts') && ['numbers','sight-counts','island-areas'].some(c => channels.has(c))) table.classList.add('multi-numeric-board');
   const values = artifact?.clues || [];
   const rowCounts = new Map(values.filter(c => c.type === 'row-count').map(c => [c.row, c.count]));
   const colCounts = new Map(values.filter(c => c.type === 'column-count').map(c => [c.col, c.count]));
@@ -167,7 +175,7 @@ function renderBoard(reveal = false) {
     }
     for (let c = 0; c < plan.cols; c++) {
       const index = r * plan.cols + c;
-      const givenWhite = plan.sight_counts?.[r][c] > 0 || plan.island_areas?.[r][c] > 0;
+      const givenWhite = plan.sight_counts?.[r][c] > 0 || plan.island_areas?.[r][c] > 0 || plan.neighbor_counts?.[r][c] != null;
       const value = reveal ? artifact.record.solution[r][c] : artifact ? input[index] : givenWhite ? 0 : -1;
       const td = node('td'); td.append(cellButton(index, r, c, value, reveal));
       if (channels.has('rooms')) {
@@ -190,18 +198,23 @@ function cellButton(index, r, c, value, reveal) {
     const mark = value === -1 ? '?' : value === 0 ? '○' : '■';
     const sight = plan.sight_counts?.[r][c] || 0;
     const area = plan.island_areas?.[r][c] || 0;
-    if (plan.numbers || sight || area) {
+    const neighbor = plan.neighbor_counts?.[r][c], hasNeighbor = neighbor != null;
+    if (plan.numbers || sight || area || hasNeighbor) {
       button.classList.add('numbered-cell');
       const labels = [];
       if (plan.numbers) labels.push(node('span', String(plan.numbers[r][c]), 'cell-number'));
       if (sight) labels.push(node('span', String(sight), 'sight-number'));
       if (area) labels.push(node('span', String(area), 'area-number'));
+      if (hasNeighbor) {
+        labels.push(node('span', `隣${neighbor}`, 'neighbor-number')); button.classList.add('neighbor-numbered');
+        if (plan.numbers || sight || area) button.classList.add('mixed-neighbor-number');
+      }
       if (plan.numbers && (sight || area)) button.classList.add('dual-numbered');
       if (sight && area) button.classList.add('mixed-numeric-givens');
       button.replaceChildren(...labels, node('span', mark, 'cell-mark'));
     } else button.textContent = mark;
     button.dataset.value = value;
-    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${sight ? `（見える白${sight}）` : ''}${area ? `（白い島の面積${area}）` : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
+    button.setAttribute('aria-label', `${r+1}行${c+1}列: ${value === -1 ? '未入力' : value === 0 ? '白' : '黒'}${plan.numbers ? `（数字${plan.numbers[r][c]}）` : ''}${sight ? `（見える白${sight}）` : ''}${area ? `（白い島の面積${area}）` : ''}${hasNeighbor ? `（隣接黒数${neighbor}）` : ''}${plan.rooms ? `（部屋${plan.rooms[r][c]+1}）` : ''}${fixed.has(index) && artifact ? '（固定ヒント）' : ''}`);
   };
   paint(value);
   button.addEventListener('click', () => {
@@ -219,8 +232,8 @@ function buildControls() {
     label.append(toggle, document.createTextNode(rule.label)); card.append(label, node('p', rule.summary));
     const parameters = new Map(), fields = node('div', undefined, 'parameters');
     for (const spec of rule.parameters) {
-      if (!['integer', 'boolean', 'region-map', 'number-grid'].includes(spec.kind)) throw new Error('Unsupported parameter kind');
-      const grid = ['region-map', 'number-grid'].includes(spec.kind);
+      if (!['integer', 'boolean', ...gridKinds].includes(spec.kind)) throw new Error('Unsupported parameter kind');
+      const grid = gridKinds.includes(spec.kind);
       // Input syntax alone does not make two data sets the same parameter.
       const sharedKey = `${spec.kind}:${spec.name}`;
       if (grid && sharedGrids.has(sharedKey)) {parameters.set(spec.name, sharedGrids.get(sharedKey)); continue;}
@@ -228,7 +241,7 @@ function buildControls() {
       if (!grid) field.type = spec.kind === 'boolean' ? 'checkbox' : 'number';
       if (spec.kind === 'boolean') field.checked = spec.default;
       else if (grid) {
-        field.value = spec.default.map(row => row.join(' ')).join('\n'); field.rows = 3; field.maxLength = 512; field.required = true;
+        field.value = spec.default.map(row => row.map(n => n === null ? '.' : n).join(' ')).join('\n'); field.rows = 3; field.maxLength = 512; field.required = true;
         sharedGrids.set(sharedKey, field);
       }
       else {field.value = spec.default; field.min = spec.minimum; field.step = '1'; field.required = true;}
@@ -237,6 +250,7 @@ function buildControls() {
         const common = node('div', undefined, 'shared-parameters'); common.append(wrapper,
           node('p', spec.kind === 'region-map'
             ? '部屋を使うルールで共有します。盤面と同じ行・列数で、0以上の整数を空白区切りで入力します。各部屋は上下左右でつながる必要があります。'
+            : spec.kind === 'clue-grid' ? '数字を空白区切りで入力します。0も数字ヒントで、数字なしは . です。数字マスは白として固定します。'
             : '盤面と同じ行・列数で、0〜99の整数を空白区切りで入力します。数字は問題に固定されます。0の意味は各ルールの説明を確認してください。'));
         $('rules').prepend(common);
       } else fields.append(wrapper);
@@ -348,6 +362,9 @@ form.addEventListener('submit', async event => {
       input = Array(isCoupled() ? area + loopEdges().length : isLoop ? loopEdges().length : area).fill(-1);
       for (const grid of [plan.sight_counts, plan.island_areas]) if (grid) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
         if (grid[r][c] > 0) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
+      }
+      if (plan.neighbor_counts) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
+        if (plan.neighbor_counts[r][c] !== null) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
       }
       for (const clue of result.clues) {
         let index, value;

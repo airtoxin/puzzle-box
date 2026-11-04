@@ -25,6 +25,7 @@ from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs import WhiteVisibilityCounts
 from puzzle_defs import ComponentsTouchBorder
 from puzzle_defs import WhiteIslandAreas
+from puzzle_defs import AdjacentBlackCounts
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -53,6 +54,16 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is AdjacentBlackCounts:
+        for r in range(rows):
+            for c in range(cols):
+                count = rule.neighbor_counts[r][c]
+                if count is None:
+                    continue
+                adjacent = sum((max(abs(r-s),abs(c-t)) if rule.diagonal else abs(r-s)+abs(c-t)) == 1 for s,t in black)
+                if (r,c) in black or adjacent != count:
+                    return False
+        return True
     if type(rule) is WhiteIslandAreas:
         numbers = {(r,c): rule.areas[r][c] for r in range(rows) for c in range(cols) if rule.areas[r][c] > 0}
         if black.intersection(numbers):

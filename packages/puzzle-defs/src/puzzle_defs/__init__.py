@@ -44,8 +44,10 @@ from puzzle_defs.puzzles.room_shapes import NoTouchingEqualTetrominoes
 from puzzle_defs.puzzles.white_visibility import WhiteVisibilityCounts
 from puzzle_defs.puzzles.component_border import ComponentsTouchBorder
 from puzzle_defs.puzzles.white_island_areas import WhiteIslandAreas
+from puzzle_defs.puzzles.adjacent_black_counts import AdjacentBlackCounts
 
 __all__ = [
+    "AdjacentBlackCounts",
     "WhiteIslandAreas",
     "ComponentsTouchBorder",
     "WhiteVisibilityCounts",

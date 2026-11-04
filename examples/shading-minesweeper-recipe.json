@@ -1,0 +1,9 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 2,
+  "cols": 3,
+  "rules": [
+    {"type": "adjacent-black-counts", "neighbor_counts": [[0, null, 1], [null, 1, null]], "diagonal": true}
+  ],
+  "clue_kinds": ["cell"]
+}

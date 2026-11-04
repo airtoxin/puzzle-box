@@ -27,12 +27,15 @@ from puzzle_defs import (
     WhiteVisibilityCounts,
     ComponentsTouchBorder,
     WhiteIslandAreas,
+    AdjacentBlackCounts,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
 from puzzle_defs.number_layout import NumberGrid
+from puzzle_defs.clue_layout import ClueGrid
 from shading_recipe import (RULES, DEFAULT_RULES, rule_choices, check_demo_size, check_distinct_paths,
-                            load_recipe, read_rule, rule_record, shared_rooms, shared_numbers, shared_sight_counts, shared_island_areas)
+                            load_recipe, read_rule, rule_record, shared_rooms, shared_numbers,
+                            shared_sight_counts, shared_island_areas, shared_neighbor_counts)
 from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/shading-v1"
@@ -68,6 +71,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     shared_numbers(recipe)
     shared_sight_counts(recipe)
     shared_island_areas(recipe)
+    shared_neighbor_counts(recipe)
     _check_clue_kinds(recipe, clues)
     legacy = recipe.clue_kinds == ("cell",)
     encoded_clues = [clue_record(clue, legacy=legacy) for clue in clues]
@@ -147,6 +151,7 @@ def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[
     shared_numbers(recipe)
     shared_sight_counts(recipe)
     shared_island_areas(recipe)
+    shared_neighbor_counts(recipe)
     clues = [read_clue(clue, legacy=legacy) for clue in read_array(data["clues"], "clues")]
     _check_clue_kinds(recipe, clues)
     answer = data["solution"]
@@ -210,6 +215,9 @@ def _rule_text(rule: ShadingRule) -> str:
         return "Positive sight counts require white cells and count visible white cells in four straight directions, including themselves once, stopping before black cells or the border; zero is no requirement."
     if type(rule) is WhiteIslandAreas:
         return "Every white island contains exactly one positive area number and that many cells; numbered cells are white, and zero means no number."
+    if type(rule) is AdjacentBlackCounts:
+        neighbors = "eight surrounding" if rule.diagonal else "four orthogonally adjacent"
+        return f"Numbered cells are white and count black cells in the {neighbors} cells, excluding themselves; zero is a real clue, and absent entries impose no condition."
     if type(rule) is ComponentsTouchBorder:
         color = "black" if rule.black else "white"
         return f"Every edge-connected {color} component reaches the board boundary through {color} cells; separate border components and absence of {color} cells are allowed."
@@ -237,13 +245,13 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
     return _render_puzzle(recipe.rows, recipe.cols, clues, answer,
                           [_rule_text(rule) for rule in recipe.rules], reveal=reveal,
                           rooms=shared_rooms(recipe), numbers=shared_numbers(recipe), sight_counts=shared_sight_counts(recipe),
-                          island_areas=shared_island_areas(recipe))
+                          island_areas=shared_island_areas(recipe), neighbor_counts=shared_neighbor_counts(recipe))
 
 
 def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[int]],
                    rules: list[str], *, reveal: bool = False, rooms: RoomMap | None = None,
                    numbers: NumberGrid | None = None, sight_counts: NumberGrid | None = None,
-                   island_areas: NumberGrid | None = None) -> str:
+                   island_areas: NumberGrid | None = None, neighbor_counts: ClueGrid | None = None) -> str:
     """Presentation only: each format's caller must verify its full recipe first."""
     cells = [["?" for _ in range(cols)] for _ in range(rows)]
     for grid in (sight_counts, island_areas):
@@ -252,6 +260,11 @@ def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[in
                 for c in range(cols):
                     if grid[r][c] > 0:
                         cells[r][c] = "."
+    if neighbor_counts is not None:
+        for r in range(rows):
+            for c in range(cols):
+                if neighbor_counts[r][c] is not None:
+                    cells[r][c] = "."
     row_counts: dict[int, int] = {}
     col_counts: dict[int, int] = {}
     for clue in clues:
@@ -293,6 +306,9 @@ def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[in
     if island_areas is not None:
         lines.extend(["", "Fixed white island areas (. = no number; exactly one number per island):"])
         lines.extend(" ".join(str(n) if n else "." for n in row) for row in island_areas)
+    if neighbor_counts is not None:
+        lines.extend(["", "Fixed adjacent black counts (. = no clue; 0 is a clue):"])
+        lines.extend(" ".join("." if n is None else str(n) for n in row) for row in neighbor_counts)
     return "\n".join(lines)
 
 

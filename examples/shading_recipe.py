@@ -16,6 +16,9 @@ from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs import WhiteVisibilityCounts
 from puzzle_defs import ComponentsTouchBorder
 from puzzle_defs import WhiteIslandAreas
+from puzzle_defs import AdjacentBlackCounts
+from puzzle_defs.clue_layout import ClueGrid, clue_grid
+from puzzle_defs.puzzles.adjacent_black_counts import DEFAULT_NEIGHBOR_COUNTS
 from puzzle_defs.puzzles.white_island_areas import DEFAULT_ISLAND_AREAS
 from puzzle_defs.puzzles.white_visibility import DEFAULT_SIGHT_COUNTS
 from puzzle_defs.puzzles.component_size import MAX_COMPONENT_CELLS
@@ -34,7 +37,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount,
                       RectangularComponents, NonRectangularComponents, NoWhiteAcrossThreeRooms, DistinctWhiteNumbers,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
-                      ComponentsTouchBorder, WhiteIslandAreas)
+                      ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -56,6 +59,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "white-visibility-counts": WhiteVisibilityCounts(DEFAULT_SIGHT_COUNTS),
             "components-touch-border": ComponentsTouchBorder(),
             "white-island-areas": WhiteIslandAreas(DEFAULT_ISLAND_AREAS),
+            "adjacent-black-counts": AdjacentBlackCounts(DEFAULT_NEIGHBOR_COUNTS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -83,6 +87,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "counts": [list(row) for row in rule.counts]}
     if type(rule) is WhiteIslandAreas:
         return {"type": rule.ui.identifier, "areas": [list(row) for row in rule.areas]}
+    if type(rule) is AdjacentBlackCounts:
+        return {"type": rule.ui.identifier, "neighbor_counts": [list(row) for row in rule.neighbor_counts], "diagonal": rule.diagonal}
     if type(rule) is RunLengthLimit:
         return {"type": rule.ui.identifier, "max_length": rule.max_length}
     if type(rule) is ColorComponentSize:
@@ -148,6 +154,11 @@ def read_rule(data: Any) -> ShadingRule:
                 or any(type(row) is not list for row in data["areas"])):
             raise ValueError("Island areas must be an array of arrays")
         return WhiteIslandAreas(tuple(tuple(row) for row in data["areas"]))
+    if kind == "adjacent-black-counts":
+        if (set(data) != {"type", "neighbor_counts", "diagonal"} or type(data["neighbor_counts"]) is not list
+                or any(type(row) is not list for row in data["neighbor_counts"])):
+            raise ValueError("Neighbor counts must be an array of arrays")
+        return AdjacentBlackCounts(tuple(tuple(row) for row in data["neighbor_counts"]), data["diagonal"])
     for shape_rule in (RectangularComponents, NonRectangularComponents):
         if kind == shape_rule.ui.identifier and set(data) == {"type", "black"}:
             return shape_rule(data["black"])
@@ -197,6 +208,7 @@ def read_recipe(data: Any) -> ShadingRecipe:
     shared_numbers(recipe)
     shared_sight_counts(recipe)
     shared_island_areas(recipe)
+    shared_neighbor_counts(recipe)
     if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
            and r.count > recipe.rows * recipe.cols for r in recipe.rules):
         raise ValueError("Black count cannot exceed the board area")
@@ -236,6 +248,15 @@ def shared_island_areas(recipe: ShadingRecipe) -> NumberGrid | None:
         number_grid(grid, rows=recipe.rows, cols=recipe.cols)
     if grids and any(grid != grids[0] for grid in grids):
         raise ValueError("Island rules must share the same areas for this file/UI format")
+    return grids[0] if grids else None
+
+
+def shared_neighbor_counts(recipe: ShadingRecipe) -> ClueGrid | None:
+    grids = [rule.neighbor_counts for rule in recipe.rules if type(rule) is AdjacentBlackCounts]
+    for grid in grids:
+        clue_grid(grid, rows=recipe.rows, cols=recipe.cols, maximum=8)
+    if grids and any(grid != grids[0] for grid in grids):
+        raise ValueError("Adjacent-count rules must share the same neighbor counts for this file/UI format")
     return grids[0] if grids else None
 
 
