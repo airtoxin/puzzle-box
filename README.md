@@ -10,10 +10,13 @@ CP-SAT を共通の求解基盤とし、セルの値・領域・ループ・対�
 
 ## 試す
 
+[Webデモをブラウザで開く](https://puzzle-box-five.vercel.app)。黒白・スリザーリンク・黒白とループの小盤面を生成できます。公開デモの計算予算は1回10秒までです。
+
 Web アプリは `uv sync --all-packages --group dev --locked` の後、
 `uv run --no-sync python examples/web_server.py` で起動し、`http://127.0.0.1:8765` を開きます。
 ルール定義に宣言したパラメータと UI 要求から、設定欄・盤面・ヒント表示を構成します。
-外部へ公開するサーバーではありません。対応範囲と設計は [Web アプリの使い方](docs/web-app.md)を参照してください。
+このローカルサーバーを外部公開する構成ではありません。Vercel用には別の[配信手順と計算制限](docs/deploy-vercel.md)があります。
+対応範囲と設計は [Web アプリの使い方](docs/web-app.md)を参照してください。
 
 Python 3.12 以上と [uv](https://docs.astral.sh/uv/) を使います。
 リポジトリのルートで全 workspace package をインストールしてください。
