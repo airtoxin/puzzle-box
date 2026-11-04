@@ -220,7 +220,7 @@ def _rule_text(rule: ShadingRule) -> str:
     if type(rule) is WhiteVisibilityCounts:
         return "Positive sight counts require white cells and count visible white cells in four straight directions, including themselves once, stopping before black cells or the border; zero is no requirement."
     if type(rule) is WhiteEndpointMarkers:
-        return "Circles are white with exactly one orthogonal white neighbor; no other white cell may have degree one. Isolated white cells are not endpoints. Numbered straight-run lengths are unsupported."
+        return "Circles are white with exactly one orthogonal white neighbor; no other white cell may have degree one. Isolated white cells are not endpoints. Compose a separate visibility rule for numbered straight-run lengths."
     if type(rule) is WhiteAreaClues:
         return "Numbered cells are white. Each white component has zero or one number; if present it equals the area. Unnumbered components are allowed; zero means no number."
     if type(rule) is WhiteIslandAreas:

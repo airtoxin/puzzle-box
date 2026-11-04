@@ -1,0 +1,13 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 2,
+  "cols": 3,
+  "rules": [
+    {"type": "white-endpoint-markers", "markers": [[1, 0, 0], [0, 0, 1]]},
+    {"type": "white-visibility-counts", "counts": [[3, 0, 0], [0, 0, 2]]},
+    {"type": "connected-white", "nonempty": true},
+    {"type": "no-white-2x2"},
+    {"type": "no-black-2x2"}
+  ],
+  "clue_kinds": ["cell"]
+}
