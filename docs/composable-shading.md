@@ -1,0 +1,133 @@
+# ルールを選んで黒白盤面を生成する
+
+4種類の既存 DSL 部品を同じマス変数へ適用し、問題の生成・保存・一意性検証までを
+つないだ小さな実例です。`ShadingRecipe` は盤面サイズとルールを保持し、既存の
+`generate()` が各マスの色ヒントを減らします。生成器にパズル固有の分岐は加えていません。
+
+## まず動かす
+
+リポジトリのルートで実行します。
+
+```sh
+uv sync --all-packages --group dev --locked
+uv run --no-sync python examples/generate_shading.py generate --seed 17 --output shading.json
+uv run --no-sync python examples/generate_shading.py verify shading.json
+uv run --no-sync python examples/generate_shading.py verify examples/shading-sample.json
+```
+
+既定は 3×3、黒3個、4ルールすべて有効です。生成結果の JSON は標準出力にも出ます。
+検証は保存データからモデルを作り直し、解が一意であること、保存した解と一致すること、
+残る各ヒントを1つずつ消すと一意でなくなることを確認します。
+成功時は `valid`, `unique`, `irreducible` が `true` の JSON を返します。
+
+保存した [例題](../examples/shading-sample.json)は次の問題です。
+`?` は未確定、`.` は白、`#` は黒を表します。
+
+```text
+問題            解
+? ? ?           . . #
+? ? ?           # . .
+. ? #           . . #
+```
+
+ルールは「黒は3個」「黒は辺で接触しない」「白は上下左右で連結し、1マス以上ある」
+「白だけの2×2はない」です。この2ヒントから解は1通りに決まります。
+この例で各ルールを1つだけ外すと、順に2、5、4、2通りの解になります。
+つまり4ルールはいずれも解を絞る役割を持っています。各ヒントも必要です。
+
+## 部品を選ぶ
+
+```sh
+uv run --no-sync python examples/generate_shading.py generate --rows 3 --cols 4 --rules count non-touching connected-white --black-count 3 --seed 7
+uv run --no-sync python examples/generate_shading.py generate --rules count non-touching --black-count 2 --diagonal --seed 7
+```
+
+| Python のルール | CLI 名 | 再利用する DSL | 意味 |
+| --- | --- | --- | --- |
+| `BlackCount(n)` | `count` | `sum_expr(...) == n` | 黒の総数を固定 |
+| `NonTouchingBlack()` | `non-touching` | `non_touching`、隣接ペア | 黒同士の辺接触を禁止 |
+| `ConnectedWhite()` | `connected-white` | `connected`、`at_least_one` | 白が非空かつ上下左右で連結 |
+| `NoWhite2x2()` | `no-white-2x2` | `windows(2, 2)`、`at_least_one` | 各2×2窓に黒が1個以上 |
+
+`--diagonal` は黒同士の角接触も禁止します。`--allow-empty-white` は白0個も許します。
+これらのオプションは対応するルールを選んだ場合だけ作用します。
+元の `connected` が空集合も許す仕様は変更せず、非空条件を合成ルール側で加えています。
+高さまたは幅が1なら2×2窓はなく、`NoWhite2x2` は何も制限しません。
+
+ルールを選べても、必ず両立するわけではありません。例えば2×2で黒4個と非空の白の連結を
+指定すると生成は失敗します。CLI は非ゼロ終了し、Python API は `RuntimeError` を返します。
+基礎ルールだけで一意なら、ヒントが0個になることもあります。
+
+## Python で組み合わせる
+
+```python
+from generator import generate
+from puzzle import unique
+from puzzle_defs import (
+    BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2, ShadingRecipe,
+)
+
+recipe = ShadingRecipe(3, 3, (
+    BlackCount(3), NonTouchingBlack(), ConnectedWhite(), NoWhite2x2(),
+))
+clues = generate(recipe, seed=17)  # list[tuple[Cell, int]]; 0=白、1=黒
+puzzle = recipe.build_from_clues(clues)
+puzzle.add(unique())
+solution = puzzle.solve()
+assert solution is not None
+print(puzzle.result(solution))
+```
+
+`ShadingRule` は `apply(puzzle: Puzzle, board: SquareGrid, black: VarMap) -> None` を持つ
+構造的な Protocol です。同じインターフェースの Python オブジェクトで部品を追加できます。
+ルールは共有された `black[cell]` に制約を加え、設定と盤面、回答の意味を固定してください。
+ヒントを調べて基礎ルールを変えたり、回答変数を選び直したりしてはいけません。
+補助変数は作れますが、回答として数えるのは各マスの黒白だけです。
+組み込みルールとレシピは frozen dataclass で、レシピはルール列を tuple に保存します。
+カスタム部品の不変性や契約の遵守までは自動検証しません。
+
+## 再現性と保存形式
+
+`Puzzle.solve(seed=...)` は乱数 seed に加えて探索 worker 数を1に設定します。
+従来の seed 指定時の並列探索から変わるため、以前の seed で出る盤面や速度は変わり得ます。
+seed を省略した求解の設定は変更していません。同じ実行環境では、別プロセス・異なる
+`PYTHONHASHSEED` でも同じ生成結果になることをテストしています。
+異なる OR-Tools / Python / OS / モデル構築順での同一結果や、解の均一な抽選は保証しません。
+
+JSON の形式識別子は `puzzle-box/shading-v1` です。寸法、ルールとパラメータ、
+`[row, col, value]` のヒント、解、seed、Python / OR-Tools のバージョンを保存します。
+座標は0始まりです。例題には解も入っているため、プレイヤーへ渡す画面では解を隠す必要があります。
+検証時は seed を再実行せず、保存された問題そのものを検証します。
+環境情報と seed は記録用で、検証器は環境一致を強制しません。
+このファイル形式は4つの組み込みルール専用で、任意のコードを読み込む仕組みはありません。
+
+## 検証と範囲
+
+テストは CP-SAT / DSL を使わない全探索器でも検証します。3×3の全512盤面を、
+個数、座標間の距離、白マスの到達可能性探索、2×2窓の直接検査で判定します。
+8種類の組み合わせを各2 seed で生成し、一意性・各ヒントの必要性・ソルバーの答えとの一致を確認します。
+さらに各ルールを2×2の全16盤面と照合し、保存例題では各ルールを外す比較も行います。
+CLI の保存・検証、解を改変したときの拒否、矛盾した組み合わせと0ヒントも対象です。
+
+これは**同じ黒白盤面を共有するルール群**の縦切りです。セルとループ、島番号、
+ピース配置、木とテントなど、異なる回答空間を自由につなぐ互換性判定・変換機構は未実装です。
+ヒントもマスの色だけで、行列個数や矢印などを自動選択する機能はありません。
+CLI は実験を小さく保つため25マス以下に制限していますが、実行時間の上限ではありません。
+API はサイズ上限を設けておらず、大盤面の性能は未検証です。
+人間の解き筋、難易度、面白さ、最少ヒント数も保証しません。
+
+次に比較しやすい追加は、同じ回答空間のままヒントを「セル色」から「行列個数」へ
+切り替えることです。その前に候補ヒント全体でも一意にならないケースを扱い、
+全探索との照合を維持する必要があります。別の回答空間との接続はその後の設計課題です。
+
+## 土台の変更との関係
+
+機能上は [回答変数による一意性 (#2)](https://github.com/airtoxin/puzzle-box/pull/2)と
+[生成レシピの契約 (#4)](https://github.com/airtoxin/puzzle-box/pull/4)に依存します。
+白マスの連結を証明する補助変数の違いを、別の回答として数えてはいけないためです。
+#2〜#8 は main に採用済みです。この変更の PR は、採用済み main (`dd7eb32`) を
+通常 merge で取り込み、base も main に変更しました。採用時の所属検証・解の
+スナップショットの修正を保持し、main に元の実例の差分を適用した内容と一致することを確認しています。
+旧検証ブランチ `codex/integration-value-matching-verification` への切替や、
+土台の再適用は不要です。後続の依存順と検証は
+[レビューガイド](https://github.com/airtoxin/puzzle-box/blob/codex/review-roadmap/docs/review-roadmap.md)を参照してください。

@@ -378,10 +378,13 @@ class Puzzle:
 
         A unique result is returned only after proving that no different projected
         assignment exists. The original model is never changed by the check.
+        A supplied seed uses one search worker for repeatable search with a fixed
+        model and solver version. Unseeded solving keeps the solver's defaults.
         """
         solver = cp_model.CpSolver()
         if seed is not None:
             solver.parameters.random_seed = seed
+            solver.parameters.num_search_workers = 1
 
         status = solver.solve(self._model)
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
@@ -400,6 +403,7 @@ class Puzzle:
                 checker = cp_model.CpSolver()
                 if seed is not None:
                     checker.parameters.random_seed = seed
+                    checker.parameters.num_search_workers = 1
                 if checker.solve(alternative) != cp_model.INFEASIBLE:
                     return None
         return Solution(solver, self._model)
