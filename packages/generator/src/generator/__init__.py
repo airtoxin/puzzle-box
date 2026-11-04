@@ -39,7 +39,7 @@ class GeneratablePuzzle[P: Puzzle, C](Protocol):
     def build_from_clues(self, clues: list[C]) -> P: ...
 
 
-type ConstraintBuilder[P: Puzzle] = Callable[[P], Iterable[Constraint]]
+type ConstraintBuilder[P: Puzzle] = Callable[[P], Constraint | Iterable[Constraint]]
 
 
 def _answer_projection(puzzle: Puzzle) -> frozenset[int] | None:
@@ -58,7 +58,8 @@ class ConstrainedRecipe[P: Puzzle, C]:
     invocation count. They may not change the base's answer meaning or clue
     extraction. The base's answer projection is preserved. This wrapper has no
     portable encoding: serializing only its base would omit the added rules.
-    Returned items must be DSL constraints; unique() is a solve query, not a rule.
+    Builders return one DSL constraint or an iterable of them. unique() is a
+    solve query, not a rule; None from a side-effect-only function is invalid.
     """
 
     base: GeneratablePuzzle[P, C]
@@ -73,7 +74,18 @@ class ConstrainedRecipe[P: Puzzle, C]:
     def _apply(self, puzzle: P) -> P:
         answer_projection = _answer_projection(puzzle)
         for builder in self.builders:
-            for constraint in builder(puzzle):
+            result = builder(puzzle)
+            if isinstance(result, Constraint):
+                constraints = iter((result,))
+            else:
+                message = "Builders must return a DSL constraint or an iterable of DSL constraints"
+                if isinstance(result, (str, bytes, bytearray)):
+                    raise TypeError(message)
+                try:
+                    constraints = iter(result)
+                except TypeError as exc:
+                    raise TypeError(message) from exc
+            for constraint in constraints:
                 if not isinstance(constraint, Constraint):
                     raise TypeError("Builders must yield DSL constraint objects")
                 if isinstance(constraint, UniqueConstraint):
