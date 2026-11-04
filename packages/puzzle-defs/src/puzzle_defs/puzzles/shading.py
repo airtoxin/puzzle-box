@@ -3,14 +3,44 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Literal, Protocol, Sequence
 
 from puzzle import (
     Cell, Puzzle, Solution, SquareGrid, VarMap, at_least_one,
     connected, non_touching, square_grid, sum_expr,
 )
 
-Clue = tuple[Cell, int]  # 0 = white, 1 = black
+CellClue = tuple[Cell, int]  # 0 = white, 1 = black
+
+
+def _check_nonnegative(value: int, name: str) -> None:
+    if type(value) is not int or value < 0:
+        raise ValueError(f"{name} must be a nonnegative integer")
+
+
+@dataclass(frozen=True)
+class RowCountClue:
+    row: int
+    count: int
+
+    def __post_init__(self) -> None:
+        _check_nonnegative(self.row, "Row index")
+        _check_nonnegative(self.count, "Row count")
+
+
+@dataclass(frozen=True)
+class ColumnCountClue:
+    col: int
+    count: int
+
+    def __post_init__(self) -> None:
+        _check_nonnegative(self.col, "Column index")
+        _check_nonnegative(self.count, "Column count")
+
+
+Clue = CellClue | RowCountClue | ColumnCountClue
+ClueKind = Literal["cell", "row-count", "column-count"]
+CLUE_KINDS: tuple[ClueKind, ...] = ("cell", "row-count", "column-count")
 
 
 class ShadingRule(Protocol):
@@ -91,12 +121,22 @@ class ShadingPuzzle(Puzzle):
         self.set_solution_vars(self.black[c] for c in self.board.cells)
         for rule in rules:
             rule.apply(self, self.board, self.black)
-        for cell, value in clues:
-            if cell not in self.black:
-                raise ValueError("Clue cell is outside the board")
-            if type(value) is not int or value not in (0, 1):
-                raise ValueError("Clue values must be 0 (white) or 1 (black)")
-            self.add(self.black[cell] == value)
+        for clue in clues:
+            if isinstance(clue, RowCountClue):
+                if clue.row >= rows or clue.count > cols:
+                    raise ValueError("Row clue index or count exceeds the board dimensions")
+                self.add(sum_expr(self.black[Cell(clue.row, c)] for c in range(cols)) == clue.count)
+            elif isinstance(clue, ColumnCountClue):
+                if clue.col >= cols or clue.count > rows:
+                    raise ValueError("Column clue index or count exceeds the board dimensions")
+                self.add(sum_expr(self.black[Cell(r, clue.col)] for r in range(rows)) == clue.count)
+            else:
+                cell, value = clue
+                if cell not in self.black:
+                    raise ValueError("Clue cell is outside the board")
+                if type(value) is not int or value not in (0, 1):
+                    raise ValueError("Clue values must be 0 (white) or 1 (black)")
+                self.add(self.black[cell] == value)
 
     def result(self, solution: Solution) -> list[list[int]]:
         return [
@@ -111,21 +151,42 @@ class ShadingRecipe:
 
     Built-in rules are immutable. Custom rules must also keep their configuration
     and answer semantics fixed across calls; removing clues may only relax rules.
+    clue_kinds selects candidate hints, not base rules. Include "cell" to ensure
+    the initial candidate pool fixes the shading; counts alone can be ambiguous.
     """
 
     rows: int
     cols: int
     rules: tuple[ShadingRule, ...]
+    clue_kinds: tuple[ClueKind, ...] = ("cell",)
 
     def __post_init__(self) -> None:
         _check_size(self.rows, self.cols)
         object.__setattr__(self, "rules", tuple(self.rules))
+        kinds = tuple(self.clue_kinds)
+        if any(kind not in CLUE_KINDS for kind in kinds) or len(set(kinds)) != len(kinds):
+            raise ValueError("Clue kinds must be distinct cell, row-count or column-count values")
+        object.__setattr__(self, "clue_kinds", kinds)
 
     def create_empty(self) -> ShadingPuzzle:
         return self.build_from_clues([])
 
     def extract_clues(self, solution: Solution, puzzle: ShadingPuzzle) -> list[Clue]:
-        return [(c, solution.value(puzzle.black[c])) for c in puzzle.board.cells]
+        # Including all cell clues makes the candidate pool unique even when
+        # row/column counts alone leave several answers. Reduction retains any
+        # cell clues that are still necessary; it never changes the base rules.
+        values = {c: solution.value(puzzle.black[c]) for c in puzzle.board.cells}
+        clues: list[Clue] = []
+        for kind in self.clue_kinds:
+            if kind == "cell":
+                clues.extend(values.items())
+            elif kind == "row-count":
+                clues.extend(RowCountClue(r, sum(values[Cell(r, c)] for c in range(self.cols)))
+                             for r in range(self.rows))
+            else:
+                clues.extend(ColumnCountClue(c, sum(values[Cell(r, c)] for r in range(self.rows)))
+                             for c in range(self.cols))
+        return clues
 
-    def build_from_clues(self, clues: list[Clue]) -> ShadingPuzzle:
+    def build_from_clues(self, clues: Sequence[Clue]) -> ShadingPuzzle:
         return ShadingPuzzle(self.rows, self.cols, self.rules, clues)

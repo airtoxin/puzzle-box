@@ -15,7 +15,9 @@ uv run --no-sync python examples/generate_shading.py verify shading.json
 uv run --no-sync python examples/generate_shading.py verify examples/shading-sample.json
 ```
 
-既定は 3×3、黒3個、4ルールすべて有効です。生成結果の JSON は標準出力にも出ます。
+既定は 3×3、黒3個、4ルールすべて有効です。生成結果の JSON は既定では標準出力にも出ます。
+解を見ずに遊ぶときは `generate --output FILE --quiet` で保存し、`show FILE` を使ってください。
+盤面の入力と解答確認は [端末で解いてみる](play-shading.md)にまとめています。
 検証は保存データからモデルを作り直し、解が一意であること、保存した解と一致すること、
 残る各ヒントを1つずつ消すと一意でなくなることを確認します。
 成功時は `valid`, `unique`, `irreducible` が `true` の JSON を返します。
@@ -70,7 +72,7 @@ from puzzle_defs import (
 recipe = ShadingRecipe(3, 3, (
     BlackCount(3), NonTouchingBlack(), ConnectedWhite(), NoWhite2x2(),
 ))
-clues = generate(recipe, seed=17)  # list[tuple[Cell, int]]; 0=白、1=黒
+clues = generate(recipe, seed=17)  # 既定は (Cell, int) のセルヒント; 0=白、1=黒
 puzzle = recipe.build_from_clues(clues)
 puzzle.add(unique())
 solution = puzzle.solve()
@@ -94,12 +96,14 @@ seed を省略した求解の設定は変更していません。同じ実行環
 `PYTHONHASHSEED` でも同じ生成結果になることをテストしています。
 異なる OR-Tools / Python / OS / モデル構築順での同一結果や、解の均一な抽選は保証しません。
 
-JSON の形式識別子は `puzzle-box/shading-v1` です。寸法、ルールとパラメータ、
+セルヒントだけの JSON の形式識別子は `puzzle-box/shading-v1` です。寸法、ルールとパラメータ、
 `[row, col, value]` のヒント、解、seed、Python / OR-Tools のバージョンを保存します。
 座標は0始まりです。例題には解も入っているため、プレイヤーへ渡す画面では解を隠す必要があります。
 検証時は seed を再実行せず、保存された問題そのものを検証します。
 環境情報と seed は記録用で、検証器は環境一致を強制しません。
 このファイル形式は4つの組み込みルール専用で、任意のコードを読み込む仕組みはありません。
+行列個数を含むヒント候補には v2 を使います。両形式を読み込める検証器と
+その使い方は [複数のヒント形式](mixed-shading-clues.md)を参照してください。
 
 ## 検証と範囲
 
@@ -111,21 +115,23 @@ CLI の保存・検証、解を改変したときの拒否、矛盾した組み�
 
 これは**同じ黒白盤面を共有するルール群**の縦切りです。セルとループ、島番号、
 ピース配置、木とテントなど、異なる回答空間を自由につなぐ互換性判定・変換機構は未実装です。
-ヒントもマスの色だけで、行列個数や矢印などを自動選択する機能はありません。
+ヒントはセルの色と行・列の黒マス数を選べます。矢印などのヒントは未対応です。
 CLI は実験を小さく保つため25マス以下に制限していますが、実行時間の上限ではありません。
 API はサイズ上限を設けておらず、大盤面の性能は未検証です。
 人間の解き筋、難易度、面白さ、最少ヒント数も保証しません。
 
-次に比較しやすい追加は、同じ回答空間のままヒントを「セル色」から「行列個数」へ
-切り替えることです。その前に候補ヒント全体でも一意にならないケースを扱い、
-全探索との照合を維持する必要があります。別の回答空間との接続はその後の設計課題です。
+行列個数への拡張では、候補ヒント全体でも一意にならないケースを確認し、
+セルヒントとの混在で一意性を補えるようにしました。全探索との照合も維持しています。
+次はヒント種類の優先度や人間向け推論の評価が候補です。別の回答空間との接続は引き続き設計課題です。
 
 ## 土台の変更との関係
 
 機能上は [回答変数による一意性 (#2)](https://github.com/airtoxin/puzzle-box/pull/2)と
 [生成レシピの契約 (#4)](https://github.com/airtoxin/puzzle-box/pull/4)に依存します。
 白マスの連結を証明する補助変数の違いを、別の回答として数えてはいけないためです。
-レビュー差分を分離するため、この変更の draft PR は #2〜#8 を検証済みの
-`codex/integration-value-matching-verification` (`0d4cde3`) を base にしています。
-これらは main へ未反映です。土台の採否が決まった後に rebase / base の変更が必要で、
-この実例のPRだけを現行 main に適用することはできません。
+#2〜#8 は main に採用済みです。この変更の PR は、採用済み main (`dd7eb32`) を
+通常 merge で取り込み、base も main に変更しました。採用時の所属検証・解の
+スナップショットの修正を保持し、main に元の実例の差分を適用した内容と一致することを確認しています。
+旧検証ブランチ `codex/integration-value-matching-verification` への切替や、
+土台の再適用は不要です。後続の依存順と検証は
+[レビューガイド](https://github.com/airtoxin/puzzle-box/blob/codex/review-roadmap/docs/review-roadmap.md)を参照してください。
