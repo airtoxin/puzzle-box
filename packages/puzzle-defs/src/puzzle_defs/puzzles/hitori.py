@@ -1,4 +1,5 @@
 from puzzle import Puzzle, Solution, at_most_one, connected, square_grid
+from puzzle_defs.number_layout import equal_number_pairs
 
 Grid = list[list[int]]
 
@@ -19,21 +20,10 @@ class HitoriPuzzle(Puzzle):
 
         self.black = self.bool_var_map("black", board.cells)
 
-        # Same number in same row: at least one must be black
-        for row in board.rows():
-            for i in range(len(row)):
-                for j in range(i + 1, len(row)):
-                    a, b = row[i], row[j]
-                    if grid[a.row][a.col] == grid[b.row][b.col]:
-                        self.add(self.black[a] | self.black[b])
-
-        # Same number in same column: at least one must be black
-        for col in board.cols():
-            for i in range(len(col)):
-                for j in range(i + 1, len(col)):
-                    a, b = col[i], col[j]
-                    if grid[a.row][a.col] == grid[b.row][b.col]:
-                        self.add(self.black[a] | self.black[b])
+        # The dedicated puzzle and composable fragment share only pair finding;
+        # the dedicated constructor's existing input and connectivity policy stay intact.
+        for a,b in equal_number_pairs(board,grid):
+            self.add(self.black[a] | self.black[b])
 
         # Black cells are not adjacent
         for a, b in board.adjacent_cell_pairs():

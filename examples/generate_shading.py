@@ -19,11 +19,13 @@ from puzzle_defs import (
     BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines, NoBlack2x2, NoThreeConsecutive,
     RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWhiteAcrossThreeRooms,
     RectangularComponents, NonRectangularComponents,
+    DistinctWhiteNumbers,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
+from puzzle_defs.number_layout import NumberGrid
 from shading_recipe import (RULES, DEFAULT_RULES, rule_choices, check_demo_size, check_distinct_paths,
-                            load_recipe, read_rule, rule_record, shared_rooms)
+                            load_recipe, read_rule, rule_record, shared_rooms, shared_numbers)
 from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/shading-v1"
@@ -56,6 +58,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
         raise ValueError("Unknown completion selection")
     rules = [rule_record(rule) for rule in recipe.rules]
     shared_rooms(recipe)
+    shared_numbers(recipe)
     _check_clue_kinds(recipe, clues)
     legacy = recipe.clue_kinds == ("cell",)
     encoded_clues = [clue_record(clue, legacy=legacy) for clue in clues]
@@ -132,6 +135,7 @@ def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[
                            ("cell",) if legacy else tuple(read_array(data["clue_kinds"], "clue_kinds")))
     check_demo_size(recipe)
     shared_rooms(recipe)
+    shared_numbers(recipe)
     clues = [read_clue(clue, legacy=legacy) for clue in read_array(data["clues"], "clues")]
     _check_clue_kinds(recipe, clues)
     answer = data["solution"]
@@ -189,6 +193,8 @@ def _rule_text(rule: ShadingRule) -> str:
         return f"Every row and every column contains exactly {rule.count} black cells."
     if type(rule) is NoWhiteAcrossThreeRooms:
         return "A straight white run cannot cross two room boundaries; re-entering a room counts again."
+    if type(rule) is DistinctWhiteNumbers:
+        return "No row or column contains equal fixed numbers on two white cells."
     if type(rule) is RectangularComponents or type(rule) is NonRectangularComponents:
         color = "black" if rule.black else "white"
         shape = "a filled rectangle" if type(rule) is RectangularComponents else "nonrectangular"
@@ -202,11 +208,13 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
     verify(data)
     recipe, clues, answer = _read_record(data)
     return _render_puzzle(recipe.rows, recipe.cols, clues, answer,
-                          [_rule_text(rule) for rule in recipe.rules], reveal=reveal, rooms=shared_rooms(recipe))
+                          [_rule_text(rule) for rule in recipe.rules], reveal=reveal,
+                          rooms=shared_rooms(recipe), numbers=shared_numbers(recipe))
 
 
 def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[int]],
-                   rules: list[str], *, reveal: bool = False, rooms: RoomMap | None = None) -> str:
+                   rules: list[str], *, reveal: bool = False, rooms: RoomMap | None = None,
+                   numbers: NumberGrid | None = None) -> str:
     """Presentation only: each format's caller must verify its full recipe first."""
     cells = [["?" for _ in range(cols)] for _ in range(rows)]
     row_counts: dict[int, int] = {}
@@ -241,6 +249,9 @@ def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[in
     if rooms is not None:
         lines.extend(["", "Fixed rooms (same label = same room; not answer values):"])
         lines.extend(" ".join(str(n) for n in row) for row in rooms)
+    if numbers is not None:
+        lines.extend(["", "Fixed numbers (labels, not answer values):"])
+        lines.extend(" ".join(str(n) for n in row) for row in numbers)
     return "\n".join(lines)
 
 

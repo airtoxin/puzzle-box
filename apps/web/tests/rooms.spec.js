@@ -13,7 +13,7 @@ async function configure(page) {
 test('one declared room editor renders boundaries and keeps rules through answer checking', async ({page}) => {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await configure(page);
-  await expect(page.locator('#rules textarea')).toHaveCount(1);
+  await expect(page.locator('#rules textarea[data-kind="region-map"]')).toHaveCount(1);
   await expect(page.locator('.room-board [data-room="0"]')).toHaveCount(3);
   await expect(page.locator('.room-board [data-room="1"]')).toHaveCount(3);
   await expect(page.locator('.room-board [data-room="0"].room-bottom')).toHaveCount(3);
@@ -33,18 +33,18 @@ test('one declared room editor renders boundaries and keeps rules through answer
   for await (const chunk of stream) chunks.push(chunk);
   expect(JSON.parse(Buffer.concat(chunks).toString('utf8'))).toEqual(result.record);
   await page.getByLabel('各部屋内で黒をつなぐ', {exact: true}).check();
-  await expect(page.locator('#rules textarea')).toHaveCount(1);
+  await expect(page.locator('#rules textarea[data-kind="region-map"]')).toHaveCount(1);
   await expect(page.locator('#generate')).toBeEnabled();
   const conflict = page.waitForResponse('**/api/generate'); await page.locator('#generate').click();
   expect((await (await conflict).json()).status).toBe('unsatisfiable');
   await page.getByLabel('各部屋の黒数を固定', {exact: true}).uncheck();
-  await expect(page.locator('#rules textarea')).toBeEnabled();
-  await page.locator('#rules textarea').fill('0 x 0\n1 1 1');
+  await expect(page.locator('#rules textarea[data-kind="region-map"]')).toBeEnabled();
+  await page.locator('#rules textarea[data-kind="region-map"]').fill('0 x 0\n1 1 1');
   await expect(page.locator('#status')).toContainText('整数を空白');
   await expect(page.locator('#generate')).toBeDisabled();
-  await page.locator('#rules textarea').fill('0 1 0\n0 1 0');
+  await page.locator('#rules textarea[data-kind="region-map"]').fill('0 1 0\n0 1 0');
   await expect(page.locator('#status')).toContainText('orthogonally connected');
-  await page.locator('#rules textarea').fill('0 0 0\n1 1 1');
+  await page.locator('#rules textarea[data-kind="region-map"]').fill('0 0 0\n1 1 1');
   await expect(page.locator('#generate')).toBeEnabled();
   await page.setViewportSize({width:390,height:844});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

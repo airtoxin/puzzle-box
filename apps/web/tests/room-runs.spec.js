@@ -6,7 +6,7 @@ test('white-run rule declares shared rooms and keeps its condition through gener
   await page.getByLabel('黒マスを離す', {exact:true}).check();
   await page.getByLabel('白い直線の3部屋またぎを禁止', {exact:true}).check();
   await page.getByLabel('部屋配置（同じ数字が同じ部屋）', {exact:true}).fill('0 1 2\n0 1 2');
-  await expect(page.locator('#rules textarea')).toHaveCount(1);
+  await expect(page.locator('#rules textarea[data-kind="region-map"]')).toHaveCount(1);
   await expect(page.locator('[data-room="0"]')).toHaveCount(2);
   await expect(page.locator('#generate')).toBeEnabled();
   const generated = page.waitForResponse('**/api/generate'); await page.locator('#generate').click();
@@ -20,7 +20,7 @@ test('white-run rule declares shared rooms and keeps its condition through gener
   const checked = page.waitForResponse('**/api/check'); await page.locator('#check').click();
   expect(await (await checked).json()).toEqual({status:'ok',correct:true});
   await page.getByLabel('各部屋の黒数を固定', {exact:true}).check();
-  await expect(page.locator('#rules textarea')).toHaveCount(1); // includes this third room-rule type
+  await expect(page.locator('#rules textarea[data-kind="region-map"]')).toHaveCount(1); // includes this third room-rule type
   await page.getByLabel('各部屋の黒数を固定', {exact:true}).uncheck();
   await page.getByLabel('黒マス数', {exact:true}).fill('1');
   await expect(page.locator('#generate')).toBeEnabled();
