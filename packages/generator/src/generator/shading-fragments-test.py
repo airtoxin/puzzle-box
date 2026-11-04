@@ -202,7 +202,8 @@ def test_cli_choices_preserve_new_rule_ids(script, args):
 
 def test_original_cli_defaults_are_not_expanded_to_every_catalog_rule():
     assert codec.DEFAULT_RULES == ("count", "non-touching", "connected-white", "no-white-2x2")
-    assert len(codec.RULES) == 10 and len(set(codec.RULES)) == 10
+    assert len(codec.RULES) == len(set(codec.RULES))
+    assert set(codec.DEFAULT_RULES) < set(codec.RULES)
 
 
 @pytest.mark.parametrize("filename,recipe", zip(

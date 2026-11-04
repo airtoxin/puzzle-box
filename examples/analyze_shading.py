@@ -15,6 +15,7 @@ from puzzle_defs import (BlackCount, ColumnCountClue, ConnectedWhite, NonTouchin
                          NoWhite2x2, RowCountClue, ShadingPuzzle, ShadingRecipe,
                          BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines,
                          NoBlack2x2, NoThreeConsecutive)
+from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
 from shading_recipe import BUILT_IN_RULE_TYPES, rule_choices
@@ -57,6 +58,15 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
                    for r in range(rows-1) for c in range(cols-1))
     if type(rule) is BlackDominoes:
         return all(len(group) == 2 for group in _components(black))
+    if type(rule) is RoomBlackCount or type(rule) is RoomConnectedBlack:
+        for label in {n for row in rule.rooms for n in row}:
+            selected = {(r, c) for r, c in black if rule.rooms[r][c] == label}
+            if type(rule) is RoomBlackCount:
+                if len(selected) != rule.count:
+                    return False
+            elif len(_components(selected)) > 1 or not selected and rule.nonempty:
+                return False
+        return True
     row_lines = [bits[r*cols:(r+1)*cols] for r in range(rows)]
     col_lines = [bits[c::cols] for c in range(cols)]
     if type(rule) is NoThreeConsecutive:
@@ -65,6 +75,8 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
         return all(line.count(0) == line.count(1) for line in row_lines + col_lines)
     if type(rule) is DistinctLines:
         return len(set(row_lines)) == rows and len(set(col_lines)) == cols
+    if type(rule) is LineBlackCount:
+        return all(sum(line) == rule.count for line in row_lines + col_lines)
     raise ValueError("Diagnostics support exact built-in rule types only, not custom rules or subclasses")
 
 

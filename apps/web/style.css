@@ -182,7 +182,7 @@ button:not(.cell):not(.edge):not(.primary):hover:enabled {
   background:#dfecde;
 }
 
-button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible {
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible {
   outline:3px solid #99601f;
   outline-offset:3px;
 }
@@ -244,6 +244,17 @@ th {
 td {
   padding:0;
 }
+
+.shared-parameters {padding:12px; border:1px solid #698374; border-radius:7px; margin-bottom:12px;}
+.shared-parameters p {font-size:.8rem;}
+.shared-parameters textarea {display:block; box-sizing:border-box; width:100%; font:inherit; padding:8px; resize:vertical;}
+.room-board {border-spacing:0;}
+.room-board td {border:1px solid #aab6a9;}
+.room-board .room-top {border-top:3px solid #233d33;}
+.room-board .room-bottom {border-bottom:3px solid #233d33;}
+.room-board .room-left {border-left:3px solid #233d33;}
+.room-board .room-right {border-right:3px solid #233d33;}
+.room-board .cell {border-radius:0; margin:2px;}
 
 .cell {
   width:clamp(34px,5.7vw,56px);

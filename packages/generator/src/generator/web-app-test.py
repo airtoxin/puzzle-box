@@ -42,7 +42,7 @@ def test_existing_rules_declare_their_controls_without_changing_dataclass_parame
 def test_plan_merges_shared_cells_and_only_selected_hint_channels():
     data = request()
     full = api.read_request(data).plan
-    assert {c["name"] for c in full["requirements"]["channels"]} == set(api.RENDERERS)
+    assert {c["name"] for c in full["requirements"]["channels"]} == set(api.RENDERERS) - {"rooms"}
     data["clue_kinds"] = ["row-count"]
     reduced = api.read_request(data).plan["requirements"]
     assert {c["name"] for c in reduced["channels"]} == {"answer", "row-counts"}

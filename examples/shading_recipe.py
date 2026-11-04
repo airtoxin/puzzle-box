@@ -6,6 +6,8 @@ from typing import Any
 from puzzle_defs import (BlackCount, ConnectedWhite, NonTouchingBlack, NoWhite2x2, ShadingRecipe,
                          BalancedLines, BlackDominoes, ConnectedBlack, DistinctLines,
                          NoBlack2x2, NoThreeConsecutive)
+from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount
+from puzzle_defs.room_layout import DEFAULT_ROOMS, RoomMap, room_map
 from puzzle_defs.puzzles.shading import CLUE_KINDS, ShadingRule
 from json_records import MAX_BYTES as MAX_RECIPE_BYTES, load_json as _load_json
 
@@ -16,7 +18,7 @@ PARAMETERLESS_RULE_TYPES = (NoWhite2x2, NoBlack2x2, BlackDominoes, NoThreeConsec
                            BalancedLines, DistinctLines)
 BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       ConnectedBlack, NoBlack2x2, BlackDominoes, NoThreeConsecutive,
-                      BalancedLines, DistinctLines)
+                      BalancedLines, DistinctLines, RoomBlackCount, RoomConnectedBlack, LineBlackCount)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -25,6 +27,8 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
     return {"count": BlackCount(count), "non-touching": NonTouchingBlack(diagonal),
             "connected-white": ConnectedWhite(not allow_empty_white),
             "connected-black": ConnectedBlack(),
+            "room-black-count": RoomBlackCount(DEFAULT_ROOMS),
+            "room-connected-black": RoomConnectedBlack(DEFAULT_ROOMS), "line-black-count": LineBlackCount(),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
@@ -38,6 +42,12 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": "connected-white", "nonempty": rule.nonempty}
     if type(rule) is ConnectedBlack:
         return {"type": "connected-black", "nonempty": rule.nonempty}
+    if type(rule) is RoomBlackCount:
+        return {"type": "room-black-count", "rooms": [list(row) for row in rule.rooms], "count": rule.count}
+    if type(rule) is RoomConnectedBlack:
+        return {"type": "room-connected-black", "rooms": [list(row) for row in rule.rooms], "nonempty": rule.nonempty}
+    if type(rule) is LineBlackCount:
+        return {"type": "line-black-count", "count": rule.count}
     for kind in PARAMETERLESS_RULE_TYPES:
         if type(rule) is kind:
             return {"type": kind.ui.identifier}
@@ -56,6 +66,16 @@ def read_rule(data: Any) -> ShadingRule:
         return ConnectedWhite(data["nonempty"])
     if kind == "connected-black" and set(data) == {"type", "nonempty"}:
         return ConnectedBlack(data["nonempty"])
+    if kind in ("room-black-count", "room-connected-black"):
+        parameter = "count" if kind == "room-black-count" else "nonempty"
+        if (set(data) != {"type", "rooms", parameter} or type(data["rooms"]) is not list
+                or any(type(row) is not list for row in data["rooms"])):
+            raise ValueError("Invalid room rule parameters; rooms must be an array of arrays")
+        if kind == "room-black-count":
+            return RoomBlackCount(tuple(tuple(row) for row in data["rooms"]), data["count"])
+        return RoomConnectedBlack(tuple(tuple(row) for row in data["rooms"]), data["nonempty"])
+    if kind == "line-black-count" and set(data) == {"type", "count"}:
+        return LineBlackCount(data["count"])
     for rule_type in PARAMETERLESS_RULE_TYPES:
         if kind == rule_type.ui.identifier and set(data) == {"type"}:
             return rule_type()
@@ -65,6 +85,16 @@ def read_rule(data: Any) -> ShadingRule:
 def check_demo_size(recipe: ShadingRecipe) -> None:
     if recipe.rows * recipe.cols > 25:
         raise ValueError("This small-board demo supports at most 25 cells")
+
+
+def shared_rooms(recipe: ShadingRecipe) -> RoomMap | None:
+    layouts = [rule.rooms for rule in recipe.rules
+               if type(rule) is RoomBlackCount or type(rule) is RoomConnectedBlack]
+    for layout in layouts:
+        room_map(layout, rows=recipe.rows, cols=recipe.cols)
+    if layouts and any(layout != layouts[0] for layout in layouts):
+        raise ValueError("Room rules must share the same partition for this file/UI format")
+    return layouts[0] if layouts else None
 
 
 def read_recipe(data: Any) -> ShadingRecipe:
@@ -80,7 +110,9 @@ def read_recipe(data: Any) -> ShadingRecipe:
         raise ValueError("Recipe clue_kinds must be an array of cell, row-count or column-count values")
     recipe = ShadingRecipe(data["rows"], data["cols"], tuple(read_rule(r) for r in data["rules"]), tuple(kinds))
     check_demo_size(recipe)
-    if any(type(r) is BlackCount and r.count > recipe.rows * recipe.cols for r in recipe.rules):
+    shared_rooms(recipe)
+    if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
+           and r.count > recipe.rows * recipe.cols for r in recipe.rules):
         raise ValueError("Black count cannot exceed the board area")
     return recipe
 

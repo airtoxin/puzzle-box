@@ -4,7 +4,7 @@
 CP-SAT を共通の求解基盤とし、セルの値・領域・ループ・対応付けを表現します。
 問題生成器は、完成解からヒントを作り、一意性を保ちながら減らします。
 
-プログラムから定義するライブラリに加え、[黒白10ルール](docs/shading-fragments.md)やスリザーリンクの条件、黒白とセル中心ループの固定3条件を画面で扱う
+プログラムから定義するライブラリに加え、[黒白10ルール](docs/shading-fragments.md)と[部屋・行列の3ルール](docs/room-fragments.md)、スリザーリンクの条件、黒白とセル中心ループの固定3条件を画面で扱う
 [ローカル Web アプリ](docs/web-app.md)があります。任意のルール全般や盤面型を扱うアプリ、
 良問の保証、人間向けの一般的な解法・難易度判定はまだありません。
 
@@ -117,7 +117,7 @@ uv run --no-sync python examples/generate_shading.py verify puzzle.json
 設定・問題・探索レポートの区別、入力検証、再現性は [レシピの保存と読込](docs/shading-recipe-files.md) を参照してください。
 
 探索で出題可能な完成解が見つかっても、通常生成が曖昧な別の完成解を選ぶことがあります。
-黒白4ルール・9セル以下なら `generate --selection finite` で、一意に出題できる候補を先に列挙して選べます。
+対応する黒白の組み込みルール・9セル以下なら `generate --selection finite` で、一意に出題できる候補を先に列挙して選べます。
 [選定から生成・表示・検証までの実例](docs/finite-shading-generation.md)に、行ヒントだけで出題する手順と限界をまとめています。
 
 [複数の生成結果を比較する](docs/compare-shading-seeds.md)では、３つの保存済みレシピを使い、
