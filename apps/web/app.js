@@ -1,11 +1,11 @@
 const $ = id => document.getElementById(id);
 const form = $('recipe-form');
-let catalog, plan, artifact, input = [], fixed = new Set(), revision = 0, timer;
+let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, timer;
 const selected = new Map();
 const hints = new Map();
 const messages = {
   unsatisfiable: 'この組合せを満たす盤面はありません。ルールや設定を変更してください。',
-  insufficient_hints: '選んだヒントだけでは、どの完成盤面も一意に決まりません。セルヒントなどを追加してください。',
+  insufficient_hints: '選んだヒントだけでは、どの完成盤面も一意に決まりません。セルや辺の固定ヒントなどを追加してください。',
   timeout: '計算予算に達したため打ち切りました。解なしとは判定していません。サイズやルール、予算を調整してください。',
   unconfirmed: '生成・検証を完了できませんでした。解なしや唯一解とは判定していません。',
   busy: '別の生成が実行中です。終了してからもう一度お試しください。',
@@ -17,7 +17,7 @@ function node(tag, text, className) {
   return el;
 }
 function readRequest() {
-  return {format: catalog.request_format, rows: Number($('rows').value), cols: Number($('cols').value),
+  return {format: 'puzzle-box/web-request-v2', family: profile.id, rows: Number($('rows').value), cols: Number($('cols').value),
     seed: Number($('seed').value), budget_seconds: Number($('budget').value),
     rules: [...selected].filter(([, s]) => s.toggle.checked).map(([id, s]) => ({id,
       parameters: Object.fromEntries([...s.parameters].map(([name, field]) =>
@@ -34,12 +34,13 @@ function clearArtifact() {
 }
 function syncParameters() {
   const area = Number($('rows').value) * Number($('cols').value);
-  for (const rule of catalog.rules) {
+  const edges = 2 * area + Number($('rows').value) + Number($('cols').value);
+  for (const rule of profile.rules) {
     const state = selected.get(rule.identifier);
     for (const spec of rule.parameters) {
       const field = state.parameters.get(spec.name);
       field.disabled = !state.toggle.checked;
-      if (spec.kind === 'integer') field.max = spec.maximum === 'area' ? area : spec.maximum;
+      if (spec.kind === 'integer') field.max = spec.maximum === 'area' ? area : spec.maximum === 'edges' ? edges : spec.maximum;
     }
   }
 }
@@ -69,6 +70,9 @@ function renderBoard(reveal = false) {
   if (!plan) return;
   $('preview-title').textContent = reveal ? '解答' : artifact ? '生成した問題' : '盤面プレビュー';
   const channels = new Set(plan.requirements.channels.map(c => c.name));
+  if (plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges') {
+    renderLoop(reveal, channels); return;
+  }
   const table = node('table'); table.setAttribute('aria-label', artifact ? '生成した問題' : '盤面プレビュー');
   const values = artifact?.clues || [];
   const rowCounts = new Map(values.filter(c => c.type === 'row-count').map(c => [c.row, c.count]));
@@ -111,9 +115,11 @@ function renderBoard(reveal = false) {
   $('board').replaceChildren(table);
 }
 function buildControls() {
-  for (const rule of catalog.rules) {
+  selected.clear(); hints.clear(); $('rules').replaceChildren(); $('hints').replaceChildren();
+  for (const rule of profile.rules) {
     const card = node('div', undefined, 'rule-card'); const label = node('label', undefined, 'rule-title');
-    const toggle = document.createElement('input'); toggle.type = 'checkbox'; toggle.checked = ['count', 'connected-white'].includes(rule.identifier);
+    const toggle = document.createElement('input'); toggle.type = 'checkbox';
+    toggle.checked = rule.required || profile.defaults.rules.includes(rule.identifier); toggle.disabled = rule.required;
     label.append(toggle, document.createTextNode(rule.label)); card.append(label, node('p', rule.summary));
     const parameters = new Map(), fields = node('div', undefined, 'parameters');
     for (const spec of rule.parameters) {
@@ -125,12 +131,64 @@ function buildControls() {
     }
     card.append(fields); $('rules').append(card); selected.set(rule.identifier, {toggle, parameters});
   }
-  for (const hint of catalog.clues) {
+  for (const hint of profile.clues) {
     const toggle = document.createElement('input'); toggle.type = 'checkbox'; toggle.checked = true;
     const label = node('label', undefined, 'hint'); label.append(toggle, document.createTextNode(hint.label));
     $('hints').append(label); hints.set(hint.identifier, toggle);
   }
 }
+function loopEdges() {
+  const edges = [];
+  for (let r = 0; r <= plan.rows; r++) for (let c = 0; c < plan.cols; c++) edges.push([r,c,r,c+1]);
+  for (let r = 0; r < plan.rows; r++) for (let c = 0; c <= plan.cols; c++) edges.push([r,c,r+1,c]);
+  return edges;
+}
+function renderLoop(reveal, channels) {
+  const edges = loopEdges(), indices = new Map(edges.map((e, i) => [e.join(','), i]));
+  const solution = new Set(artifact?.record.solution.map(e => e.join(',')) || []);
+  const numbers = new Map((artifact?.clues || []).filter(c => c.type === 'cell-count').map(c => [`${c.row},${c.col}`, c.count]));
+  const table = node('table', undefined, 'loop-board'); table.setAttribute('aria-label', 'ループ盤面');
+  for (let r = 0; r <= 2 * plan.rows; r++) {
+    const tr = node('tr');
+    for (let c = 0; c <= 2 * plan.cols; c++) {
+      const td = node('td');
+      if (r % 2 === 0 && c % 2 === 0) {const dot = node('span', '●', 'vertex'); dot.setAttribute('aria-hidden', 'true'); td.append(dot);}
+      else if (r % 2 && c % 2) {
+        const count = channels.has('cell-counts') ? numbers.get(`${(r-1)/2},${(c-1)/2}`) : undefined;
+        const clue = node('span', String(count ?? '·'), 'loop-clue');
+        clue.setAttribute('aria-label', `${(r+1)/2}行${(c+1)/2}列の辺数: ${count ?? 'ヒントなし'}`); td.append(clue);
+      } else {
+        const horizontal = r % 2 === 0;
+        const edge = horizontal ? [r/2,(c-1)/2,r/2,(c+1)/2] : [(r-1)/2,c/2,(r+1)/2,c/2];
+        const index = indices.get(edge.join(','));
+        const button = node('button', undefined, `edge ${horizontal ? 'horizontal' : 'vertical'}`);
+        button.type = 'button'; button.dataset.edgeIndex = index;
+        button.disabled = !artifact || fixed.has(index) || reveal;
+        if (artifact && fixed.has(index)) button.classList.add('fixed');
+        const paint = value => {
+          button.dataset.value = value;
+          button.textContent = value === -1 ? '?' : value === 0 ? '×' : horizontal ? '━' : '┃';
+          button.setAttribute('aria-label', `${horizontal ? '横辺' : '縦辺'} ${edge[0]+1}行${edge[1]+1}列: ${value === -1 ? '未入力' : value === 0 ? '線なし' : '線あり'}${artifact && fixed.has(index) ? '（固定ヒント）' : ''}`);
+        };
+        paint(reveal ? Number(solution.has(edge.join(','))) : artifact ? input[index] : -1);
+        button.addEventListener('click', () => {input[index] = (input[index]+2)%3-1; paint(input[index]); $('answer-status').textContent = '';});
+        td.append(button);
+      }
+      tr.append(td);
+    }
+    table.append(tr);
+  }
+  $('board').replaceChildren(table);
+}
+function chooseProfile() {
+  clearTimeout(timer); ++revision;
+  profile = catalog.profiles.find(p => p.id === $('family').value);
+  $('rows').value = profile.defaults.rows; $('cols').value = profile.defaults.cols;
+  $('rows').max = $('cols').max = profile.board.max_cells;
+  $('size-note').textContent = `最大${profile.board.max_cells}セル。Seedが同じでも、環境の変更をまたぐ一致は保証しません。`;
+  buildControls(); refresh();
+}
+$('family').addEventListener('change', chooseProfile);
 form.addEventListener('input', () => {clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true;
   timer = setTimeout(refresh, 120);});
 form.addEventListener('submit', async event => {
@@ -141,21 +199,30 @@ form.addEventListener('submit', async event => {
   try {
     const result = await post('/api/generate', readRequest());
     if (result.status === 'ok') {
-      artifact = result; plan = result.plan; input = Array(plan.rows * plan.cols).fill(-1); fixed = new Set();
-      for (const clue of result.clues.filter(c => c.type === 'cell')) {
-        const index = clue.row * plan.cols + clue.col; input[index] = clue.value; fixed.add(index);
+      artifact = result; plan = result.plan; fixed = new Set();
+      const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
+      input = Array(isLoop ? loopEdges().length : plan.rows * plan.cols).fill(-1);
+      for (const clue of result.clues.filter(c => c.type === (isLoop ? 'edge' : 'cell'))) {
+        const index = isLoop ? loopEdges().findIndex(e => e.join(',') === clue.edge.join(',')) : clue.row * plan.cols + clue.col;
+        input[index] = isLoop ? clue.used : clue.value; fixed.add(index);
       }
+      $('entry-note').textContent = isLoop ? '辺を押すと、未入力 → 線なし（×）→ 線ありの順に切り替わります。固定ヒントは変更できません。' : '未知のマスを押すと、未入力 → 白 → 黒の順に切り替わります。固定ヒントは変更できません。';
       renderBoard(); $('actions').hidden = false;
       $('status').textContent = `生成しました。唯一解・ヒント既約性を検証済み。\n${result.clues.length}個のヒント / ${result.evidence.enumerated_boards}盤面を独立列挙して照合。`;
     } else $('status').textContent = messages[result.status] || `設定を確認してください。${result.message || ''}`;
   } catch { $('status').textContent = '通信が途切れました。生成の成否は未確認です。予算内でサーバーの処理が終了するまでお待ちください。'; }
   finally { form.inert = false; $('generate').disabled = false; }
 });
-$('check').addEventListener('click', () => {
+$('check').addEventListener('click', async () => {
   if (!artifact) return;
-  $('answer-status').textContent = input.includes(-1) ? '未入力のマスがあります。' :
-    input.every((v, i) => v === artifact.record.solution[Math.floor(i / plan.cols)][i % plan.cols]) ?
-      '正解です。すべてのルールとヒントを満たしています。' : 'まだ正解ではありません。ルールとヒントを確認してください。';
+  if (input.includes(-1)) {$('answer-status').textContent = '未入力のマスまたは辺があります。'; return;}
+  form.inert = $('board').inert = $('actions').inert = true;
+  $('answer-status').textContent = 'サーバーでルールとヒントを確認中…';
+  try {
+    const result = await post('/api/check', {format: 'puzzle-box/web-answer-v1', request: artifact.request, clues: artifact.clues, answer: [...input]});
+    $('answer-status').textContent = result.status === 'ok' ? (result.correct ? '正解です。すべてのルールとヒントを満たしています。' : 'まだ正解ではありません。ルールとヒントを確認してください。') : messages[result.status] || '解答を検証できませんでした。';
+  } catch {$('answer-status').textContent = '通信が途切れました。解答の正しさは未確認です。';}
+  finally {form.inert = $('board').inert = $('actions').inert = false; $('check').focus();}
 });
 $('reveal').addEventListener('click', () => {
   if (!artifact) return;
@@ -170,5 +237,6 @@ $('download').addEventListener('click', () => {
 try {
   const response = await fetch('/api/catalog'); catalog = await response.json();
   if (catalog.format !== 'puzzle-box/web-catalog-v1') throw new Error('Unsupported catalog');
-  buildControls(); await refresh();
+  for (const p of catalog.profiles) {const option = node('option', p.label); option.value = p.id; $('family').append(option);}
+  chooseProfile();
 } catch { $('status').textContent = 'UI定義を読み込めません。対応するローカルサーバーの起動状態を確認してください。'; }

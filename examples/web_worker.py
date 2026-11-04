@@ -3,6 +3,7 @@
 import json
 import sys
 from typing import Any
+from puzzle_defs import SlitherlinkRecipe
 
 from analyze_shading import finite_space, full_clues
 from finite_shading import generate_finite
@@ -13,6 +14,9 @@ from web_catalog import read_request
 def generate_request(data: Any) -> dict[str, Any]:
     request = read_request(data)
     recipe = request.recipe
+    if isinstance(recipe, SlitherlinkRecipe):
+        from web_loop import generate_loop
+        return generate_loop(request, data)
     _, boards, masks = finite_space(recipe)
     allowed = set(range(len(boards)))
     for mask in masks:
@@ -46,7 +50,12 @@ def generate_request(data: Any) -> dict[str, Any]:
 
 if __name__ == "__main__":
     try:
-        result = generate_request(json.loads(sys.stdin.read(8193)))
+        data = json.loads(sys.stdin.read(8193))
+        if sys.argv[1:] == ["--check"]:
+            from web_answers import check_answer
+            result = check_answer(data)
+        else:
+            result = generate_request(data)
     except Exception:
         # Preserve uncertainty without exposing internal tracebacks/paths or
         # interpreting an implementation/solver error as a mathematical result.

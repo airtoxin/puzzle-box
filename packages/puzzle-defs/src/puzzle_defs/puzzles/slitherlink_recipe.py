@@ -1,10 +1,13 @@
 """A fixed Slitherlink recipe with cell-count and explicit edge-state clues."""
 
 from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import ClassVar, Literal, Sequence
 
 from puzzle import Cell, Edge, Solution, Vertex, at_least_one, sum_expr
 from puzzle_defs.puzzles.slitherlink import SlitherlinkPuzzle
+from puzzle_defs.ui import ClueUi, RuleUi, UiChannel, UiParameter, UiRequirements
+
+LOOP_UI = UiRequirements(channels=(UiChannel("answer", "binary-edges"),), max_cells=4)
 
 
 def _coordinate(value: object) -> bool:
@@ -13,6 +16,8 @@ def _coordinate(value: object) -> bool:
 
 @dataclass(frozen=True)
 class CellEdgeCountClue:
+    ui: ClassVar[ClueUi] = ClueUi("cell-count", "セルを囲む辺の数",
+        UiRequirements(channels=(UiChannel("cell-counts", "cell-edge-counts"),), max_cells=4))
     cell: Cell
     count: int
 
@@ -25,6 +30,8 @@ class CellEdgeCountClue:
 
 @dataclass(frozen=True)
 class EdgeStateClue:
+    ui: ClassVar[ClueUi] = ClueUi("edge", "線の有無を固定するヒント",
+        UiRequirements(channels=(UiChannel("edge-givens", "edge-givens"),), max_cells=4))
     edge: Edge
     used: int
 
@@ -52,6 +59,14 @@ class SlitherlinkRecipe:
     Edge clues fix the full visible answer when counts alone are ambiguous.
     This adapter deliberately has no shared rule interface with shading recipes.
     """
+
+    ui: ClassVar[UiRequirements] = LOOP_UI
+    rule_ui: ClassVar[tuple[RuleUi, ...]] = (
+        RuleUi("single-loop", "空でない1本のループ", "交差や分岐のない1本の輪を描きます。必須です。",
+               requirements=LOOP_UI, required=True),
+        RuleUi("loop-length", "ループの長さ", "使用する辺の本数を指定します。",
+               (UiParameter("length", "辺の本数", "integer", 8, maximum="edges"),), LOOP_UI),
+    )
 
     rows: int
     cols: int

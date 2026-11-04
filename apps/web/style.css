@@ -102,7 +102,7 @@ h2 span {
   color:#435e55;
 }
 
-input[type=number] {
+input[type=number],select {
   display:block;
   width:100%;
   padding:8px 10px;
@@ -178,11 +178,11 @@ button {
   cursor:pointer;
 }
 
-button:not(.cell):not(.primary):hover:enabled {
+button:not(.cell):not(.edge):not(.primary):hover:enabled {
   background:#dfecde;
 }
 
-button:focus-visible,input:focus-visible,summary:focus-visible {
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible {
   outline:3px solid #99601f;
   outline-offset:3px;
 }
@@ -285,6 +285,16 @@ td {
   font-size:.65rem;
   margin-left:2px;
 }
+
+.loop-board {border-spacing:3px; text-align:center;}
+.vertex {display:block; width:28px; font-size:12px;}
+.loop-clue {display:block; font-size:1.2rem; font-weight:700;}
+.edge {padding:0; border-radius:4px; font-size:1.2rem; color:#213c33; background:#fff;}
+.edge.horizontal {width:48px; height:28px;}
+.edge.vertical {width:28px; height:48px;}
+.edge[data-value="-1"] {color:#526e5e; background:#eef1e8;}
+.edge:disabled {opacity:1;}
+.edge.fixed {border:3px solid #99601f;}
 
 #status {
   font-size:.9rem;

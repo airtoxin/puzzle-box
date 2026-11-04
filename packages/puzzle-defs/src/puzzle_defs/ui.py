@@ -24,14 +24,16 @@ class UiParameter:
     kind: Literal["integer", "boolean"]
     default: int | bool
     minimum: int = 0
-    maximum: int | Literal["area"] = "area"
+    maximum: int | Literal["area", "edges"] = "area"
 
-    def validate(self, value: Any, *, area: int) -> None:
+    def validate(self, value: Any, *, area: int, edges: int | None = None) -> None:
         if self.kind == "boolean":
             if type(value) is not bool:
                 raise ValueError(f"{self.name} must be a boolean")
         elif self.kind == "integer":
-            maximum = area if self.maximum == "area" else self.maximum
+            maximum = area if self.maximum == "area" else edges if self.maximum == "edges" else self.maximum
+            if maximum is None:
+                raise ValueError("An edge bound requires the number of grid edges")
             if type(value) is not int or not self.minimum <= value <= maximum:
                 raise ValueError(f"{self.name} must be an integer in {self.minimum}..{maximum}")
         else:
@@ -45,6 +47,7 @@ class RuleUi:
     summary: str
     parameters: tuple[UiParameter, ...] = ()
     requirements: UiRequirements = UiRequirements()
+    required: bool = False
 
     def record(self) -> dict[str, Any]:
         return asdict(self)

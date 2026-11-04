@@ -221,3 +221,19 @@ def test_busy_response_and_generation_error_do_not_leak_or_hold_the_lock(local_s
     assert status == 200 and json.loads(body)["status"] == "timeout"
     assert local_server.generation_lock.acquire(blocking=False)
     local_server.generation_lock.release()
+
+
+def test_http_answer_validation_is_origin_protected_bounded_and_uses_a_real_worker(local_server):
+    result = worker.generate_request(request())
+    data = {"format": "puzzle-box/web-answer-v1", "request": request(), "clues": result["clues"],
+            "answer": [v for row in result["record"]["solution"] for v in row]}
+    assert send(local_server, "/api/check", json.dumps(data))[0] == 403
+    with local_server.generation_lock:
+        assert send(local_server, "/api/check", json.dumps(data), origin=local_server.origin)[0] == 409
+    status, _, body = send(local_server, "/api/check", json.dumps(data), origin=local_server.origin)
+    assert status == 200 and json.loads(body) == {"status": "ok", "correct": True}
+    data["answer"] = [0]*6
+    status, _, body = send(local_server, "/api/check", json.dumps(data), origin=local_server.origin)
+    assert status == 200 and json.loads(body) == {"status": "ok", "correct": False}
+    data["answer"] = [True]*6
+    assert send(local_server, "/api/check", json.dumps(data), origin=local_server.origin)[0] == 400

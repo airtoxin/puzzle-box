@@ -12,6 +12,7 @@ from typing import Any, cast
 
 from json_records import _constant, _finite_float, _object
 from web_catalog import catalog, read_request
+from web_answers import read_check
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_BODY = 8192
@@ -20,10 +21,14 @@ ASSETS = {"/": ("index.html", "text/html"), "/app.js": ("app.js", "text/javascri
 
 
 def run_generation(data: Any) -> dict[str, Any]:
-    request = read_request(data)
+    return run_job(data)
+
+
+def run_job(data: Any, *, check: bool = False) -> dict[str, Any]:
+    request = read_check(data) if check else read_request(data)
     try:
         result = subprocess.run(
-            [sys.executable, str(ROOT / "examples/web_worker.py")], input=json.dumps(data),
+            [sys.executable, str(ROOT / "examples/web_worker.py"), *( ["--check"] if check else [])], input=json.dumps(data),
             capture_output=True, text=True, encoding="utf-8", cwd=ROOT, timeout=request.budget,
             env=dict(os.environ, PYTHONHASHSEED="0", PYTHONIOENCODING="utf-8"),
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
@@ -108,7 +113,7 @@ class Handler(BaseHTTPRequestHandler):
                 or self.headers.get_content_type() != "application/json"):
             self.json_response(403, {"status": "forbidden"})
             return
-        if self.path not in ("/api/plan", "/api/generate"):
+        if self.path not in ("/api/plan", "/api/generate", "/api/check"):
             self.json_response(404, {"status": "not_found"})
             return
         try:
@@ -123,7 +128,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("Incomplete request")
             data = json.loads(raw.decode("utf-8"), object_pairs_hook=_object,
                               parse_constant=_constant, parse_float=_finite_float)
-            request = read_request(data)
+            request = read_check(data) if self.path == "/api/check" else read_request(data)
         except (ValueError, RecursionError, TimeoutError) as exc:
             self.json_response(400, {"status": "invalid", "message": str(exc)})
             return
@@ -133,7 +138,7 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response(409, {"status": "busy"})
         else:
             try:
-                self.json_response(200, run_generation(data))
+                self.json_response(200, run_job(data, check=True) if self.path == "/api/check" else run_generation(data))
             finally:
                 self.application.generation_lock.release()
 
