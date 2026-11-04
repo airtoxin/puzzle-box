@@ -157,8 +157,16 @@ def benchmark(selected: list[str], seeds: list[int], output: Path, *,
                             if (type(verified.get("clue_count")) is not int
                                     or verified["clue_count"] != len(record["clues"])):
                                 raise ValueError("Verifier clue count does not match the artifact")
-                            with (output / filename).open("xb") as target:
-                                target.write(content)
+                            destination = output / filename
+                            target = destination.open("xb")
+                            try:
+                                with target:
+                                    target.write(content)
+                            except BaseException:
+                                # Exclusive creation succeeded: this attempt owns
+                                # the file. A failed open must never enter cleanup.
+                                destination.unlink()
+                                raise
                             run.update(status="verified", artifact=filename,
                                        sha256=hashlib.sha256(content).hexdigest(), verification_result=verified)
                         except (ValueError, KeyError, TypeError, OSError) as exc:

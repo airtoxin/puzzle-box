@@ -132,6 +132,58 @@ def test_generation_failure_is_recorded_and_next_seed_runs(app, monkeypatch, tmp
     assert all(r["verification"]["reason"] == "generation_incomplete" for r in report["runs"])
 
 
+@pytest.mark.parametrize("failure", ["write", "close", "existing"])
+def test_failed_publication_removes_only_its_own_file(app, monkeypatch, tmp_path, failure):
+    output = tmp_path / "new"
+    destination = output / "shading-3x3-seed-0.json"
+    original_open = Path.open
+    monkeypatch.setattr(app, "_environment", lambda: {})
+
+    def phase(command, **kwargs):
+        if "generate" in command:
+            Path(command[command.index("--output") + 1]).write_text('{"clues": []}', encoding="utf-8")
+            return {"status": "ok", "seconds": 0.1}
+        if failure == "existing":
+            # A file arrives after directory creation, before exclusive publish.
+            destination.write_text("preserve this file", encoding="utf-8")
+        return {"status": "ok", "seconds": 0.1, "stdout": json.dumps({
+            "valid": True, "unique": True, "irreducible": True, "clue_count": 0})}
+
+    class FailingFile:
+        def __init__(self, file):
+            self.file = file
+
+        def __enter__(self):
+            return self
+
+        def write(self, content):
+            self.file.write(content[:3])  # A real incomplete file exists.
+            if failure == "write":
+                raise OSError("injected write failure")
+            self.file.write(content[3:])
+
+        def __exit__(self, *args):
+            self.file.close()
+            if failure == "close":
+                raise OSError("injected close failure")
+
+    def open_file(path, mode="r", *args, **kwargs):
+        file = original_open(path, mode, *args, **kwargs)
+        return FailingFile(file) if path == destination and mode == "xb" else file
+
+    monkeypatch.setattr(app, "_phase", phase)
+    monkeypatch.setattr(Path, "open", open_file)
+    report = app.benchmark(["shading-3x3"], [0], output)
+    assert report["runs"][0]["status"] == "artifact_failed"
+    assert report["complete"] is True
+    if failure == "existing":
+        assert destination.read_text(encoding="utf-8") == "preserve this file"
+    else:
+        assert not destination.exists()
+        assert list(output.iterdir()) == [output / "report.json"]
+        assert f"injected {failure} failure" in report["runs"][0]["error"]
+
+
 def test_three_real_recipe_types_and_failure_controls(tmp_path):
     output = tmp_path / "results"
     process = subprocess.run([
