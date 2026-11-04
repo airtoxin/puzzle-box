@@ -14,7 +14,7 @@ from puzzle_defs import ArrowCountClue, ArrowSite, BlackCellClue, EdgeStateClue,
 from puzzle_defs.puzzles.yajilin_recipe import YAJILIN_CLUE_KINDS, YajilinClue
 from generate_slitherlink import edge_record, read_edge
 from edge_answers import edge_rows, edge_template, parse_edge_answer
-from json_records import load_json
+from json_records import load_json, read_array
 
 FORMAT = "puzzle-box/yajilin-v1"
 ARROWS = {"up": "^", "down": "v", "left": "<", "right": ">"}
@@ -86,13 +86,14 @@ def read_record(data: dict[str, Any]) -> tuple[YajilinRecipe, list[YajilinClue],
                 or type(data["seed"]) is not int or data["seed"] != history["initial_seed"] + used - 1):
             raise ValueError("Generation metadata must agree with the successful seed")
     sites = []
-    for site in data["arrow_sites"]:
+    for site in read_array(data["arrow_sites"], "arrow_sites"):
         if not isinstance(site, dict) or set(site) != {"cell", "direction"}:
             raise ValueError("Invalid arrow site fields")
         sites.append(ArrowSite(read_cell(site["cell"]), site["direction"]))
-    recipe = YajilinRecipe(data["rows"], data["cols"], tuple(sites), tuple(data["clue_kinds"]))
+    recipe = YajilinRecipe(data["rows"], data["cols"], tuple(sites),
+                          tuple(read_array(data["clue_kinds"], "clue_kinds")))
     check_size(recipe)
-    clues = [read_clue(c) for c in data["clues"]]
+    clues = [read_clue(c) for c in read_array(data["clues"], "clues")]
     for clue in clues:
         kind = "arrow" if isinstance(clue, ArrowCountClue) else "black" if isinstance(clue, BlackCellClue) else "edge"
         if kind not in recipe.clue_kinds:
@@ -100,8 +101,8 @@ def read_record(data: dict[str, Any]) -> tuple[YajilinRecipe, list[YajilinClue],
     expected = data["solution"]
     if not isinstance(expected, dict) or set(expected) != {"black_cells", "loop_edges"}:
         raise ValueError("Solution must contain black_cells and loop_edges")
-    black = [read_cell(c) for c in expected["black_cells"]]
-    edges = [read_edge(e) for e in expected["loop_edges"]]
+    black = [read_cell(c) for c in read_array(expected["black_cells"], "solution.black_cells")]
+    edges = [read_edge(e) for e in read_array(expected["loop_edges"], "solution.loop_edges")]
     if len(set(black)) != len(black) or len(set(edges)) != len(edges):
         raise ValueError("Solution must not contain duplicate cells or edges")
     blocked = {s.cell for s in sites}

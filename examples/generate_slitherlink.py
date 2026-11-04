@@ -13,7 +13,7 @@ from puzzle import Cell, Edge, Vertex, unique
 from puzzle_defs import CellEdgeCountClue, EdgeStateClue, SlitherlinkRecipe
 from puzzle_defs.puzzles.slitherlink_recipe import LOOP_CLUE_KINDS, LoopClue
 from edge_answers import edge_template, parse_edge_answer
-from json_records import load_json
+from json_records import load_json, read_array
 
 FORMAT = "puzzle-box/slitherlink-v1"
 
@@ -52,13 +52,14 @@ def check_demo_size(recipe: SlitherlinkRecipe) -> None:
 def read_record(data: dict[str, Any]) -> tuple[SlitherlinkRecipe, list[LoopClue], set[Edge]]:
     if not isinstance(data, dict) or data.get("format") != FORMAT:
         raise ValueError(f"Unsupported loop puzzle format; expected an object with format {FORMAT}")
-    recipe = SlitherlinkRecipe(data["rows"], data["cols"], data["loop_length"], tuple(data["clue_kinds"]))
+    recipe = SlitherlinkRecipe(data["rows"], data["cols"], data["loop_length"],
+                              tuple(read_array(data["clue_kinds"], "clue_kinds")))
     check_demo_size(recipe)
-    clues = [read_clue(c) for c in data["clues"]]
+    clues = [read_clue(c) for c in read_array(data["clues"], "clues")]
     if any(("cell-count" if isinstance(c, CellEdgeCountClue) else "edge") not in recipe.clue_kinds
            for c in clues):
         raise ValueError("Stored clue type is not enabled by clue_kinds")
-    edges = [read_edge(e) for e in data["solution"]]
+    edges = [read_edge(e) for e in read_array(data["solution"], "solution")]
     if len(set(edges)) != len(edges):
         raise ValueError("Solution must not contain duplicate edges")
     if any(v.row > recipe.rows or v.col > recipe.cols for e in edges for v in e):

@@ -48,6 +48,13 @@ uv run --no-sync python examples/generate_yajilin.py show examples/yajilin-sampl
 
 ## メタデータと検証の範囲
 
+各形式が使用する配列項目（`rules`、`clue_kinds`、`clues`、`arrow_sites`、回答のセル・辺一覧など）は
+JSONの配列 `[...]` で指定します。空の一覧は `[]` です。`{}`、文字列、`null`、真偽値は代用できず、
+例えば `solution.black_cells must be an array` のように項目名付きでエラーになります。
+`clue_kinds` に `{"cell": false}` を渡してキーだけをヒント種別として読むこともありません。
+黒白v1のセルヒントは `[行, 列, 値]` の3要素です。正しい配列でも要素・座標・盤面の条件は別途検証します。
+Pythonから保存記録の読込関数を呼ぶ場合も配列は `list` にします。レシピ自体のPython APIで使うタプルは変更しません。
+
 通常の保存問題では `seed` と `environment` は必須ではなく、解の正しさは盤面・ルール・ヒントから検証します。
 Yajilinの `generation` がある場合は、成功seedと試行回数の整合性も確認します。
 通常の問題CLIは未知の追加トップレベル項目を従来どおり無視しますが、レシピ設定とcoupled診断用の形式は追加項目を拒否します。

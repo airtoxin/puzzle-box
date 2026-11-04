@@ -8,6 +8,13 @@ from typing import Any
 MAX_BYTES = 65536
 
 
+def read_array(value: Any, name: str) -> list[Any]:
+    """Require a JSON array before iterating or converting a saved field."""
+    if not isinstance(value, list):
+        raise ValueError(f"{name} must be an array")
+    return value
+
+
 def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
