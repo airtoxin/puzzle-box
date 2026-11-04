@@ -76,6 +76,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", content_type + "; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
+        self.send_header("Connection", "close")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; "
@@ -106,7 +107,31 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.json_response(404, {"status": "not_found"})
 
+    def read_body(self) -> bytes:
+        lengths = self.headers.get_all("Content-Length", [])
+        if len(lengths) != 1 or not lengths[0].isdigit() or "Transfer-Encoding" in self.headers:
+            raise ValueError("A single Content-Length is required")
+        length = int(lengths[0])
+        if length <= 0:
+            raise ValueError("Request must have a nonempty body")
+        # Consume a bounded, framed request before a rejection closes the socket:
+        # closing with incoming body data can erase the response via a TCP reset.
+        # Read at most one extra byte even if a hostile length declares gigabytes.
+        raw = self.rfile.read(min(length, MAX_BODY + 1))
+        if length > MAX_BODY:
+            raise ValueError("Request must be at most 8192 bytes")
+        if len(raw) != length:
+            raise ValueError("Incomplete request")
+        return raw
+
     def do_POST(self) -> None:
+        try:
+            raw = self.read_body()
+        except (ValueError, TimeoutError) as exc:
+            self.json_response(400, {"status": "invalid", "message": str(exc)})
+            return
+        except OSError:
+            return  # The client disconnected; no work or JSON parsing occurred.
         if not self.valid_host():
             return
         if (self.headers.get_all("Origin") != [self.application.origin]
@@ -117,15 +142,6 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response(404, {"status": "not_found"})
             return
         try:
-            lengths = self.headers.get_all("Content-Length", [])
-            if len(lengths) != 1 or not lengths[0].isdigit() or "Transfer-Encoding" in self.headers:
-                raise ValueError("A single Content-Length is required")
-            length = int(lengths[0])
-            if not 0 < length <= MAX_BODY:
-                raise ValueError("Request must be at most 8192 bytes")
-            raw = self.rfile.read(length)
-            if len(raw) != length:
-                raise ValueError("Incomplete request")
             data = json.loads(raw.decode("utf-8"), object_pairs_hook=_object,
                               parse_constant=_constant, parse_float=_finite_float)
             request = read_check(data) if self.path == "/api/check" else read_request(data)

@@ -5,6 +5,7 @@ from dataclasses import fields
 import http.client
 import importlib
 import json
+import socket
 from pathlib import Path
 import subprocess
 import sys
@@ -204,6 +205,32 @@ def test_http_catalog_static_allowlist_and_real_plan(local_server):
 def test_http_rejects_cross_origin_or_simple_form_requests(local_server, origin, content_type):
     origin = local_server.origin if origin == "same" else origin
     assert send(local_server, "/api/generate", json.dumps(request()), origin=origin, content_type=content_type)[0] == 403
+
+
+def test_rejected_origin_consumes_bounded_framed_body_before_closing(local_server):
+    body = json.dumps(request()).encode("ascii")
+    headers = (f"POST /api/check HTTP/1.1\r\nHost: {local_server.authority}\r\n"
+               f"Origin: https://attacker.example\r\nContent-Type: application/json\r\n"
+               f"Content-Length: {len(body)}\r\n\r\n").encode("ascii")
+    with socket.create_connection(("127.0.0.1", local_server.server_port), timeout=3) as connection:
+        connection.sendall(headers)
+        connection.settimeout(0.15)
+        # Sending the body after an early close can reset the connection and
+        # discard the rejection response on Windows (WinError 10053).
+        with pytest.raises(TimeoutError): connection.recv(4096)
+        connection.settimeout(3); connection.sendall(body)
+        response = http.client.HTTPResponse(connection); response.begin()
+        assert response.status == 403 and json.loads(response.read()) == {"status": "forbidden"}
+
+
+def test_oversized_declared_body_reads_only_one_byte_beyond_the_limit(local_server):
+    headers = (f"POST /api/check HTTP/1.1\r\nHost: {local_server.authority}\r\n"
+               "Content-Length: 999999999\r\n\r\n").encode("ascii")
+    with socket.create_connection(("127.0.0.1", local_server.server_port), timeout=3) as connection:
+        connection.sendall(headers + b"x"*(server_api.MAX_BODY+1))
+        response = http.client.HTTPResponse(connection); response.begin()
+        assert response.status == 400
+        assert "8192 bytes" in json.loads(response.read())["message"]
 
 
 @pytest.mark.parametrize("body", ['{"seed":0,"seed":1}', '{"x":NaN}', "["*1100, "x"*8193, b"\xff"],
