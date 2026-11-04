@@ -77,3 +77,10 @@ def test_export_and_reader_agree_on_each_enabled_clue_kind(kind, clue, enabled, 
                             lambda *a, **k: pytest.fail("Reject disabled clues before building"))
         with pytest.raises(ValueError, match="not enabled by clue_kinds"):
             display.puzzle_record(recipe, [clue], seed=0)
+
+
+@pytest.mark.parametrize("rules,clues", [((BlackCount(0),), [(Cell(0, 0), 0)]),
+                                        ((), [(Cell(0, 0), 1), (Cell(0, 0), 1)])])
+def test_export_rejects_redundant_clues_just_like_verification(rules, clues):
+    with pytest.raises(ValueError, match="not irreducible"):
+        display.puzzle_record(ShadingRecipe(1, 1, rules), clues, seed=0)

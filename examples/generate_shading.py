@@ -31,9 +31,17 @@ def _check_clue_kinds(recipe: ShadingRecipe, clues: list[Clue]) -> None:
             raise ValueError("Stored clue type is not enabled by clue_kinds")
 
 
+def _check_irreducible(recipe: ShadingRecipe, clues: list[Clue]) -> None:
+    for idx in range(len(clues)):
+        trial = recipe.build_from_clues(clues[:idx] + clues[idx + 1:])
+        trial.add(unique())
+        if trial.solve() is not None:
+            raise ValueError("Stored clues are not irreducible: a clue can still be removed")
+
+
 def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
                   selection: str = "solver") -> dict[str, Any]:
-    """Serialize generated clues only after proving their unique visible answer."""
+    """Serialize a unique, irreducible puzzle accepted by the built-in reader."""
     if type(recipe) is not ShadingRecipe:
         raise ValueError("This format requires an exact ShadingRecipe; composed recipes and subclasses need their own codec")
     check_demo_size(recipe)
@@ -46,6 +54,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     solution = puzzle.solve()
     if solution is None:
         raise ValueError("Generated clues did not determine a unique answer")
+    _check_irreducible(recipe, clues)
     legacy = recipe.clue_kinds == ("cell",)
     record = {
         "format": FORMAT if legacy else MIXED_FORMAT,
@@ -121,11 +130,7 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Stored clues are not uniquely solvable")
     if puzzle.result(solution) != answer:
         raise ValueError("Stored solution does not match the uniquely determined answer")
-    for idx in range(len(clues)):
-        trial = recipe.build_from_clues(clues[:idx] + clues[idx + 1:])
-        trial.add(unique())
-        if trial.solve() is not None:
-            raise ValueError("Stored clues are not irreducible: a clue can still be removed")
+    _check_irreducible(recipe, clues)
     return {"valid": True, "unique": True, "irreducible": True, "clue_count": len(clues)}
 
 
