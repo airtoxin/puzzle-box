@@ -57,6 +57,7 @@ from puzzle_defs.puzzles.room_neighbors import NoColorAcrossRooms, AdjacentRoomC
 from puzzle_defs.puzzles.room_components import RoomComponentCount, EqualRoomComponentSizes
 from puzzle_defs.puzzles.component_area_clues import ComponentAreaClues
 from puzzle_defs.puzzles.corner_linked_components import CornerLinkedComponents
+from puzzle_defs.puzzles.one_false_neighbor_count import OneFalseAdjacentCountPerRoom
 
 __all__ = [
     "AdjacentBlackRuns",
@@ -67,6 +68,7 @@ __all__ = [
     "EqualRoomComponentSizes",
     "ComponentAreaClues",
     "CornerLinkedComponents",
+    "OneFalseAdjacentCountPerRoom",
     "numbered_white_endpoints",
     "WhiteEndpointMarkers",
     "WhiteAreaClues",

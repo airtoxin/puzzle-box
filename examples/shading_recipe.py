@@ -23,7 +23,7 @@ from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
 from puzzle_defs import NoColorAcrossRooms, AdjacentRoomCountsDiffer
 from puzzle_defs import RoomComponentCount, EqualRoomComponentSizes
 from puzzle_defs import ComponentAreaClues
-from puzzle_defs import CornerLinkedComponents
+from puzzle_defs import CornerLinkedComponents, OneFalseAdjacentCountPerRoom
 from puzzle_defs.puzzles.corner_linked_components import MAX_CORNER_LINK_CELLS
 from puzzle_defs.puzzles.component_area_clues import DEFAULT_COMPONENT_AREAS
 from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
@@ -52,7 +52,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
                       AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues, WhiteEndpointMarkers, AdjacentBlackRuns, RoomFillLevels,
-                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents)
+                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents, OneFalseAdjacentCountPerRoom)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -88,12 +88,16 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "equal-room-component-sizes": EqualRoomComponentSizes(DEFAULT_ROOMS),
             "component-area-clues": ComponentAreaClues(DEFAULT_COMPONENT_AREAS),
             "corner-linked-components": CornerLinkedComponents(),
+            "one-false-adjacent-count-per-room": OneFalseAdjacentCountPerRoom(DEFAULT_ROOMS, DEFAULT_NEIGHBOR_COUNTS),
             "adjacent-black-component-sum": AdjacentBlackComponentSum(DEFAULT_COMPONENT_COUNTS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
 def rule_record(rule: ShadingRule) -> dict[str, Any]:
     # A subclass may change apply(); serializing only its parent would lose rules.
+    if type(rule) is OneFalseAdjacentCountPerRoom:
+        return {"type":rule.ui.identifier,"rooms":[list(row) for row in rule.rooms],
+                "neighbor_counts":[list(row) for row in rule.neighbor_counts]}
     if type(rule) is CornerLinkedComponents:
         return {"type":rule.ui.identifier,"black":rule.black}
     if type(rule) is ComponentAreaClues:
@@ -158,6 +162,11 @@ def read_rule(data: Any) -> ShadingRule:
     if not isinstance(data, dict):
         raise ValueError("A rule must be an object")
     kind = data.get("type")
+    if kind == "one-false-adjacent-count-per-room" and set(data) == {"type", "rooms", "neighbor_counts"}:
+        if (type(data["rooms"]) is not list or any(type(row) is not list for row in data["rooms"])
+                or type(data["neighbor_counts"]) is not list or any(type(row) is not list for row in data["neighbor_counts"])):
+            raise ValueError("Room and clue grids must be arrays of arrays")
+        return OneFalseAdjacentCountPerRoom(room_map(data["rooms"]),clue_grid(data["neighbor_counts"],maximum=8))
     if kind == "count" and set(data) == {"type", "count"}:
         return BlackCount(data["count"])
     if kind == "non-touching" and set(data) == {"type", "diagonal"}:
@@ -278,7 +287,8 @@ def shared_rooms(recipe: ShadingRecipe) -> RoomMap | None:
                or type(rule) is NoWhiteAcrossThreeRooms or type(rule) is RoomRotationalSymmetry
                or type(rule) is NoTouchingEqualTetrominoes or type(rule) is UniformRooms or type(rule) is RoomFillLevels
                or type(rule) is NoColorAcrossRooms or type(rule) is AdjacentRoomCountsDiffer
-               or type(rule) is RoomComponentCount or type(rule) is EqualRoomComponentSizes]
+               or type(rule) is RoomComponentCount or type(rule) is EqualRoomComponentSizes
+               or type(rule) is OneFalseAdjacentCountPerRoom]
     for layout in layouts:
         room_map(layout, rows=recipe.rows, cols=recipe.cols)
     if layouts and any(layout != layouts[0] for layout in layouts):
@@ -359,7 +369,7 @@ def shared_island_areas(recipe: ShadingRecipe) -> NumberGrid | None:
 
 
 def shared_neighbor_counts(recipe: ShadingRecipe) -> ClueGrid | None:
-    grids = [rule.neighbor_counts for rule in recipe.rules if type(rule) is AdjacentBlackCounts]
+    grids = [rule.neighbor_counts for rule in recipe.rules if type(rule) is AdjacentBlackCounts or type(rule) is OneFalseAdjacentCountPerRoom]
     for grid in grids:
         clue_grid(grid, rows=recipe.rows, cols=recipe.cols, maximum=8)
     if grids and any(grid != grids[0] for grid in grids):
