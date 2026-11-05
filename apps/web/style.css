@@ -189,7 +189,7 @@ button:not(.cell):not(.edge):not(.primary):hover:enabled {
   background:#dfecde;
 }
 
-button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible {
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible,.board:focus-visible {
   outline:3px solid #99601f;
   outline-offset:3px;
 }
@@ -228,6 +228,7 @@ button:disabled {
 
 .board {
   overflow:auto;
+  scroll-padding-inline-start:2.5rem;
   padding:28px 0;
   min-height:230px;
   display:flex;
@@ -246,6 +247,14 @@ th {
   font-size:.9rem;
   min-width:25px;
   color:#526e5e;
+}
+
+/* Keep row clues visible while a wide cell board scrolls horizontally. */
+th[scope=row] {
+  position:sticky;
+  left:0;
+  z-index:1;
+  background:#fffefa;
 }
 
 td {
@@ -386,7 +395,7 @@ footer {
     padding:18px;
   }
   .workspace {
-    grid-template-columns:1fr;
+    grid-template-columns:minmax(0,1fr);
   }
   .result {
     position:static;
