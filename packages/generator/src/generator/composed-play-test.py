@@ -59,12 +59,38 @@ def test_builtin_play_shows_count_givens_and_every_rule_without_answer():
     assert "Exactly 2 cells are black." in shown
     assert "All white cells connect through edges; at least one must be white." in shown
     assert "All black cells connect through edges; at least one must be black." in shown
-    assert "  1     0 |" in shown  # Zero row count is a clue, not a missing clue.
     assert "Answer template:" in shown
     revealed = app.show(data, reveal=True)
     assert _board(revealed) == [["#" if v else "." for v in row] for row in data["solution"]]
     assert revealed.startswith("Solution:") and "Answer template:" not in revealed
     assert data == before
+
+
+def test_zero_row_count_is_shown_as_a_clue():
+    # Fixed, uniquely solvable record: relying on a seed to generate this clue
+    # ties the display test to solver/model search order.
+    data = {"format": app.FORMAT, "recipe": _recipe("composed-shading-recipe-sample.json"), "seed": 0,
+            "clues": [{"type": "row-count", "row": 0, "count": 0},
+                      {"type": "column-count", "col": 0, "count": 1}],
+            "solution": [[0, 0, 0], [1, 1, 0]]}
+    def connected(bits, color):
+        cells = {i for i, bit in enumerate(bits) if bit == color}
+        seen, todo = set(), list(cells)[:1]
+        while todo:
+            i = todo.pop()
+            if i not in seen:
+                seen.add(i)
+                todo.extend(j for j in cells-seen if abs(i//3-j//3)+abs(i%3-j%3) == 1)
+        return bool(cells) and seen == cells
+    boards = [bits for bits in product((0, 1), repeat=6)
+              if sum(bits) == 2 and connected(bits, 0) and connected(bits, 1)]
+    row_zero = lambda bits: sum(bits[:3]) == 0
+    column_one = lambda bits: bits[0] + bits[3] == 1
+    assert [bits for bits in boards if row_zero(bits) and column_one(bits)] == [(0, 0, 0, 1, 1, 0)]
+    assert sum(row_zero(bits) for bits in boards) > 1
+    assert sum(column_one(bits) for bits in boards) > 1
+    assert app.verify(data) == {"valid": True, "unique": True, "irreducible": True, "clue_count": 2}
+    assert "  1     0 |" in app.show(data)
 
 
 def test_custom_play_keeps_component_identity_and_all_parameter_values():
