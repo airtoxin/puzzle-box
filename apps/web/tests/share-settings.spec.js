@@ -49,6 +49,7 @@ test('failed shared preview can be retried without reloading', async ({page}) =>
   await recipient.goto(url); await expect(recipient.locator('#share-status')).toContainText('読み込めませんでした');
   await expect(recipient.locator('#generate')).toBeEnabled();
   await expect(recipient.locator('#seed')).toHaveValue('0');
+  await expect(recipient.locator('#load-shared-settings')).toContainText('現在の問題・回答は消えます');
   await recipient.locator('#load-shared-settings').click();
   await expect(recipient.locator('#share-status')).toContainText('読み込みました');
   await expect(recipient.locator('#seed')).toHaveValue('7');
@@ -148,6 +149,7 @@ test('loading a link cancels safely when the user edits the current board', asyn
   await expect(page.locator('#actions')).toBeVisible(); await expect(cell).toHaveAttribute('data-value', before);
   await expect(page.locator('#seed')).toHaveValue('0');
   await expect(page.locator('#navigation-status')).toContainText('中止');
+  await expect(page.locator('#load-shared-settings')).toContainText('現在の問題・回答は消えます');
 });
 
 test('shared URL excludes query parameters and tolerates object key order', async ({page}) => {
