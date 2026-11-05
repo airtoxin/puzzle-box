@@ -163,3 +163,70 @@ test('the latest hash wins while initial shared settings are loading', async ({p
   await expect(recipient.locator('#generate')).toBeEnabled();
   await context.close();
 });
+
+for (const action of ['edit', 'check']) {
+  test(`a delayed shared preview cannot erase a later board ${action}`, async ({page}) => {
+    await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+    await page.locator('#seed').fill('7'); const url = await share(page);
+    await page.locator('#seed').fill('0'); await expect(page.locator('#generate')).toBeEnabled();
+    const response = page.waitForResponse('**/api/generate'); await page.locator('#generate').click();
+    const result = await (await response).json(); expect(result.status).toBe('ok');
+    if (action === 'check') {
+      for (const [i, value] of result.record.solution.flat().entries()) {
+        const cell = page.locator(`[data-cell-index="${i}"]`);
+        if (await cell.isEnabled()) while (await cell.getAttribute('data-value') !== String(value)) await cell.click();
+      }
+    }
+    let release, started; const gate = new Promise(r => {release = r;});
+    const waiting = new Promise(r => {started = r;});
+    await page.route('**/api/plan', async route => {started(); await gate; await route.continue();});
+    await page.evaluate(hash => {location.hash = hash;}, new URL(url).hash); await waiting;
+    const cell = page.locator('.cell:enabled').first();
+    if (action === 'edit') await cell.click();
+    else { const checked = page.waitForResponse('**/api/check'); await page.locator('#check').click(); await checked; await expect(page.locator('#answer-status')).toContainText('正解'); }
+    const before = await cell.getAttribute('data-value');
+    release(); await expect(page.locator('#share-status')).toContainText('中止');
+    await expect(page.locator('#actions')).toBeVisible(); await expect(cell).toHaveAttribute('data-value', before);
+    await expect(page.locator('#seed')).toHaveValue('0');
+  });
+}
+
+test('back to a hashless URL restores its previous settings', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#seed').fill('7'); const url = await share(page);
+  await page.locator('#seed').fill('3'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.evaluate(hash => {location.hash = hash;}, new URL(url).hash);
+  await expect(page.locator('#seed')).toHaveValue('7'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.goBack(); await expect(page.locator('#seed')).toHaveValue('3');
+});
+
+test('restoring another link clears an older displayed share URL', async ({page}) => {
+  await page.goto('/'); const first = await share(page);
+  await page.locator('#seed').fill('7'); const second = await share(page);
+  await page.evaluate(hash => {location.hash = hash;}, new URL(first).hash);
+  await expect(page.locator('#seed')).toHaveValue('0');
+  await share(page); await expect(page.locator('#share-url')).not.toHaveValue('');
+  await page.evaluate(hash => {location.hash = hash;}, new URL(second).hash);
+  await expect(page.locator('#seed')).toHaveValue('7');
+  await expect(page.locator('#share-url')).toHaveValue('');
+});
+
+for (const action of ['edit', 'generate']) {
+  test(`a delayed shared preview reports cancellation after form ${action}`, async ({page}) => {
+    await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+    await page.locator('#seed').fill('7'); const url = await share(page);
+    await page.locator('#seed').fill('0'); await expect(page.locator('#generate')).toBeEnabled();
+    let release, started; const gate = new Promise(r => {release = r;});
+    const waiting = new Promise(r => {started = r;});
+    await page.route('**/api/plan', async route => {
+      if (route.request().postDataJSON().seed === 7) {started(); await gate;}
+      await route.continue();
+    });
+    await page.evaluate(hash => {location.hash = hash;}, new URL(url).hash); await waiting;
+    if (action === 'edit') await page.locator('#seed').fill('3');
+    else {const generated = page.waitForResponse('**/api/generate'); await page.locator('#generate').click(); await generated;}
+    release(); await expect(page.locator('#share-status')).toContainText('中止');
+    await expect(page.locator('#seed')).toHaveValue(action === 'edit' ? '3' : '0');
+    if (action === 'generate') await expect(page.locator('#actions')).toBeVisible();
+  });
+}
