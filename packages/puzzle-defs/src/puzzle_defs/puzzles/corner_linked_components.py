@@ -6,7 +6,7 @@ from typing import ClassVar
 
 from puzzle import Cell, Puzzle, SquareGrid, VarMap, sum_expr
 from puzzle_defs.puzzles.component_shapes import _check_color
-from puzzle_defs.ui import RuleUi, UiParameter
+from puzzle_defs.ui import RuleUi, UiParameter, UiRequirements
 
 MAX_CORNER_LINK_CELLS = 10
 
@@ -29,13 +29,14 @@ class CornerLinkedComponents:
 
     Empty color sets and multiple chains are allowed. Diagonal contacts inside
     the same orthogonal component do not count. Core/file limit: ten cells;
-    the Web and finite tools retain their existing nine-cell limit.
+    the Web shares that limit; finite diagnostics remain limited to nine.
     """
 
     ui: ClassVar[RuleUi] = RuleUi(
         "corner-linked-components", "各成分を別の成分と角でつなぐ",
         "対象色の各上下左右の成分を、別成分と角で接触させます。成分内部の角接触は数えません。複数チェーン・対象色0個は許し、形の一致は検査しません。",
         (UiParameter("black", "角でつなぐ色は黒（オフなら白）", "boolean", True),),
+        requirements=UiRequirements(max_cells=10),
     )
     black: bool = True
 

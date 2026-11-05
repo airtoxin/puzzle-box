@@ -24,7 +24,7 @@ class ComponentAreaClues:
         "component-area-clues", "数字セルが属する成分の面積を固定",
         "数字を含む同色の上下左右の成分を、そのマス数にします。数字セルは黒にも白にもできます。0は数字なし。9セル以下の実験的な部品です。",
         (UiParameter("component_areas", "所属する成分の面積（0は数字なし）", "number-grid", DEFAULT_COMPONENT_AREAS),),
-        UiRequirements(channels=(UiChannel("answer","binary-cells"),UiChannel("component-areas","cell-component-areas"))),
+        UiRequirements(max_cells=9, channels=(UiChannel("answer","binary-cells"),UiChannel("component-areas","cell-component-areas"))),
     )
     component_areas: NumberGrid
 

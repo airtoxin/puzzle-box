@@ -19,7 +19,7 @@ class UiChannel:
 class UiRequirements:
     topology: str = "rectangular-cells"
     channels: tuple[UiChannel, ...] = (UiChannel("answer", "binary-cells"),)
-    max_cells: int = 9
+    max_cells: int = 100
     min_rows: int = 1
     min_cols: int = 1
 

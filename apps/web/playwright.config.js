@@ -9,7 +9,7 @@ export default defineConfig({
   testDir: './tests', workers: 1, retries: 0, timeout: 45000,
   // Keep a bounded suite budget as rule-fragment coverage grows; individual
   // tests still fail after 45s, and CI logs identify the last running case.
-  globalTimeout: 300000,
+  globalTimeout: 480000,
   reporter: process.env.CI ? 'line' : 'list',
   use: {baseURL: remote || 'http://127.0.0.1:8792', headless: true},
   webServer: remote ? undefined : {

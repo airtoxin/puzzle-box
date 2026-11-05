@@ -60,7 +60,7 @@ uv run --no-sync python examples/generate_shading.py verify stars.json
 ```
 
 通常のPython生成には壁時計の時間制限がありません。盤面を大きくしても短時間で終わる保証はありません。
-小盤面の有限生成・診断は9セル・8ルール出現以下、保存CLIは25セル以下です。
+小盤面の有限生成・診断は9セル・8ルール出現以下、保存CLIは100セル以下です。
 `--rules room-black-count` などの短縮指定は既定の2×3部屋配置を使います。独自配置には保存レシピかPython APIを使ってください。
 
 ## 部屋データと UI の合成

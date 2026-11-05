@@ -1,4 +1,7 @@
-from typing import Hashable, Iterable, Sequence, cast
+from dataclasses import dataclass
+import math
+import time
+from typing import Hashable, Iterable, Literal, Sequence, cast
 
 from ortools.sat.python import cp_model
 
@@ -57,6 +60,15 @@ ConstraintType = (
     | NoBoundaryCrossConstraint
     | CompoundConstraint
 )
+
+
+@dataclass(frozen=True)
+class SolveResult:
+    """Feasibility and visible-answer uniqueness are separate proof results."""
+
+    status: Literal["sat", "unsat", "unknown"]
+    solution: Solution | None = None
+    uniqueness: Literal["unique", "multiple", "unknown", "not_checked"] = "not_checked"
 
 
 class Puzzle:
@@ -397,29 +409,66 @@ class Puzzle:
         A supplied seed uses one search worker for repeatable search with a fixed
         model and solver version. Unseeded solving keeps the solver's defaults.
         """
-        solver = cp_model.CpSolver()
-        if seed is not None:
-            solver.parameters.random_seed = seed
-            solver.parameters.num_search_workers = 1
-
-        status = solver.solve(self._model)
-        if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        result = self.solve_result(seed=seed)
+        if self._require_unique and result.uniqueness != "unique":
             return None
+        return result.solution
 
-        if self._require_unique:
-            variables = self._vars if self._solution_vars is None else self._solution_vars
-            if variables:
-                alternative = self._model.clone()
-                # The clone retains variable indices. Exclude the whole visible
-                # assignment, thereby excluding all its internal witnesses at once.
-                alternative.add_forbidden_assignments(
-                    [var._internal for var in variables],
-                    [[solver.value(var._internal) for var in variables]],
-                )
-                checker = cp_model.CpSolver()
-                if seed is not None:
-                    checker.parameters.random_seed = seed
-                    checker.parameters.num_search_workers = 1
-                if checker.solve(alternative) != cp_model.INFEASIBLE:
-                    return None
-        return Solution(solver, self._model)
+    def exclude_solution(self, solution: Solution) -> None:
+        """Exclude one visible answer and all of its auxiliary witnesses."""
+        variables = self._vars if self._solution_vars is None else self._solution_vars
+        if solution._model is not self._model:
+            raise ValueError("Solution must belong to the same Puzzle")
+        if not variables:
+            self._model.add_bool_or([])
+            return
+        self._model.add_forbidden_assignments(
+            [var._internal for var in variables], [[solution.value(var) for var in variables]],
+        )
+
+    def solve_result(self, seed: int | None = None, *, time_limit: float | None = None,
+                     check_unique: bool = False) -> SolveResult:
+        """Solve within one shared time budget, preserving unknown outcomes.
+
+        SAT includes a witness even if uniqueness is multiple or unknown. Only
+        an INFEASIBLE second solve proves uniqueness. Model errors raise instead
+        of becoming mathematical verdicts. The original model is unchanged.
+        """
+        if time_limit is not None and (not math.isfinite(time_limit) or time_limit < 0):
+            raise ValueError("time_limit must be finite and nonnegative")
+        deadline = None if time_limit is None else time.monotonic() + time_limit
+
+        def run(model: cp_model.CpModel):
+            solver = cp_model.CpSolver()
+            if seed is not None:
+                solver.parameters.random_seed = seed
+                solver.parameters.num_search_workers = 1
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return solver, cp_model.UNKNOWN
+                solver.parameters.max_time_in_seconds = remaining
+            status = solver.solve(model)
+            if status == cp_model.MODEL_INVALID:
+                raise ValueError("Invalid solver model")
+            return solver, status
+
+        solver, status = run(self._model)
+        if status == cp_model.INFEASIBLE:
+            return SolveResult("unsat")
+        if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            return SolveResult("unknown")
+        solution = Solution(solver, self._model)
+        if not (check_unique or self._require_unique):
+            return SolveResult("sat", solution)
+        variables = self._vars if self._solution_vars is None else self._solution_vars
+        if not variables:
+            return SolveResult("sat", solution, "unique")
+        alternative = self._model.clone()
+        alternative.add_forbidden_assignments(
+            [var._internal for var in variables], [[solution.value(var) for var in variables]],
+        )
+        _, status = run(alternative)
+        uniqueness = ("unique" if status == cp_model.INFEASIBLE else "multiple"
+                      if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else "unknown")
+        return SolveResult("sat", solution, uniqueness)

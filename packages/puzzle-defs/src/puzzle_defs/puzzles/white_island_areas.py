@@ -24,7 +24,7 @@ class WhiteIslandAreas:
         "white-island-areas", "白い島の面積を数字に合わせる",
         "各白連結成分は正の数字を1つ含み、面積をその数字に合わせます。数字マスは白、0は数字なし。9セル以下です。",
         (UiParameter("areas", "白い島の面積（0は数字なし）", "number-grid", DEFAULT_ISLAND_AREAS, maximum=99),),
-        UiRequirements(channels=(UiChannel("answer", "binary-cells"), UiChannel("island-areas", "cell-island-areas"))),
+        UiRequirements(max_cells=9, channels=(UiChannel("answer", "binary-cells"), UiChannel("island-areas", "cell-island-areas"))),
     )
     areas: NumberGrid
 

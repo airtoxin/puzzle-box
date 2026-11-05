@@ -54,7 +54,7 @@ def app(environ, start_response):
         length = environ.get("CONTENT_LENGTH", "")
         if (not length.isascii() or not length.isdigit() or len(length) > 5
                 or not 0 < int(length) <= MAX_BODY or environ.get("HTTP_TRANSFER_ENCODING")):
-            raise ValueError("A body of 1..8192 bytes and a single Content-Length is required")
+            raise ValueError(f"A body of 1..{MAX_BODY} bytes and a single Content-Length is required")
         raw = environ["wsgi.input"].read(int(length))
         if len(raw) != int(length): raise ValueError("Incomplete request body")
         data = json.loads(raw.decode("utf-8"), object_pairs_hook=_object,

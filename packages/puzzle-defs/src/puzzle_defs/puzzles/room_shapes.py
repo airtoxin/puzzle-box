@@ -1,6 +1,6 @@
 """Conditional shape-contact rules, separate from room piece-size constraints."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import ClassVar
 
 from puzzle import Cell, Puzzle, SquareGrid, VarMap, non_touching, sum_expr
@@ -22,7 +22,7 @@ class NoTouchingEqualTetrominoes:
 
     ui: ClassVar[RuleUi] = RuleUi("no-touching-equal-tetrominoes", "同形テトロミノの部屋間接触を禁止",
         "各部屋の黒が連結4マスのとき、回転・反転して同じ形同士の辺接触を禁止します。黒数・部屋内連結は別ルールです。",
-        (ROOM_PARAMETER,), ROOM_UI)
+        (ROOM_PARAMETER,), replace(ROOM_UI, max_cells=25))
     rooms: RoomMap
 
     def __post_init__(self) -> None:

@@ -2,7 +2,9 @@
 
 from typing import Any
 
-from puzzle_defs import SlitherlinkRecipe, YajilinRecipe, YajilinAnswer
+from puzzle_defs import (SlitherlinkRecipe, YajilinRecipe, YajilinAnswer,
+                         CellEdgeCountClue, EdgeStateClue, RowCountClue, ColumnCountClue,
+                         BlackCellClue, ArrowCountClue)
 from generate_shading import read_clue as shading_clue
 from generate_slitherlink import read_clue as loop_clue
 from generate_yajilin import read_clue as coupled_clue
@@ -39,13 +41,42 @@ def read_check(data: Any):
             raise ValueError("Clue kind is not enabled by this recipe")
     if isinstance(recipe, YajilinRecipe):
         clues = [coupled_clue(c) for c in data["clues"]]
-        recipe.build_from_clues(clues)
+        for clue in clues:
+            if isinstance(clue, (BlackCellClue, ArrowCountClue)):
+                if clue.cell.row >= recipe.rows or clue.cell.col >= recipe.cols:
+                    raise ValueError("Cell clue is outside the board")
+                if isinstance(clue, ArrowCountClue):
+                    site = next((site for site in recipe.arrow_sites if site.cell == clue.cell), None)
+                    if site is None or clue.count > len(recipe.ray(site)):
+                        raise ValueError("Arrow count must fit a configured arrow site's ray")
+                if isinstance(clue, BlackCellClue) and clue.cell in {site.cell for site in recipe.arrow_sites}:
+                    raise ValueError("Black clue cannot refer to an arrow site")
+            elif isinstance(clue, EdgeStateClue):
+                if any(v.row >= recipe.rows or v.col >= recipe.cols for v in clue.edge):
+                    raise ValueError("Edge clue is outside the board")
     elif isinstance(recipe, SlitherlinkRecipe):
         clues = [loop_clue(c) for c in data["clues"]]
-        recipe.build_from_clues(clues)
+        for clue in clues:
+            if isinstance(clue, CellEdgeCountClue):
+                if clue.cell.row >= recipe.rows or clue.cell.col >= recipe.cols:
+                    raise ValueError("Cell clue is outside the board")
+            elif any(v.row > recipe.rows or v.col > recipe.cols for v in clue.edge):
+                raise ValueError("Edge clue is outside the board")
     else:
         clues = [shading_clue(c) for c in data["clues"]]
-        recipe.build_from_clues(clues)
+        for clue in clues:
+            if isinstance(clue, RowCountClue):
+                if clue.row >= recipe.rows or clue.count > recipe.cols:
+                    raise ValueError("Row clue index or count exceeds the board dimensions")
+            elif isinstance(clue, ColumnCountClue):
+                if clue.col >= recipe.cols or clue.count > recipe.rows:
+                    raise ValueError("Column clue index or count exceeds the board dimensions")
+            else:
+                cell, value = clue
+                if not (0 <= cell.row < recipe.rows and 0 <= cell.col < recipe.cols):
+                    raise ValueError("Clue cell is outside the board")
+                if type(value) is not int or value not in (0, 1):
+                    raise ValueError("Clue values must be 0 (white) or 1 (black)")
     if len(set(clues)) != len(clues): raise ValueError("Duplicate clues are not supported")
     return request
 
@@ -74,14 +105,11 @@ def check_answer(data: Any) -> dict[str, Any]:
         puzzle = recipe.build_from_clues(clues)
         for edge, bit in zip(edges, data["answer"]): puzzle.add(puzzle.edge_on[edge] == bit)
     else:
-        from analyze_shading import finite_space, full_clues as shading_full_clues
-        _, boards, masks = finite_space(recipe)
         answer = tuple(data["answer"])
         clues = [shading_clue(c) for c in data["clues"]]
-        index = boards.index(answer)
-        correct = all(index in mask for mask in masks) and set(clues) <= set(shading_full_clues(recipe, answer))
-        if not correct: return {"status": "ok", "correct": False}
         puzzle = recipe.build_from_clues(clues)
         for cell, bit in zip(puzzle.board.cells, answer): puzzle.add(puzzle.black[cell] == bit)
-    # A failed/inconclusive solver confirmation is not a verdict against the user.
-    return {"status": "ok", "correct": True} if puzzle.solve(seed=request.seed) is not None else {"status": "unconfirmed"}
+    result = puzzle.solve_result(seed=request.seed, time_limit=request.budget)
+    if result.status == "unknown":
+        return {"status": "unconfirmed"}
+    return {"status": "ok", "correct": result.status == "sat"}

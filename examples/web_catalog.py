@@ -31,7 +31,7 @@ def catalog() -> dict[str, Any]:
     return {"format": "puzzle-box/web-catalog-v1", "request_format": FORMAT,
             "rules": [kind.ui.record() for kind in RULE_TYPES],
             "clues": [asdict(clue) for clue in CLUE_UI], "renderers": RENDERERS,
-            "limits": {"max_cells": 9, "max_rules": MAX_RECIPE_RULES, "max_budget_seconds": 30},
+            "limits": {"max_cells": 100, "max_rules": MAX_RECIPE_RULES, "max_budget_seconds": 30},
             "board": asdict(ShadingRecipe.ui), "profiles": profiles()}
 
 
@@ -82,8 +82,8 @@ def _read_shading(data: Any) -> Request:
     fields = {"format", "rows", "cols", "rules", "clue_kinds", "seed", "budget_seconds"}
     if type(data) is not dict or set(data) != fields or data["format"] != FORMAT:
         raise ValueError("Unsupported request format or missing/unknown fields")
-    rows = _integer(data["rows"], "rows", 1, 9)
-    cols = _integer(data["cols"], "cols", 1, 9)
+    rows = _integer(data["rows"], "rows", 1, 100)
+    cols = _integer(data["cols"], "cols", 1, 100)
     seed = _integer(data["seed"], "seed", 0, 2**31-1)
     budget = _integer(data["budget_seconds"], "budget_seconds", 1, 30)
     raw = data["rules"]

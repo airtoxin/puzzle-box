@@ -198,7 +198,7 @@ def test_one_star_example_matches_independent_permutations_and_needs_no_cell_clu
     assert len(expected) == 1 and all_answers(recipe) == expected
     clues = generate(recipe, seed=0)
     assert clues == [] and saved.verify(saved.puzzle_record(recipe, clues, seed=0))["unique"]
-    with pytest.raises(ValueError, match="9 cells"): api.read_request(request(recipe))
+    assert api.read_request(request(recipe)).recipe == recipe
 
 
 @pytest.mark.parametrize("name", ["norinori", "room-connection", "star"])

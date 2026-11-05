@@ -6,7 +6,7 @@ const hints = new Map();
 const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid', 'run-clue-grid'];
 // Capabilities of these renderers, independent of what a newer server declares.
 const renderers = {
-  shading: {topology: 'rectangular-cells', maxCells: 9, minSide: 1, required: ['answer'],
+  shading: {topology: 'rectangular-cells', maxCells: 100, minSide: 1, required: ['answer'],
     channels: {answer: 'binary-cells', givens: 'cell-givens', 'row-counts': 'row-counts', 'column-counts': 'column-counts', rooms: 'cell-regions', numbers: 'cell-numbers', 'sight-counts': 'cell-sight-counts', 'island-areas': 'cell-island-areas', 'neighbor-counts': 'cell-neighbor-counts', 'component-counts': 'cell-component-counts', 'endpoint-markers': 'cell-endpoint-markers', 'black-runs': 'cell-black-runs', 'component-areas': 'cell-component-areas', 'orthogonal-counts': 'cell-orthogonal-counts'}},
   slitherlink: {topology: 'rectangular-cells', maxCells: 4, minSide: 1, required: ['answer'],
     channels: {answer: 'binary-edges', 'cell-counts': 'cell-edge-counts', 'edge-givens': 'edge-givens'}},
@@ -85,6 +85,7 @@ function rejectUnsupportedUi() {
 const messages = {
   unsatisfiable: 'この組合せを満たす盤面はありません。ルールや設定を変更してください。',
   insufficient_hints: '選んだヒントだけでは、どの完成盤面も一意に決まりません。セルや辺の固定ヒントなどを追加してください。',
+  search_exhausted: '候補探索の上限に達しました。一意になる問題はまだ見つかっていませんが、不可能とは判定していません。Seedやヒント形式を変えて試してください。',
   timeout: '計算予算に達したため打ち切りました。解なしとは判定していません。サイズやルール、予算を調整してください。',
   unconfirmed: '生成・検証を完了できませんでした。解なしや唯一解とは判定していません。',
   busy: '別の生成が実行中です。終了してからもう一度お試しください。',
@@ -280,6 +281,7 @@ function buildControls() {
     const toggle = document.createElement('input'); toggle.type = 'checkbox';
     toggle.checked = rule.required || profile.defaults.rules.includes(rule.identifier); toggle.disabled = rule.required;
     label.append(toggle, document.createTextNode(rule.label)); card.append(label, node('p', rule.summary));
+    if (rule.requirements.max_cells < profile.board.max_cells) card.append(node('p', `このルールは最大${rule.requirements.max_cells}セルです。`));
     const parameters = new Map(), fields = node('div', undefined, 'parameters');
     for (const spec of rule.parameters) {
       if (!['integer', 'boolean', ...gridKinds].includes(spec.kind)) throw new Error('Unsupported parameter kind');
@@ -394,7 +396,7 @@ function chooseProfile() {
   $('rows').value = profile.defaults.rows; $('cols').value = profile.defaults.cols;
   $('rows').max = $('cols').max = profile.board.max_cells;
   $('rows').min = profile.board.min_rows; $('cols').min = profile.board.min_cols;
-  $('size-note').textContent = `最大${profile.board.max_cells}セル。Seedが同じでも、環境の変更をまたぐ一致は保証しません。`;
+  $('size-note').textContent = `最大${profile.board.max_cells}セル。選ぶルールにより上限が下がります。大きさとルールによっては時間内に生成できません。Seedが同じでも、環境の変更をまたぐ一致は保証しません。`;
   buildControls(); refresh();
 }
 $('family').addEventListener('change', chooseProfile);
@@ -430,7 +432,9 @@ form.addEventListener('submit', async event => {
       }
       $('entry-note').textContent = isCoupled() ? 'セルは未入力 → 白 → 黒、辺は未入力 → 線なし（×）→ 線あり。両方を入力してください。固定ヒントは変更できません。' : isLoop ? '辺を押すと、未入力 → 線なし（×）→ 線ありの順に切り替わります。固定ヒントは変更できません。' : '未知のマスを押すと、未入力 → 白 → 黒の順に切り替わります。固定ヒントは変更できません。';
       renderBoard(); $('actions').hidden = false;
-      $('status').textContent = `生成しました。唯一解・ヒント既約性を検証済み。\n${result.clues.length}個のヒント / ${result.evidence.enumerated_boards}盤面を独立列挙して照合。`;
+      $('status').textContent = `生成しました。唯一解・ヒント既約性を検証済み。\n${result.clues.length}個のヒント / ` + (result.evidence.method === 'cp-sat'
+        ? `ソルバーで別解がないことを証明。${result.evidence.candidates}候補を探索。`
+        : `${result.evidence.enumerated_boards}盤面を独立列挙して照合。`);
     } else $('status').textContent = messages[result.status] || `設定を確認してください。${result.message || ''}`;
   } catch (error) {
     if (error instanceof UnsupportedUiError) rejectUnsupportedUi();

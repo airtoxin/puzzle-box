@@ -160,8 +160,8 @@ def test_cli_generation_is_repeatable_and_saved_record_verifies(tmp_path: Path):
 
 def test_cli_rejects_unknown_rules_and_oversized_boards():
     assert _cli("generate", "--rules", "unknown").returncode != 0
-    too_large = _cli("generate", "--rows", "6", "--cols", "6")
-    assert too_large.returncode != 0 and "at most 25" in too_large.stderr
+    too_large = _cli("generate", "--rows", "11", "--cols", "10")
+    assert too_large.returncode != 0 and "at most 100" in too_large.stderr
 
 
 def test_published_sample_verifies_and_each_rule_matters():

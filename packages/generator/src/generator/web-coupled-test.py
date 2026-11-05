@@ -190,5 +190,6 @@ def test_check_requires_both_channels_and_checks_hints_instead_of_trusting_an_an
 
 def test_solver_nonconfirmation_is_not_a_wrong_answer(monkeypatch):
     result = worker.generate_request({**request(), "rows": 2, "cols": 2, "clue_kinds": []})
-    monkeypatch.setattr(Puzzle, "solve", lambda *args, **kwargs: None)
+    from puzzle import SolveResult
+    monkeypatch.setattr(Puzzle, "solve_result", lambda *args, **kwargs: SolveResult("unknown"))
     assert checks.check_answer(candidate(result)) == {"status": "unconfirmed"}

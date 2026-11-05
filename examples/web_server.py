@@ -15,7 +15,7 @@ from web_catalog import catalog, read_request
 from web_answers import read_check
 
 ROOT = Path(__file__).resolve().parents[1]
-MAX_BODY = 8192
+MAX_BODY = 32768
 ASSETS = {"/": ("index.html", "text/html"), "/app.js": ("app.js", "text/javascript"),
           "/style.css": ("style.css", "text/css")}
 
@@ -37,7 +37,7 @@ def run_job(data: Any, *, check: bool = False) -> dict[str, Any]:
             return {"status": "unconfirmed"}
         response = json.loads(result.stdout)
         if type(response) is not dict or response.get("status") not in (
-                "ok", "unsatisfiable", "insufficient_hints", "unconfirmed"):
+                "ok", "unsatisfiable", "insufficient_hints", "search_exhausted", "unconfirmed"):
             return {"status": "unconfirmed"}
         return response
     except subprocess.TimeoutExpired:
@@ -119,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
         # Read at most one extra byte even if a hostile length declares gigabytes.
         raw = self.rfile.read(min(length, MAX_BODY + 1))
         if length > MAX_BODY:
-            raise ValueError("Request must be at most 8192 bytes")
+            raise ValueError(f"Request must be at most {MAX_BODY} bytes")
         if len(raw) != length:
             raise ValueError("Incomplete request")
         return raw

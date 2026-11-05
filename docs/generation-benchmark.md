@@ -37,7 +37,7 @@ uv run --no-sync python examples/benchmark_generation.py --seeds 0 1 --phase-sec
 | `shading-insufficient-hints` | 2×2、黒数1、行数ヒントのみ。黒セルの列を区別できない |
 | `shading-inconsistent` | 2×2、黒数4、黒非接触。規則が矛盾する |
 
-サイズは各デモの上限以内です。黒白は25セル、Slitherlinkは9セル、ヤジリンは12セル、
+サイズは各デモの上限以内です。黒白は100セル、Slitherlinkは9セル、ヤジリンは12セル、
 黒白の有限選択は9セルまでで、それより大きい実用盤面の性能は調べません。
 任意レシピを受け取る汎用ベンチマークや自動リトライではありません。
 

@@ -126,5 +126,6 @@ def test_server_checks_rules_and_hints_without_trusting_a_stored_solution():
 def test_solver_nonconfirmation_does_not_mark_a_valid_answer_wrong(monkeypatch):
     data = request(); data.update(rows=1, cols=1, rules=[data["rules"][0]], clue_kinds=[])
     candidate = {"format": checks.FORMAT, "request": data, "clues": [], "answer": [1]*4}
-    monkeypatch.setattr(Puzzle, "solve", lambda *args, **kwargs: None)
+    from puzzle import SolveResult
+    monkeypatch.setattr(Puzzle, "solve_result", lambda *args, **kwargs: SolveResult("unknown"))
     assert checks.check_answer(candidate) == {"status": "unconfirmed"}

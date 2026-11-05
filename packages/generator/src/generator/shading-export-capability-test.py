@@ -52,16 +52,16 @@ def test_supported_exports_still_round_trip_with_selection_metadata(kinds):
     assert display.verify(record) == {"valid": True, "unique": True, "irreducible": True, "clue_count": 0}
 
 
-@pytest.mark.parametrize("cols", [25, 26])
+@pytest.mark.parametrize("cols", [100, 101])
 def test_export_enforces_its_readers_board_limit_before_building(cols, monkeypatch):
     recipe = ShadingRecipe(1, cols, (BlackCount(0),))
-    if cols == 25:
+    if cols == 100:
         record = display.puzzle_record(recipe, [], seed=0)
         assert display.verify(record)["valid"]
     else:
         monkeypatch.setattr(ShadingRecipe, "build_from_clues",
                             lambda *a, **k: pytest.fail("Reject oversized exports before building"))
-        with pytest.raises(ValueError, match="at most 25 cells"):
+        with pytest.raises(ValueError, match="at most 100 cells"):
             display.puzzle_record(recipe, [], seed=0)
 
 

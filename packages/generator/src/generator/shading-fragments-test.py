@@ -183,8 +183,7 @@ def test_web_reports_conflicts_and_hint_insufficiency_without_widening_limits():
     nine = tuple(codec.rule_choices().values())[:9]
     with pytest.raises(ValueError, match="at most 8"):
         api.read_request(request(ShadingRecipe(2, 3, nine)))
-    with pytest.raises(ValueError, match="at most 9"):
-        api.read_request(request(ShadingRecipe(4, 4, (BalancedLines(),))))
+    assert api.read_request(request(ShadingRecipe(4, 4, (BalancedLines(),)))).recipe.rows == 4
 
 
 @pytest.mark.parametrize("script,args", [
