@@ -42,6 +42,21 @@ test('catalog controls the computation budget and hosting description', async ({
   await expect(page.locator('#budget')).toHaveAttribute('max', String(catalog.limits.max_budget_seconds));
   await expect(page.locator('#hosting-label')).toContainText(catalog.hosting?.label || 'LOCAL LAB');
   if (catalog.hosting) await expect(page.locator('#hosting-note')).toContainText(`${catalog.hosting.budget_seconds}秒`);
+  await expect(page.locator('#capabilities li')).toHaveText(catalog.profiles.map(p =>
+    `${p.label}：${p.rules.length}ルール、最大${p.board.max_cells}セル`));
+});
+
+test('capability summary follows changed catalog rules and board limits', async ({page}) => {
+  await page.route('**/api/catalog', async route => {
+    const response = await route.fetch(), data = await response.json();
+    const shading = data.profiles.find(p => p.id === 'shading');
+    shading.rules = shading.rules.filter(r => shading.defaults.rules.includes(r.identifier));
+    shading.board.max_cells = 8;
+    await route.fulfill({json: data});
+  });
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await expect(page.locator('#rules .rule-card')).toHaveCount(2);
+  await expect(page.locator('#capabilities li').first()).toHaveText('黒白セル：2ルール、最大8セル');
 });
 
 test('coupled cells and center edges require a complete joint answer', async ({page}) => {

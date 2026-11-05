@@ -465,6 +465,8 @@ try {
     $('hosting-label').textContent = catalog.hosting.label + ' · セルと辺';
     $('hosting-note').textContent = `小盤面のWeb実験。計算は1回${catalog.hosting.budget_seconds}秒まで。混雑時や利用枠の上限では使えない場合があります。`;
   }
+  $('capabilities').replaceChildren(...catalog.profiles.map(p =>
+    node('li', `${p.label}：${p.rules.length}ルール、最大${p.board.max_cells}セル`)));
   for (const p of catalog.profiles) {const option = node('option', p.label); option.value = p.id; $('family').append(option);}
   chooseProfile();
 } catch { $('status').textContent = 'UI定義を読み込めません。対応するローカルサーバーの起動状態を確認してください。'; }
