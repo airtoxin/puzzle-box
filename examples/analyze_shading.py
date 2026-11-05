@@ -19,6 +19,7 @@ from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWh
 from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
+from puzzle_defs import DiagonalRunLimit
 from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
@@ -357,6 +358,17 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     if type(rule) is RunLengthLimit:
         return all(sum(1 for _ in group) <= rule.max_length
                    for line in row_lines + col_lines for _,group in groupby(line))
+    if type(rule) is DiagonalRunLimit:
+        # Group whole diagonals by their invariant, rather than CSP windows.
+        for sign in (-1, 1):
+            diagonals: dict[int, list[int]] = {}
+            for r in range(rows):
+                for c in range(cols):
+                    diagonals.setdefault(r+sign*c, []).append(bits[r*cols+c])
+            if any(sum(1 for _ in group) > rule.max_length
+                   for line in diagonals.values() for _,group in groupby(line)):
+                return False
+        return True
     if type(rule) is NoThreeConsecutive:
         return all(len(set(line[i:i+3])) > 1 for line in row_lines + col_lines for i in range(len(line)-2))
     if type(rule) is BalancedLines:
