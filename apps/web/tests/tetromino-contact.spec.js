@@ -1,5 +1,30 @@
 import {test, expect} from '@playwright/test';
 
+test('tetromino contact supports and checks a six by six board', async ({page}) => {
+  await page.goto('/');
+  await expect(page.locator('#board .cell')).toHaveCount(6);
+  await page.getByLabel('行数', {exact:true}).fill('6');
+  await page.getByLabel('列数', {exact:true}).fill('6');
+  await page.getByLabel('黒マス数', {exact:true}).fill('0');
+  await page.getByLabel('同形テトロミノの部屋間接触を禁止', {exact:true}).check();
+  await page.locator('textarea[data-kind="region-map"]')
+    .fill('0 0 0 0 0 0\n0 0 0 0 0 0\n0 0 0 0 0 0\n1 1 1 1 1 1\n1 1 1 1 1 1\n1 1 1 1 1 1');
+  await expect(page.locator('#board .cell')).toHaveCount(36);
+  await expect(page.locator('#generate')).toBeEnabled();
+  const response = page.waitForResponse('**/api/generate');
+  await page.locator('#generate').click();
+  const result = await (await response).json();
+  expect(result.status).toBe('ok');
+  expect(result.evidence).toMatchObject({unique:true, irreducible:true});
+  for (let i=0; i<36; i++) {
+    const cell = page.locator('#board .cell').nth(i);
+    if (await cell.isEnabled()) while (await cell.getAttribute('data-value') !== '0') await cell.click();
+  }
+  const checked = page.waitForResponse('**/api/check');
+  await page.locator('#check').click();
+  expect(await (await checked).json()).toEqual({status:'ok',correct:true});
+});
+
 test('room tetromino contact is conditional and is independent of black two-by-two exclusion', async ({page}) => {
   const errors=[]; page.on('pageerror',e => errors.push(e.message));
   await page.goto('/'); await page.getByLabel('黒マスの個数', {exact:true}).uncheck();

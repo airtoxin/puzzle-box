@@ -19,6 +19,9 @@ with pytest.MonkeyPatch.context() as patch:
     codec = importlib.import_module("shading_recipe")
     saved = importlib.import_module("generate_shading")
     deductions = importlib.import_module("explain_shading")
+    api = importlib.import_module("web_catalog")
+    worker = importlib.import_module("web_worker")
+    checks = importlib.import_module("web_answers")
 
 ROOMS = ((0,0,0,0),(0,0,0,0),(1,1,1,1),(1,1,1,1))
 
@@ -137,8 +140,8 @@ def test_codec_geometry_and_input_size_are_validated_before_candidate_enumeratio
     with pytest.raises(ValueError,match="same partition"): codec.recipe_record(wrong)
     module=importlib.import_module("puzzle_defs.puzzles.room_shapes")
     monkeypatch.setattr(module,"enumerate_connected_regions",lambda *a,**k: pytest.fail("Must reject first"))
-    with pytest.raises(ValueError,match="25 board cells"):
-        ShadingRecipe(5,6,(NoTouchingEqualTetrominoes(((0,)*6,)*5),)).create_empty()
+    with pytest.raises(ValueError,match="100 board cells"):
+        ShadingRecipe(1,101,(NoTouchingEqualTetrominoes(((0,)*101,)),)).create_empty()
 
 
 def test_web_sized_o_and_l_example_is_valid_until_black_two_by_two_is_forbidden():
@@ -146,3 +149,62 @@ def test_web_sized_o_and_l_example_is_valid_until_black_two_by_two_is_forbidden(
     assert len(all_answers(recipe)) == 2
     from puzzle_defs import NoBlack2x2
     assert not all_answers(ShadingRecipe(3,3,(*recipe.rules,NoBlack2x2())))
+
+
+def test_six_by_six_fixed_boards_match_independent_shape_and_contact_checker():
+    rooms = tuple((r//3,)*6 for r in range(6))
+    rule = NoTouchingEqualTetrominoes(rooms)
+    first = {(1,0),(2,0),(2,1),(2,2)}
+    examples = [
+        {(3,0),(4,0),(4,1),(4,2)},  # translated L touching the first
+        {(3,1),(4,0),(4,1),(4,2)},  # T touching L
+        {(3,3),(4,3),(4,4),(4,5)},  # equal L without edge contact
+        {(3,0),(4,0),(4,1),(4,2),(3,5)},  # five cells is not a piece
+        {(3,0),(3,2),(4,0),(4,2)},  # disconnected four-cell mask
+        set(),
+    ]
+    for second in examples:
+        points = first | second
+        touch = any(abs(r-s)+abs(c-t) == 1 for r,c in first for s,t in second)
+        expected = not (len(second) == 4 and connected(second) and touch and congruent(first, second))
+        bits = tuple(int((r,c) in points) for r in range(6) for c in range(6))
+        assert oracle.accepts(rule, bits, 6, 6) == expected
+        p = ShadingRecipe(6,6,(rule,)).build_from_clues(
+            [(Cell(r,c),int((r,c) in points)) for r in range(6) for c in range(6)])
+        assert (p.solve(seed=0) is not None) == expected
+
+
+def test_six_by_six_lits_generation_is_unique_and_checks_real_answers():
+    rooms = [[r//3]*6 for r in range(6)]
+    request = {"format": api.FORMAT, "rows": 6, "cols": 6,
+        "rules": [{"id":"room-black-count","parameters":{"rooms":rooms,"count":4}},
+                  {"id":"room-connected-black","parameters":{"rooms":rooms,"nonempty":True}},
+                  {"id":"connected-black","parameters":{"nonempty":True}},
+                  {"id":"no-black-2x2","parameters":{}},
+                  {"id":"no-touching-equal-tetrominoes","parameters":{"rooms":rooms}}],
+        "clue_kinds":["cell","row-count","column-count"],"seed":0,"budget_seconds":30}
+    result = worker.generate_request(request)
+    assert result["status"] == "ok" and result["evidence"]["unique"] and result["evidence"]["irreducible"]
+    assert result["plan"]["requirements"]["max_cells"] == 100
+    assert saved.verify(result["record"])["unique"]
+    answer = [v for row in result["record"]["solution"] for v in row]
+    assert oracle.accepts(NoTouchingEqualTetrominoes(tuple(map(tuple,rooms))), answer, 6, 6)
+    submission = {"format":checks.FORMAT,"request":request,"clues":result["clues"],"answer":answer}
+    assert checks.check_answer(submission) == {"status":"ok","correct":True}
+    answer[0] = 1-answer[0]
+    assert checks.check_answer(submission) == {"status":"ok","correct":False}
+
+
+def test_full_100_cell_board_preserves_rotated_shape_contacts():
+    rooms = tuple((r//5,)*10 for r in range(10))
+    rule = NoTouchingEqualTetrominoes(rooms)
+    first = {(3,0),(4,0),(4,1),(4,2)}
+    same_touching = {(5,0),(6,0),(6,1),(6,2)}
+    rotated_touching = {(5,1),(6,1),(7,0),(7,1)}
+    different_touching = {(5,1),(6,0),(6,1),(6,2)}
+    for second, expected in [(same_touching, False), (rotated_touching, False), (different_touching, True)]:
+        bits = tuple(int((r,c) in first|second) for r in range(10) for c in range(10))
+        assert oracle.accepts(rule,bits,10,10) == expected
+        puzzle = ShadingRecipe(10,10,(rule,)).build_from_clues(
+            [(Cell(r,c),int((r,c) in first|second)) for r in range(10) for c in range(10)])
+        assert (puzzle.solve(seed=0) is not None) == expected

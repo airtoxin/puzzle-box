@@ -116,4 +116,4 @@ def test_catalog_reports_each_remaining_rule_limit():
     assert limits["white-island-areas"] == limits["unequal-corner-component-sizes"] == 9
     assert limits["corner-linked-components"] == 10
     assert limits["white-visibility-counts"] == 100
-    assert limits["no-touching-equal-tetrominoes"] == 25
+    assert limits["no-touching-equal-tetrominoes"] == 100
