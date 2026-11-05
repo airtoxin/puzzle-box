@@ -22,6 +22,7 @@ from puzzle_defs import (
     DistinctWhiteNumbers,
     RunLengthLimit,
     DiagonalRunLimit,
+    UnequalCornerComponentSizes,
     RoomRotationalSymmetry,
     ColorComponentSize,
     NoTouchingEqualTetrominoes,
@@ -194,6 +195,9 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _rule_text(rule: ShadingRule) -> str:
+    if type(rule) is UnequalCornerComponentSizes:
+        color = "black" if rule.black else "white"
+        return f"Distinct orthogonal {color} components touching at a corner have different areas; internal corners and separated equal components are allowed. Shape is unrestricted by this rule."
     if isinstance(rule, BlackCount):
         subject = "cell is" if rule.count == 1 else "cells are"
         return f"Exactly {rule.count} {subject} black."

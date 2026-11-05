@@ -61,8 +61,10 @@ from puzzle_defs.puzzles.one_false_neighbor_count import OneFalseAdjacentCountPe
 from puzzle_defs.puzzles.directional_majority import DirectionalRunLimit, RoomMajorityCount
 from puzzle_defs.puzzles.orthogonal_black_counts import OrthogonalBlackCounts
 from puzzle_defs.puzzles.diagonal_run_limit import DiagonalRunLimit
+from puzzle_defs.puzzles.unequal_corner_sizes import UnequalCornerComponentSizes
 
 __all__ = [
+    "UnequalCornerComponentSizes",
     "DiagonalRunLimit",
     "AdjacentBlackRuns",
     "RoomFillLevels",

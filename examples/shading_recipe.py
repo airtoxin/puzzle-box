@@ -11,6 +11,8 @@ from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
 from puzzle_defs import DiagonalRunLimit
+from puzzle_defs import UnequalCornerComponentSizes
+from puzzle_defs.puzzles.unequal_corner_sizes import MAX_CORNER_SIZE_CELLS
 from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
@@ -54,7 +56,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
                       AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues, WhiteEndpointMarkers, AdjacentBlackRuns, RoomFillLevels,
-                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount, OrthogonalBlackCounts, DiagonalRunLimit)
+                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount, OrthogonalBlackCounts, DiagonalRunLimit, UnequalCornerComponentSizes)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -71,6 +73,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "distinct-white-numbers": DistinctWhiteNumbers(DEFAULT_NUMBERS),
             "run-length-limit": RunLengthLimit(),
             "diagonal-run-limit": DiagonalRunLimit(),
+            "unequal-corner-component-sizes": UnequalCornerComponentSizes(),
             "room-rotational-symmetry": RoomRotationalSymmetry(DEFAULT_ROOMS),
             "color-component-size": ColorComponentSize(3),
             "no-touching-equal-tetrominoes": NoTouchingEqualTetrominoes(DEFAULT_ROOMS),
@@ -101,6 +104,8 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
 
 def rule_record(rule: ShadingRule) -> dict[str, Any]:
     # A subclass may change apply(); serializing only its parent would lose rules.
+    if type(rule) is UnequalCornerComponentSizes:
+        return {"type":rule.ui.identifier,"black":rule.black}
     if type(rule) is OrthogonalBlackCounts:
         return {"type":rule.ui.identifier,"orthogonal_counts":[list(row) for row in rule.orthogonal_counts]}
     if type(rule) is DirectionalRunLimit:
@@ -176,6 +181,8 @@ def read_rule(data: Any) -> ShadingRule:
     if not isinstance(data, dict):
         raise ValueError("A rule must be an object")
     kind = data.get("type")
+    if kind == "unequal-corner-component-sizes" and set(data) == {"type","black"}:
+        return UnequalCornerComponentSizes(data["black"])
     if kind == "orthogonal-black-counts" and set(data) == {"type", "orthogonal_counts"}:
         if type(data["orthogonal_counts"]) is not list or any(type(row) is not list for row in data["orthogonal_counts"]):
             raise ValueError("Orthogonal counts must be an array of arrays")
@@ -302,6 +309,9 @@ def read_rule(data: Any) -> ShadingRule:
 def check_demo_size(recipe: ShadingRecipe) -> None:
     if recipe.rows * recipe.cols > 25:
         raise ValueError("This small-board demo supports at most 25 cells")
+    if (recipe.rows*recipe.cols > MAX_CORNER_SIZE_CELLS
+            and any(type(r) is UnequalCornerComponentSizes for r in recipe.rules)):
+        raise ValueError(f"Unequal corner component sizes support at most {MAX_CORNER_SIZE_CELLS} board cells")
     if (recipe.rows*recipe.cols > MAX_CORNER_LINK_CELLS
             and any(type(r) is CornerLinkedComponents for r in recipe.rules)):
         raise ValueError(f"Corner-linked components support at most {MAX_CORNER_LINK_CELLS} board cells")

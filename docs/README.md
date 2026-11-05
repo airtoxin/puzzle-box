@@ -31,6 +31,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 部屋内の成分数と成分の面積を組み合わせる | [ぬりツイン型の部屋内成分](room-components.md) |
 | 長方形成分などを辺・角でつなぐ | [8近傍の連結](corner-connected-color.md) |
 | 各成分に別成分との角接触を要求する | [チェーンの孤立禁止](corner-linked-components.md) |
+| 角で接する別成分の面積を異ならせる | [ぬりぼうの成分面積](unequal-corner-sizes.md) |
 | 色ごとに方向を変え、部屋の多数色の個数を合わせる | [方向と多数色の2断片](directional-majority.md) |
 | 同色の連続する長さを制限する | [連続長の上限](run-length.md) |
 | 斜めの同色連続長を別に制限する | [ノンダンゴ型の斜め連続長](diagonal-run-limit.md) |
