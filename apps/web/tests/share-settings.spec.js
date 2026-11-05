@@ -63,8 +63,8 @@ test('room and number grids survive sharing in their declared rule order', async
   const rules = catalog.profiles.find(p => p.id === 'shading').rules;
   const room = rules.findIndex(r => r.parameters.some(p => p.name === 'rooms'));
   const numbers = rules.findIndex(r => r.parameters.some(p => p.name === 'numbers'));
-  await page.locator('#rules .rule-card').nth(room).locator('input[type=checkbox]').first().check();
-  await page.locator('#rules .rule-card').nth(numbers).locator('input[type=checkbox]').first().check();
+  await page.locator(`[data-rule-id="${rules[room].identifier}"]`).locator('input[type=checkbox]').first().check();
+  await page.locator(`[data-rule-id="${rules[numbers].identifier}"]`).locator('input[type=checkbox]').first().check();
   await page.locator('textarea[data-kind=region-map]').fill('0 0 0\n1 1 1');
   await page.locator('textarea[data-kind=number-grid]:enabled').fill('1 2 3\n4 5 6');
   const url = await share(page);
@@ -155,8 +155,8 @@ test('loading a link cancels safely when the user edits the current board', asyn
 test('shared URL excludes query parameters and tolerates object key order', async ({page}) => {
   const catalogResponse = page.waitForResponse('**/api/catalog'); await page.goto('/'); const catalog = await (await catalogResponse).json();
   await expect(page.locator('#generate')).toBeEnabled();
-  const index = catalog.profiles.find(p => p.id === 'shading').rules.findIndex(r => r.identifier === 'room-black-count');
-  await page.locator('#rules .rule-card').nth(index).locator('input[type=checkbox]').first().check();
+  expect(catalog.profiles.find(p => p.id === 'shading').rules.some(r => r.identifier === 'room-black-count')).toBe(true);
+  await page.locator('[data-rule-id="room-black-count"] input[type=checkbox]').first().check();
   await page.locator('textarea[data-kind=region-map]').fill('0 0 0\n1 1 1');
   await page.evaluate(() => history.replaceState(null, '', '/?token=sentinel')); const url = await share(page);
   expect(new URL(url).search).toBe('');
