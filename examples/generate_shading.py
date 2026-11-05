@@ -33,6 +33,7 @@ from puzzle_defs import (
     NoColorAcrossRooms, AdjacentRoomCountsDiffer,
     RoomComponentCount, EqualRoomComponentSizes,
     ComponentAreaClues,
+    CornerLinkedComponents,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -248,6 +249,9 @@ def _rule_text(rule: ShadingRule) -> str:
         color = "black" if rule.black else "white"
         empty = "at least one is required" if rule.nonempty else "absence is allowed"
         return f"All {color} cells connect through edges or corners (eight neighbors); {empty}. Other rules still use their own adjacency definitions."
+    if type(rule) is CornerLinkedComponents:
+        color = "black" if rule.black else "white"
+        return f"Every orthogonal {color} component touches a different component at a corner; empty color sets and multiple chains are allowed, and shapes are not compared."
     if type(rule) is ComponentAreaClues:
         return "Each positive clue fixes the area of its own same-color component; clue cells may be black or white, zero is absent, and repeated/unnumbered components are allowed."
     if type(rule) is RoomComponentCount:

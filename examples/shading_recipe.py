@@ -23,6 +23,8 @@ from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
 from puzzle_defs import NoColorAcrossRooms, AdjacentRoomCountsDiffer
 from puzzle_defs import RoomComponentCount, EqualRoomComponentSizes
 from puzzle_defs import ComponentAreaClues
+from puzzle_defs import CornerLinkedComponents
+from puzzle_defs.puzzles.corner_linked_components import MAX_CORNER_LINK_CELLS
 from puzzle_defs.puzzles.component_area_clues import DEFAULT_COMPONENT_AREAS
 from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
 from puzzle_defs.marker_layout import DEFAULT_ENDPOINT_MARKERS, MarkerGrid, marker_grid
@@ -50,7 +52,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
                       AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues, WhiteEndpointMarkers, AdjacentBlackRuns, RoomFillLevels,
-                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues)
+                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -85,12 +87,15 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "room-component-count": RoomComponentCount(DEFAULT_ROOMS),
             "equal-room-component-sizes": EqualRoomComponentSizes(DEFAULT_ROOMS),
             "component-area-clues": ComponentAreaClues(DEFAULT_COMPONENT_AREAS),
+            "corner-linked-components": CornerLinkedComponents(),
             "adjacent-black-component-sum": AdjacentBlackComponentSum(DEFAULT_COMPONENT_COUNTS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
 def rule_record(rule: ShadingRule) -> dict[str, Any]:
     # A subclass may change apply(); serializing only its parent would lose rules.
+    if type(rule) is CornerLinkedComponents:
+        return {"type":rule.ui.identifier,"black":rule.black}
     if type(rule) is ComponentAreaClues:
         return {"type":rule.ui.identifier,"component_areas":[list(row) for row in rule.component_areas]}
     if type(rule) is RoomComponentCount:
@@ -185,6 +190,8 @@ def read_rule(data: Any) -> ShadingRule:
         return AcyclicColor(data["black"])
     if kind == "components-touch-border" and set(data) == {"type", "black"}:
         return ComponentsTouchBorder(data["black"])
+    if kind == "corner-linked-components" and set(data) == {"type","black"}:
+        return CornerLinkedComponents(data["black"])
     if kind == "component-area-clues":
         if (set(data) != {"type","component_areas"} or type(data["component_areas"]) is not list
                 or any(type(row) is not list for row in data["component_areas"])):
@@ -260,6 +267,9 @@ def read_rule(data: Any) -> ShadingRule:
 def check_demo_size(recipe: ShadingRecipe) -> None:
     if recipe.rows * recipe.cols > 25:
         raise ValueError("This small-board demo supports at most 25 cells")
+    if (recipe.rows*recipe.cols > MAX_CORNER_LINK_CELLS
+            and any(type(r) is CornerLinkedComponents for r in recipe.rules)):
+        raise ValueError(f"Corner-linked components support at most {MAX_CORNER_LINK_CELLS} board cells")
 
 
 def shared_rooms(recipe: ShadingRecipe) -> RoomMap | None:

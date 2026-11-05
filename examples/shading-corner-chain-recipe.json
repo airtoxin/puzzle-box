@@ -1,0 +1,10 @@
+{
+  "format":"puzzle-box/shading-recipe-v1",
+  "rows":2,"cols":3,
+  "rules":[
+    {"type":"corner-linked-components","black":true},
+    {"type":"room-component-count","rooms":[[0,0,0],[0,0,0]],"count":2,"black":true},
+    {"type":"count","count":3}
+  ],
+  "clue_kinds":["cell"]
+}
