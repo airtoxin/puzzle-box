@@ -59,12 +59,22 @@ def test_builtin_play_shows_count_givens_and_every_rule_without_answer():
     assert "Exactly 2 cells are black." in shown
     assert "All white cells connect through edges; at least one must be white." in shown
     assert "All black cells connect through edges; at least one must be black." in shown
-    assert "  1     0 |" in shown  # Zero row count is a clue, not a missing clue.
     assert "Answer template:" in shown
     revealed = app.show(data, reveal=True)
     assert _board(revealed) == [["#" if v else "." for v in row] for row in data["solution"]]
     assert revealed.startswith("Solution:") and "Answer template:" not in revealed
     assert data == before
+
+
+def test_zero_row_count_is_shown_as_a_clue():
+    # Fixed, uniquely solvable record: relying on a seed to generate this clue
+    # ties the display test to solver/model search order.
+    data = {"format": app.FORMAT, "recipe": _recipe("composed-shading-recipe-sample.json"), "seed": 0,
+            "clues": [{"type": "row-count", "row": 0, "count": 0},
+                      {"type": "column-count", "col": 0, "count": 1}],
+            "solution": [[0, 0, 0], [1, 1, 0]]}
+    assert app.verify(data) == {"valid": True, "unique": True, "irreducible": True, "clue_count": 2}
+    assert "  1     0 |" in app.show(data)
 
 
 def test_custom_play_keeps_component_identity_and_all_parameter_values():
