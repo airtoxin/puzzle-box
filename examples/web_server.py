@@ -36,17 +36,59 @@ def run_job(data: Any, *, check: bool = False) -> dict[str, Any]:
         )
         if result.returncode != 0:
             return {"status": "unconfirmed"}
-        response = json.loads(result.stdout)
-        if type(response) is not dict or response.get("status") not in (
-                "ok", "unsatisfiable", "insufficient_hints", "search_exhausted", "unconfirmed"):
-            return {"status": "unconfirmed"}
-        return response
+        response = json.loads(result.stdout, object_pairs_hook=_object,
+                              parse_constant=_constant, parse_float=_finite_float)
+        return worker_response(response, request.plan, data, check=check)
     except subprocess.TimeoutExpired:
         # run() kills and reaps the worker. OS startup/cleanup may exceed the
         # budget; this is not a CPU, memory, or arbitrary-code sandbox.
         return {"status": "timeout", "budget_seconds": request.budget}
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return {"status": "unconfirmed"}
+
+
+def worker_response(response: Any, plan: dict[str, Any], data: Any, *, check: bool) -> dict[str, Any]:
+    """Admit only well-formed worker outcomes; malformed successes are unknown.
+
+    These are inexpensive transport checks, not a second solver or a proof of
+    the worker's mathematical claims. Model construction stays in the worker.
+    """
+    unknown = {"status": "unconfirmed"}
+    if type(response) is not dict:
+        return unknown
+    status = response.get("status")
+    if check:
+        if status == "unconfirmed":
+            return response
+        return response if status == "ok" and type(response.get("correct")) is bool else unknown
+    if status in ("unsatisfiable", "insufficient_hints", "search_exhausted", "unconfirmed"):
+        return response
+    if status != "ok":
+        return unknown
+    evidence = response.get("evidence")
+    if (type(evidence) is not dict or evidence.get("unique") is not True
+            or evidence.get("irreducible") is not True):
+        return unknown
+    if data.get("family", "shading") == "shading":
+        if evidence.get("method") != "cp-sat":
+            return unknown
+        count = evidence.get("candidates")
+        if type(count) is not int or count < 1:
+            return unknown
+    else:
+        if "method" in evidence:
+            return unknown
+        count, completions = evidence.get("enumerated_boards"), evidence.get("completion_count")
+        if type(count) is not int or count < 1 or type(completions) is not int or completions < 1:
+            return unknown
+    # asdict() retains tuples while JSON transports them as arrays.
+    wire_plan = json.loads(json.dumps(plan, allow_nan=False))
+    if (type(response.get("plan")) is not dict or response["plan"] != wire_plan
+            or type(response.get("request")) is not dict or response["request"] != data
+            or type(response.get("record")) is not dict or "solution" not in response["record"]
+            or type(response.get("clues")) is not list):
+        return unknown
+    return response
 
 
 class LocalServer(ThreadingHTTPServer):

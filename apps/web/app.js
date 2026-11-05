@@ -361,6 +361,9 @@ form.addEventListener('submit', async event => {
   try {
     const request = readRequest(), result = await post('/api/generate', request);
     if (result.status === 'ok') {
+      if (result.evidence?.unique !== true || result.evidence?.irreducible !== true) {
+        $('status').textContent = messages.unconfirmed; return;
+      }
       assertRenderablePlan(result.plan, request);
       artifact = result; plan = result.plan; fixed = new Set();
       const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
@@ -401,7 +404,11 @@ $('check').addEventListener('click', async () => {
   try {
     const answer = isCoupled() ? {cells: input.slice(0, plan.rows*plan.cols), edges: input.slice(plan.rows*plan.cols)} : [...input];
     const result = await post('/api/check', {format: isCoupled() ? 'puzzle-box/web-answer-v2' : 'puzzle-box/web-answer-v1', request: artifact.request, clues: artifact.clues, answer});
-    $('answer-status').textContent = result.status === 'ok' ? (result.correct ? '正解です。すべてのルールとヒントを満たしています。' : 'まだ正解ではありません。ルールとヒントを確認してください。') : messages[result.status] || '解答を検証できませんでした。';
+    $('answer-status').textContent = result.status === 'ok' && typeof result.correct === 'boolean'
+      ? (result.correct ? '正解です。すべてのルールとヒントを満たしています。' : 'まだ正解ではありません。ルールとヒントを確認してください。')
+      : result.status === 'ok' || result.status === 'unconfirmed'
+        ? '解答を検証できませんでした。正誤は未確定です。'
+        : messages[result.status] || '解答を検証できませんでした。正誤は未確定です。';
   } catch {$('answer-status').textContent = '通信が途切れました。解答の正しさは未確認です。';}
   finally {form.inert = $('board').inert = $('answer-buttons').inert = false; $('check').focus();}
 });
