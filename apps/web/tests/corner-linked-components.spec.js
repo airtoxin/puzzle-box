@@ -52,7 +52,8 @@ test('six by six corner-linked puzzle renders and checks both answers',async({pa
   await page.locator('#rows').fill('6');
   await page.locator('#cols').fill('6');
   await page.getByLabel('黒マス数',{exact:true}).fill('6');
-  await page.locator('#budget').fill('30');
+  const maxBudget=Number(await page.locator('#budget').getAttribute('max'));
+  await page.locator('#budget').fill(String(Math.min(10,maxBudget)));
   const generated=page.waitForResponse('**/api/generate');
   await page.locator('#generate').click();
   const data=await (await generated).json();expect(data.status).toBe('ok');
@@ -64,7 +65,14 @@ test('six by six corner-linked puzzle renders and checks both answers',async({pa
   let checked=page.waitForResponse('**/api/check');await page.locator('#check').click();
   expect(await (await checked).json()).toEqual({status:'ok',correct:true});
   const editable=page.locator('#board [data-cell-index]:enabled').first();
-  await expect(editable).toBeVisible();await editable.click();
+  await expect(editable).toBeVisible();
+  const original=await editable.getAttribute('data-value');
+  expect(['0','1']).toContain(original);
+  const opposite=String(1-Number(original));
+  for(const target of [opposite,original,opposite]) {
+    for(let turn=0;turn<3 && await editable.getAttribute('data-value')!==target;turn++) await editable.click();
+    await expect(editable).toHaveAttribute('data-value',target);
+  }
   checked=page.waitForResponse('**/api/check');await page.locator('#check').click();
   expect(await (await checked).json()).toEqual({status:'ok',correct:false});
 });
