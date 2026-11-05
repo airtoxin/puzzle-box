@@ -17,7 +17,10 @@ jobs:
   check:
     name: ${{ matrix.os }} / Python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 12
+    # Windows runs the entire Python suite plus type checking and builds; the
+    # full job has approached 12 minutes on hosted runners. Keep headroom for
+    # runner variance without reducing coverage or allowing indefinite hangs.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
