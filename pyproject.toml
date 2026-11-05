@@ -3,7 +3,7 @@ name = "puzzle-box"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["ortools>=9.15.6755"]
 
 [tool.uv.workspace]
 members = ["packages/*"]
