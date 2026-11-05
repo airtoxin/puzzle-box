@@ -32,15 +32,21 @@ def read_check(data: Any):
         count = 2*recipe.rows*recipe.cols+recipe.rows+recipe.cols if isinstance(recipe, SlitherlinkRecipe) else recipe.rows*recipe.cols
         if data["format"] != FORMAT or not binary(data["answer"], count):
             raise ValueError("A v1 answer must contain one 0 or 1 for every cell or edge")
-    if type(data["clues"]) is not list or len(data["clues"]) > recipe.rows*recipe.cols+count+recipe.rows+recipe.cols:
+    read_clues(recipe, data["clues"], count)
+    return request
+
+
+def read_clues(recipe: Any, clue_data: Any, count: int) -> list[Any]:
+    """Parse bounded Web clues without creating a puzzle or solver model."""
+    if type(clue_data) is not list or len(clue_data) > recipe.rows*recipe.cols+count+recipe.rows+recipe.cols:
         raise ValueError("clues must be a bounded array")
     # Check hint kinds before constructing the typed recipe's constraints.
     kinds = set(recipe.clue_kinds)
-    for clue in data["clues"]:
+    for clue in clue_data:
         if type(clue) is not dict or type(clue.get("type")) is not str or clue["type"] not in kinds:
             raise ValueError("Clue kind is not enabled by this recipe")
     if isinstance(recipe, YajilinRecipe):
-        clues = [coupled_clue(c) for c in data["clues"]]
+        clues = [coupled_clue(c) for c in clue_data]
         for clue in clues:
             if isinstance(clue, (BlackCellClue, ArrowCountClue)):
                 if clue.cell.row >= recipe.rows or clue.cell.col >= recipe.cols:
@@ -55,7 +61,7 @@ def read_check(data: Any):
                 if any(v.row >= recipe.rows or v.col >= recipe.cols for v in clue.edge):
                     raise ValueError("Edge clue is outside the board")
     elif isinstance(recipe, SlitherlinkRecipe):
-        clues = [loop_clue(c) for c in data["clues"]]
+        clues = [loop_clue(c) for c in clue_data]
         for clue in clues:
             if isinstance(clue, CellEdgeCountClue):
                 if clue.cell.row >= recipe.rows or clue.cell.col >= recipe.cols:
@@ -63,7 +69,7 @@ def read_check(data: Any):
             elif any(v.row > recipe.rows or v.col > recipe.cols for v in clue.edge):
                 raise ValueError("Edge clue is outside the board")
     else:
-        clues = [shading_clue(c) for c in data["clues"]]
+        clues = [shading_clue(c) for c in clue_data]
         for clue in clues:
             if isinstance(clue, RowCountClue):
                 if clue.row >= recipe.rows or clue.count > recipe.cols:
@@ -78,7 +84,7 @@ def read_check(data: Any):
                 if type(value) is not int or value not in (0, 1):
                     raise ValueError("Clue values must be 0 (white) or 1 (black)")
     if len(set(clues)) != len(clues): raise ValueError("Duplicate clues are not supported")
-    return request
+    return clues
 
 
 def check_answer(data: Any) -> dict[str, Any]:
