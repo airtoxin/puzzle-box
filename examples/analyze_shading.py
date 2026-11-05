@@ -20,6 +20,7 @@ from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
 from puzzle_defs import DiagonalRunLimit
+from puzzle_defs import UnequalCornerComponentSizes
 from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
@@ -63,6 +64,11 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is UnequalCornerComponentSizes:
+        selected = {(r,c) for r in range(rows) for c in range(cols) if (((r,c) in black) == rule.black)}
+        groups = _components(selected)
+        return all(len(first) != len(second) or not any(abs(r-s) == abs(c-t) == 1
+                   for r,c in first for s,t in second) for first,second in combinations(groups,2))
     if type(rule) is OrthogonalBlackCounts:
         return all(n is None or sum(abs(r-s)+abs(c-t) == 1 for s,t in black) == n
                    for r,row in enumerate(rule.orthogonal_counts) for c,n in enumerate(row))
