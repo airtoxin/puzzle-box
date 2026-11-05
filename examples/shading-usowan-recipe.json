@@ -1,0 +1,11 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 2,
+  "cols": 3,
+  "rules": [
+    {"type": "one-false-adjacent-count-per-room", "rooms": [[0,0,0],[0,0,0]], "neighbor_counts": [[1,null,null],[2,null,null]]},
+    {"type": "non-touching", "diagonal": false},
+    {"type": "connected-white", "nonempty": true}
+  ],
+  "clue_kinds": ["cell"]
+}

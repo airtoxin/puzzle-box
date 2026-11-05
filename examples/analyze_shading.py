@@ -32,7 +32,7 @@ from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
 from puzzle_defs import NoColorAcrossRooms, AdjacentRoomCountsDiffer
 from puzzle_defs import RoomComponentCount, EqualRoomComponentSizes
 from puzzle_defs import ComponentAreaClues
-from puzzle_defs import CornerLinkedComponents
+from puzzle_defs import CornerLinkedComponents, OneFalseAdjacentCountPerRoom
 from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
@@ -62,6 +62,18 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is OneFalseAdjacentCountPerRoom:
+        errors = {n:0 for row in rule.rooms for n in row}
+        for r in range(rows):
+            for c in range(cols):
+                count = rule.neighbor_counts[r][c]
+                if count is None:
+                    continue
+                if (r,c) in black:
+                    return False
+                actual = sum(abs(r-s)+abs(c-t) == 1 for s,t in black)
+                errors[rule.rooms[r][c]] += actual != count
+        return all(n == 1 for n in errors.values())
     if type(rule) is CornerLinkedComponents:
         selected = {(r,c) for r in range(rows) for c in range(cols) if (((r,c) in black) == rule.black)}
         remaining = set(selected)
