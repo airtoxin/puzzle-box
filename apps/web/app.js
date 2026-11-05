@@ -558,23 +558,41 @@ function validateSharedControls(request) {
 }
 let shareNavigation = 0, catalogReady = false, sharePending = false, currentEntryId, divergedFromCurrentEntry = false;
 const historyKey = 'puzzleBoxShareSettingsV1', historyEntryKey = 'puzzleBoxEntryIdV1';
+const entrySettings = new Map();
+let historyTimer;
+function historyFailure() {
+  $('share-status').textContent = '履歴に設定を保存できません。戻る・進むでは設定を復元できない場合があります。';
+}
 function ensureEntryId() {
-  const state = history.state;
-  if (state !== null && (typeof state !== 'object' || Array.isArray(state))) return undefined;
-  if (typeof state?.[historyEntryKey] === 'string') return state[historyEntryKey];
-  const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
-  history.replaceState({...state, [historyEntryKey]: id}, '');
-  return id;
+  try {
+    const state = history.state;
+    if (state !== null && (typeof state !== 'object' || Array.isArray(state))) throw new Error('unsupported history state');
+    if (typeof state?.[historyEntryKey] === 'string') return state[historyEntryKey];
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+    history.replaceState({...state, [historyEntryKey]: id}, '');
+    return id;
+  } catch {historyFailure(); return undefined;}
+}
+function flushHistorySettings() {
+  clearTimeout(historyTimer); historyTimer = undefined;
+  try {
+    const state = history.state, id = state?.[historyEntryKey];
+    if (!id || !entrySettings.has(id)) return;
+    history.replaceState({...state, [historyKey]: entrySettings.get(id)}, '');
+  } catch {historyFailure();}
 }
 function rememberCurrentSettings() {
   if (!catalogReady || !currentEntryId || history.state?.[historyEntryKey] !== currentEntryId || form.inert) return;
   try {
     if (!form.checkValidity()) return;
-    const state = history.state;
-    if (state !== null && (typeof state !== 'object' || Array.isArray(state))) return;
-    history.replaceState({...state, [historyKey]: readRequest()}, '');
-  } catch {} // The browser may reject history updates or an unfinished grid.
+    entrySettings.set(currentEntryId, readRequest());
+    // Keep same-document history accurate immediately without calling
+    // replaceState for every keystroke; persist once editing settles.
+    if (entrySettings.size > 200) entrySettings.delete(entrySettings.keys().next().value);
+    clearTimeout(historyTimer); historyTimer = setTimeout(flushHistorySettings, 500);
+  } catch {} // An unfinished grid is not a restorable setting.
 }
+window.addEventListener('pagehide', flushHistorySettings);
 function cancelPendingShare(changed = false) {
   if (changed && history.state?.[historyEntryKey] !== currentEntryId) divergedFromCurrentEntry = true;
   if (!sharePending) return false;
@@ -584,7 +602,7 @@ function cancelPendingShare(changed = false) {
 }
 async function restoreSharedSettings() {
   const hash = location.hash, navigation = ++shareNavigation;
-  const remembered = !hash ? history.state?.[historyKey] : undefined;
+  const remembered = !hash ? (entrySettings.get(history.state?.[historyEntryKey]) || history.state?.[historyKey]) : undefined;
   if (!hash && !remembered) {sharePending = false; currentEntryId = ensureEntryId(); divergedFromCurrentEntry = false; rememberCurrentSettings(); return;}
   sharePending = true;
   try {
@@ -596,7 +614,7 @@ async function restoreSharedSettings() {
     if (navigation !== shareNavigation || hash !== location.hash || form.inert) return;
     applySharedSettings(request);
     currentEntryId = ensureEntryId(); divergedFromCurrentEntry = false; $('share-url').value = ''; rememberCurrentSettings();
-    $('share-status').textContent = '共有された設定を読み込みました。';
+    if (currentEntryId) $('share-status').textContent = '共有された設定を読み込みました。';
     return true;
   } catch {
     if (navigation === shareNavigation && hash === location.hash)
@@ -625,7 +643,9 @@ $('share-settings').addEventListener('click', async () => {
 // Leave the current work intact unless the destination passes validation.
 window.addEventListener('hashchange', async event => {
   if (!catalogReady) return; // Initial loading reads the latest location.
-  if (ensureEntryId() === currentEntryId && !divergedFromCurrentEntry) {++shareNavigation; sharePending = false; rememberCurrentSettings(); return;}
+  const destinationId = ensureEntryId();
+  if (!destinationId) {++shareNavigation; sharePending = false; return;}
+  if (destinationId === currentEntryId && !divergedFromCurrentEntry) {++shareNavigation; sharePending = false; rememberCurrentSettings(); return;}
   if (form.inert) {++shareNavigation; sharePending = false; $('share-status').textContent = '処理中は共有設定に移動できません。処理後にURLを開き直してください。'; return;}
   if (await restoreSharedSettings()) refresh();
 });

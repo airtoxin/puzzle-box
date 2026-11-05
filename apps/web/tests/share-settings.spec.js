@@ -389,3 +389,41 @@ test('family change is saved before its pending preview completes', async ({page
   await expect(page.locator('#family')).toHaveValue('slitherlink');
   await expect(page.locator('#generate')).toBeEnabled();
 });
+
+test('history update exceptions are reported without breaking initialization or current work', async ({page}) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {history.replaceState = () => {throw new DOMException('blocked', 'SecurityError');};});
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await expect(page.locator('#share-status')).toContainText('履歴に設定を保存できません');
+  await expect(page.locator('#retry-catalog')).toBeHidden();
+  await page.locator('#seed').fill('3'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.evaluate(() => {location.hash = '#invalid';});
+  await expect(page.locator('#share-status')).toContainText('履歴に設定を保存できません');
+  await expect(page.locator('#seed')).toHaveValue('3');
+  expect(errors).toEqual([]);
+});
+
+test('rapid edits are coalesced before writing browser history', async ({page}) => {
+  await page.addInitScript(() => {
+    const original = history.replaceState.bind(history); window.__historyWrites = 0;
+    history.replaceState = (...args) => {window.__historyWrites++; return original(...args);};
+  });
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.evaluate(() => {window.__historyWrites = 0;});
+  for (let i = 0; i < 10; i++) await page.locator('#seed').fill(String(i));
+  await expect(page.locator('#generate')).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => history.state?.puzzleBoxShareSettingsV1?.seed)).toBe(9);
+  expect(await page.evaluate(() => window.__historyWrites)).toBeLessThanOrEqual(2);
+});
+
+test('history snapshot write failure is reported and leaves the form usable', async ({page}) => {
+  await page.addInitScript(() => {
+    const original = history.replaceState.bind(history);
+    history.replaceState = (...args) => {if (window.__blockHistory) throw new DOMException('blocked', 'SecurityError'); return original(...args);};
+  });
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.evaluate(() => {window.__blockHistory = true;});
+  await page.locator('#seed').fill('3'); await expect(page.locator('#generate')).toBeEnabled();
+  await expect(page.locator('#share-status')).toContainText('履歴に設定を保存できません');
+  await expect(page.locator('#seed')).toHaveValue('3');
+});
