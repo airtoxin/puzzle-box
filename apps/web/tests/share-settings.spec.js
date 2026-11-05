@@ -318,6 +318,14 @@ test('back restores the original entry after an edit cancels a pending link', as
 });
 
 test('back after cancelling a link with a board edit preserves the puzzle and answer', async ({page}) => {
+  await page.addInitScript(() => {
+    const fetchOriginal = window.fetch; window.__planRequests = [];
+    window.fetch = (...args) => {
+      const result = fetchOriginal(...args);
+      if (args[0] === '/api/plan') window.__planRequests.push(result);
+      return result;
+    };
+  });
   await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
   await page.locator('#seed').fill('7'); const url = await share(page);
   await page.locator('#seed').fill('0'); await expect(page.locator('#generate')).toBeEnabled();
@@ -330,7 +338,16 @@ test('back after cancelling a link with a board edit preserves the puzzle and an
   const cell = page.locator('.cell:enabled').first(); await cell.click();
   const before = await cell.getAttribute('data-value');
   await expect(page.locator('#share-status')).toContainText('中止');
-  release(); await page.goBack();
+  const pendingResponse = page.waitForResponse(response => response.url().endsWith('/api/plan') && response.request().postDataJSON().seed === 7);
+  release(); await pendingResponse;
+  await page.evaluate(() => new Promise(resolve => {
+    window.addEventListener('hashchange', resolve, {once:true}); history.back();
+  }));
+  await page.evaluate(async () => {
+    await new Promise(requestAnimationFrame);
+    await Promise.allSettled(window.__planRequests);
+    await new Promise(requestAnimationFrame);
+  });
   await expect(page.locator('#actions')).toBeVisible();
   await expect(cell).toHaveAttribute('data-value', before);
   await expect(page.locator('#seed')).toHaveValue('0');
