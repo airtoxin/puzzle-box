@@ -461,3 +461,5 @@ footer {
 #generated-rules li + li { margin-top: 0.75rem; }
 #generated-rules p { margin: 0.25rem 0 0; }
 #generated-rules .rule-settings { font-size: 0.9em; }
+
+#generated-clues h4 { margin: 1rem 0 0.5rem; font-size: 1em; }

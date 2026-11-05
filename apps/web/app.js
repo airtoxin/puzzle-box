@@ -91,12 +91,12 @@ async function post(path, data) {
   return fetchJsonWithTimeout(path, options, (budget + 15) * 1000);
 }
 function clearArtifact() {
-  artifact = undefined; $('generated-rules').hidden = true; $('generated-rules-list').replaceChildren(); $('actions').hidden = true; $('answer-status').textContent = '';
+  artifact = undefined; $('generated-rules').hidden = true; $('generated-rules-list').replaceChildren(); $('generated-clues-list').replaceChildren(); $('generated-clues').hidden = true; $('actions').hidden = true; $('answer-status').textContent = '';
   $('reveal').textContent = '答えを表示';
 }
 // The catalog supplies the same explanations used when selecting rules. Bind them
 // to the successful request, never to the editable controls.
-function renderGeneratedRules(request) {
+function renderGeneratedRules(request, clues) {
   const declarations = catalog.profiles.find(p => p.id === request.family).rules;
   const list = $('generated-rules-list');
   list.replaceChildren(...request.rules.map(({id, parameters}) => {
@@ -111,6 +111,25 @@ function renderGeneratedRules(request) {
     return item;
   }));
   if (!request.rules.length) list.append(node('li', '追加ルールはありません。'));
+  const clueHelp = {
+    shading: {
+      cell: '固定されたマスは、表示された黒または白のままです。',
+      'row-count': '盤面の左側の数字は、その行の黒マスの数です。',
+      'column-count': '盤面の上側の数字は、その列の黒マスの数です。',
+    },
+    slitherlink: {
+      'cell-count': 'マスの数字は、そのマスを囲む4辺のうち線を引く辺の数です。',
+      edge: '固定された辺は、表示された線あり・線なしのままです。',
+    },
+    coupled: {
+      black: '固定されたマスは、表示された黒または白のままです。',
+      edge: '固定された辺は、表示された線あり・線なしのままです。',
+    },
+  };
+  const types = new Set(clues.map(clue => clue.type));
+  const help = Object.entries(clueHelp[request.family]).filter(([type]) => types.has(type));
+  $('generated-clues-list').replaceChildren(...help.map(([, text]) => node('li', text)));
+  $('generated-clues').hidden = !help.length;
   $('generated-rules').hidden = false;
 }
 function syncParameters() {
@@ -426,7 +445,7 @@ form.addEventListener('submit', async event => {
         input[index] = value; fixed.add(index);
       }
       $('entry-note').textContent = isCoupled() ? 'セルは未入力 → 白 → 黒、辺は未入力 → 線なし（×）→ 線あり。両方を入力してください。固定ヒントは変更できません。' : isLoop ? '辺を押すと、未入力 → 線なし（×）→ 線ありの順に切り替わります。固定ヒントは変更できません。' : '未知のマスを押すと、未入力 → 白 → 黒の順に切り替わります。固定ヒントは変更できません。';
-      renderBoard(); renderGeneratedRules(request); $('actions').hidden = false;
+      renderBoard(); renderGeneratedRules(request, result.clues); $('actions').hidden = false;
       $('status').textContent = `生成しました。唯一解・ヒント既約性を検証済み。\n${result.clues.length}個のヒント / ` + (result.evidence.method === 'cp-sat'
         ? `ソルバーで別解がないことを証明。${result.evidence.candidates}候補を探索。`
         : `${result.evidence.enumerated_boards}盤面を独立列挙して照合。`);
