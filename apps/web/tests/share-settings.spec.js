@@ -319,11 +319,17 @@ test('back restores the original entry after an edit cancels a pending link', as
 
 test('back after cancelling a link with a board edit preserves the puzzle and answer', async ({page}) => {
   await page.addInitScript(() => {
-    const fetchOriginal = window.fetch; window.__planRequests = [];
+    const fetchOriginal = window.fetch; window.__planRequests = []; window.__planBodies = [];
     window.fetch = (...args) => {
-      const result = fetchOriginal(...args);
-      if (args[0] === '/api/plan') window.__planRequests.push(result);
-      return result;
+      if (args[0] !== '/api/plan') return fetchOriginal(...args);
+      const result = fetchOriginal(...args).then(response => {
+        const readJson = response.json.bind(response);
+        response.json = (...jsonArgs) => {
+          const body = readJson(...jsonArgs); window.__planBodies.push(body); return body;
+        };
+        return response;
+      });
+      window.__planRequests.push(result); return result;
     };
   });
   await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
@@ -344,9 +350,12 @@ test('back after cancelling a link with a board edit preserves the puzzle and an
     window.addEventListener('hashchange', resolve, {once:true}); history.back();
   }));
   await page.evaluate(async () => {
-    await new Promise(requestAnimationFrame);
-    await Promise.allSettled(window.__planRequests);
-    await new Promise(requestAnimationFrame);
+    // Include response bodies and any refresh triggered by applying a restored plan.
+    for (let round = 0; round < 3; round++) {
+      await Promise.allSettled([...window.__planRequests]);
+      await Promise.allSettled([...window.__planBodies]);
+      await new Promise(requestAnimationFrame);
+    }
   });
   await expect(page.locator('#actions')).toBeVisible();
   await expect(cell).toHaveAttribute('data-value', before);
