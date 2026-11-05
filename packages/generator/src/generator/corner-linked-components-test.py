@@ -1,4 +1,4 @@
-"""Connected-subset clauses versus two component partitions and local floods."""
+"""Solver forests versus two independent component checks."""
 
 from dataclasses import replace
 import importlib
@@ -58,11 +58,13 @@ def fixed(rows,cols,bits,*rules):
         [(Cell(r,c),bits[r*cols+c]) for r in range(rows) for c in range(cols)])
 
 
-def test_three_by_three_reference_checkers_agree_on_all_512_boards():
+def test_three_by_three_solver_and_reference_checkers_agree_on_all_512_boards():
     for black in (True,False):
         rule=CornerLinkedComponents(black)
         for bits in product((0,1),repeat=9):
-            assert oracle.accepts(rule,bits,3,3)==reference(bits,3,3,black)
+            expected=reference(bits,3,3,black)
+            assert oracle.accepts(rule,bits,3,3)==expected
+            assert (fixed(3,3,bits,rule).solve() is not None)==expected
 
 
 def test_internal_corners_single_components_and_empty_color_have_distinct_meanings():
@@ -105,12 +107,12 @@ def test_round_trip_and_resource_bound_are_checked_before_enumeration(monkeypatc
     assert codec.read_recipe(codec.recipe_record(ten))==ten
     record=saved.puzzle_record(ten,[],seed=0)
     assert saved.verify(record)["unique"] and "corner" in saved.show(record)
-    large=replace(ten,cols=6)
-    with pytest.raises(ValueError,match="at most 10"):codec.recipe_record(large)
-    with pytest.raises(ValueError,match="at most 10"):saved.show({**record,"cols":6,"solution":[[0]*6,[0]*6]})
+    large=replace(ten,rows=1,cols=101)
+    with pytest.raises(ValueError,match="at most 100"):codec.recipe_record(large)
+    with pytest.raises(ValueError,match="at most 100"):saved.show({**record,"rows":1,"cols":101,"solution":[[0]*101]})
     module=importlib.import_module("puzzle_defs.puzzles.corner_linked_components")
-    monkeypatch.setattr(module,"_connected_subsets",lambda *a:pytest.fail("Must reject before enumeration"))
-    with pytest.raises(ValueError,match="at most 10"):large.create_empty()
+    monkeypatch.setattr(module.Puzzle,"int_var_map",lambda *a,**k:pytest.fail("Must reject before creating labels"))
+    with pytest.raises(ValueError,match="at most 100"):large.create_empty()
 
 
 def request(recipe):
@@ -134,6 +136,38 @@ def test_corner_chain_example_composes_with_component_and_cell_counts():
     answer=[v for row in result["record"]["solution"] for v in row]
     assert checks.check_answer({"format":checks.FORMAT,"request":result["request"],"clues":result["clues"],"answer":answer})=={"status":"ok","correct":True}
     assert worker.generate_request(request(replace(recipe,rules=(*recipe.rules,ConnectedBlack()))))["status"]=="unsatisfiable"
-    assert api.read_request(request(ShadingRecipe(2,5,(CornerLinkedComponents(),)))).plan["requirements"]["max_cells"] == 10
+    assert api.read_request(request(ShadingRecipe(2,5,(CornerLinkedComponents(),)))).plan["requirements"]["max_cells"] == 100
     for family in ("slitherlink","coupled"):
         with pytest.raises(ValueError):api.read_request({**request(recipe),"family":family})
+
+
+@pytest.mark.parametrize("black",[True,False])
+def test_hundred_cell_components_and_internal_corners(black):
+    rule=CornerLinkedComponents(black)
+    for chosen,expected in [
+        ({0,11,88,99},True),  # two disconnected diagonal chains
+        ({0,1,10},False),     # internal diagonal only
+        ({0,11,99},False),    # one component lacks a contact
+        (set(),True),
+    ]:
+        bits=tuple(int((i in chosen)==black) for i in range(100))
+        assert reference(bits,10,10,black)==expected
+        assert oracle.accepts(rule,bits,10,10)==expected
+        p=fixed(10,10,bits,rule);p.add(unique())
+        assert (p.solve() is not None)==expected
+
+
+def test_six_by_six_generation_and_answer_check():
+    from puzzle_defs import NonTouchingBlack
+    from puzzle_defs import ConnectedWhite
+    recipe=ShadingRecipe(6,6,(BlackCount(6),NonTouchingBlack(False),ConnectedWhite(True),CornerLinkedComponents(True)))
+    req=request(recipe);req["budget_seconds"]=30
+    result=worker.generate_request(req)
+    assert result["status"]=="ok"
+    bits=tuple(v for row in result["record"]["solution"] for v in row)
+    assert reference(bits,6,6,True) and oracle.accepts(CornerLinkedComponents(True),bits,6,6)
+    assert saved.verify(result["record"])["unique"]
+    answer={"format":checks.FORMAT,"request":result["request"],"clues":result["clues"],"answer":list(bits)}
+    assert checks.check_answer(answer)=={"status":"ok","correct":True}
+    answer["answer"][0]^=1
+    assert checks.check_answer(answer)=={"status":"ok","correct":False}
