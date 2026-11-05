@@ -351,16 +351,7 @@ def read_recipe(data: Any) -> ShadingRecipe:
                 raise ValueError(f"Fixed component sizes support at most {MAX_COMPONENT_CELLS} board cells")
             if rule.size > recipe.rows*recipe.cols:
                 raise ValueError("Component size cannot exceed the board area")
-    shared_rooms(recipe)
-    shared_numbers(recipe)
-    shared_sight_counts(recipe)
-    shared_island_areas(recipe)
-    shared_endpoint_markers(recipe)
-    shared_black_runs(recipe)
-    shared_component_areas(recipe)
-    shared_orthogonal_counts(recipe)
-    shared_neighbor_counts(recipe)
-    shared_component_counts(recipe)
+    validate_shared_grids(recipe)
     if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
            and r.count > recipe.rows * recipe.cols for r in recipe.rules):
         raise ValueError("Black count cannot exceed the board area")
@@ -471,3 +462,17 @@ def shared_orthogonal_counts(recipe: ShadingRecipe) -> ClueGrid | None:
     if grids and any(grid != grids[0] for grid in grids):
         raise ValueError("Orthogonal-count rules must share the same counts for this file/UI format")
     return grids[0] if grids else None
+
+
+def validate_shared_grids(recipe: ShadingRecipe) -> None:
+    """Validate every fixed grid shared by the shading file/UI formats."""
+    shared_rooms(recipe)
+    shared_numbers(recipe)
+    shared_sight_counts(recipe)
+    shared_island_areas(recipe)
+    shared_endpoint_markers(recipe)
+    shared_black_runs(recipe)
+    shared_component_areas(recipe)
+    shared_orthogonal_counts(recipe)
+    shared_neighbor_counts(recipe)
+    shared_component_counts(recipe)

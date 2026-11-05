@@ -45,7 +45,7 @@ from puzzle_defs.clue_layout import ClueGrid
 from puzzle_defs.run_clue_layout import RunClueGrid
 from shading_recipe import (RULES, DEFAULT_RULES, rule_choices, check_demo_size, check_distinct_paths,
                             load_recipe, read_rule, rule_record, shared_rooms, shared_numbers,
-                            shared_sight_counts, shared_island_areas, shared_neighbor_counts, shared_component_counts, shared_endpoint_markers, shared_black_runs, shared_component_areas, shared_orthogonal_counts)
+                            shared_sight_counts, shared_island_areas, shared_neighbor_counts, shared_component_counts, shared_endpoint_markers, shared_black_runs, shared_component_areas, shared_orthogonal_counts, validate_shared_grids)
 from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/shading-v1"
@@ -81,16 +81,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     if selection not in ("solver", "finite"):
         raise ValueError("Unknown completion selection")
     rules = [rule_record(rule) for rule in recipe.rules]
-    shared_rooms(recipe)
-    shared_numbers(recipe)
-    shared_sight_counts(recipe)
-    shared_island_areas(recipe)
-    shared_endpoint_markers(recipe)
-    shared_black_runs(recipe)
-    shared_component_areas(recipe)
-    shared_orthogonal_counts(recipe)
-    shared_neighbor_counts(recipe)
-    shared_component_counts(recipe)
+    validate_shared_grids(recipe)
     _check_clue_kinds(recipe, clues)
     legacy = recipe.clue_kinds == ("cell",)
     encoded_clues = [clue_record(clue, legacy=legacy) for clue in clues]
@@ -180,16 +171,7 @@ def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[
                            tuple(read_rule(r) for r in read_array(data["rules"], "rules")),
                            ("cell",) if legacy else tuple(read_array(data["clue_kinds"], "clue_kinds")))
     check_demo_size(recipe)
-    shared_rooms(recipe)
-    shared_numbers(recipe)
-    shared_sight_counts(recipe)
-    shared_island_areas(recipe)
-    shared_endpoint_markers(recipe)
-    shared_black_runs(recipe)
-    shared_component_areas(recipe)
-    shared_orthogonal_counts(recipe)
-    shared_neighbor_counts(recipe)
-    shared_component_counts(recipe)
+    validate_shared_grids(recipe)
     clues = [read_clue(clue, legacy=legacy) for clue in read_array(data["clues"], "clues")]
     _check_clue_kinds(recipe, clues)
     answer = data["solution"]
