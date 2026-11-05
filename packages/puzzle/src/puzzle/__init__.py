@@ -22,7 +22,7 @@ from puzzle.expr import BoolExpr, BoolVarMap, Expr, LinearConstraint, Var, VarGr
 from puzzle.features import MissingFeatureError
 from puzzle.grid import Cell, Edge, SquareGrid, Vertex, square_grid
 from puzzle.match import MatchVarMap
-from puzzle.puzzle import Puzzle, Solution
+from puzzle.puzzle import Puzzle, Solution, SolveResult
 
 Constraint = (
     AllDifferentConstraint
@@ -56,6 +56,7 @@ __all__ = [
     "ShapeAcrossConstraint",
     "SingleCycleConstraint",
     "Solution",
+    "SolveResult",
     "SquareGrid",
     "UniqueConstraint",
     "Var",

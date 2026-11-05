@@ -134,6 +134,6 @@ def test_corner_chain_example_composes_with_component_and_cell_counts():
     answer=[v for row in result["record"]["solution"] for v in row]
     assert checks.check_answer({"format":checks.FORMAT,"request":result["request"],"clues":result["clues"],"answer":answer})=={"status":"ok","correct":True}
     assert worker.generate_request(request(replace(recipe,rules=(*recipe.rules,ConnectedBlack()))))["status"]=="unsatisfiable"
-    with pytest.raises(ValueError):api.read_request(request(ShadingRecipe(2,5,(CornerLinkedComponents(),))))
+    assert api.read_request(request(ShadingRecipe(2,5,(CornerLinkedComponents(),)))).plan["requirements"]["max_cells"] == 10
     for family in ("slitherlink","coupled"):
         with pytest.raises(ValueError):api.read_request({**request(recipe),"family":family})

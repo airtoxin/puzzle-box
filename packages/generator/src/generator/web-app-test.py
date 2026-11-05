@@ -83,7 +83,7 @@ def test_parameter_types_bounds_unknown_fields_duplicates_and_area_are_checked()
         with pytest.raises(ValueError): api.read_request(data)
     data = request(); data["rules"] *= 2
     with pytest.raises(ValueError, match="duplicate"): api.read_request(data)
-    with pytest.raises(ValueError, match="9 cells"): api.read_request({**request(), "rows": 4})
+    with pytest.raises(ValueError, match="100 cells"): api.read_request({**request(), "rows": 34})
 
 
 def test_two_rule_generation_is_reproducible_and_accepted_by_existing_saved_reader():
@@ -93,20 +93,21 @@ def test_two_rule_generation_is_reproducible_and_accepted_by_existing_saved_read
     assert first == second and data == before and first["status"] == "ok"
     assert saved.verify(first["record"]) == {"valid": True, "unique": True, "irreducible": True,
                                            "clue_count": len(first["clues"])}
-    assert first["evidence"]["enumerated_boards"] == 64
+    assert first["evidence"]["method"] == "cp-sat"
+    assert "enumerated_boards" not in first["evidence"]
     assert first["evidence"]["unique"] and first["evidence"]["irreducible"]
     assert saved.check_answer(first["record"], "/".join("".join("#" if v else "." for v in row)
                                                       for row in first["record"]["solution"]))
 
 
-def test_impossible_and_insufficient_hint_results_have_finite_evidence():
+def test_impossible_and_insufficient_hint_results_have_solver_evidence():
     data = request(); data["rules"] = [{"id": "count", "parameters": {"count": 6}},
                                       {"id": "non-touching", "parameters": {"diagonal": False}}]
     result = worker.generate_request(data)
-    assert result == {"status": "unsatisfiable", "evidence": {"enumerated_boards": 64, "completion_count": 0}}
+    assert result["status"] == "unsatisfiable" and result["evidence"]["candidates"] == 0
     data.update(rows=2, cols=2, rules=[{"id": "count", "parameters": {"count": 1}}], clue_kinds=["row-count"])
     result = worker.generate_request(data)
-    assert result == {"status": "insufficient_hints", "evidence": {"enumerated_boards": 16, "completion_count": 4}}
+    assert result["status"] == "insufficient_hints" and result["evidence"]["candidates"] == 4
 
 
 @pytest.mark.parametrize("mode", ["timeout", "exit", "malformed"])

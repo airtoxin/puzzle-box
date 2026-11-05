@@ -24,7 +24,7 @@ class AdjacentBlackComponentSum:
         "adjacent-black-component-sum", "接する黒成分の面積合計を固定",
         "数字マスは白。上下左右で接する黒成分の面積を、同じ成分は1回だけ足します。0も数字、. は丸なし。9セル以下です。",
         (UiParameter("component_counts", "接する黒成分の面積合計（. は丸なし）", "clue-grid", DEFAULT_COMPONENT_COUNTS, maximum=99),),
-        UiRequirements(channels=(UiChannel("answer", "binary-cells"), UiChannel("component-counts", "cell-component-counts"))),
+        UiRequirements(max_cells=9, channels=(UiChannel("answer", "binary-cells"), UiChannel("component-counts", "cell-component-counts"))),
     )
     component_counts: ClueGrid
 

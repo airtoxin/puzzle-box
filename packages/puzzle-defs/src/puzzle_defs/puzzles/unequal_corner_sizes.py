@@ -7,7 +7,7 @@ from typing import ClassVar
 from puzzle import Puzzle, SquareGrid, VarMap, sum_expr
 from puzzle_defs.puzzles.component_shapes import _check_color
 from puzzle_defs.puzzles.room_components import MAX_ROOM_COMPONENT_CELLS, _component_uses
-from puzzle_defs.ui import RuleUi, UiParameter
+from puzzle_defs.ui import RuleUi, UiParameter, UiRequirements
 
 MAX_CORNER_SIZE_CELLS = MAX_ROOM_COMPONENT_CELLS
 
@@ -25,6 +25,7 @@ class UnequalCornerComponentSizes:
         "unequal-corner-component-sizes", "同じ大きさの成分の角接触を禁止",
         "対象色の別々の上下左右成分が角で接するとき、面積を異ならせます。同一成分内の角接触や離れた同面積は許します。9セル以下の実験的な部品です。",
         (UiParameter("black", "面積を比べる色は黒（オフなら白）", "boolean", True),),
+        requirements=UiRequirements(max_cells=9),
     )
     black: bool = True
 

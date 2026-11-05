@@ -307,8 +307,8 @@ def read_rule(data: Any) -> ShadingRule:
 
 
 def check_demo_size(recipe: ShadingRecipe) -> None:
-    if recipe.rows * recipe.cols > 25:
-        raise ValueError("This small-board demo supports at most 25 cells")
+    if recipe.rows * recipe.cols > 100:
+        raise ValueError("Shading files support at most 100 cells")
     if (recipe.rows*recipe.cols > MAX_CORNER_SIZE_CELLS
             and any(type(r) is UnequalCornerComponentSizes for r in recipe.rules)):
         raise ValueError(f"Unequal corner component sizes support at most {MAX_CORNER_SIZE_CELLS} board cells")

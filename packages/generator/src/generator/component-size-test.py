@@ -67,10 +67,8 @@ def test_strict_parameters(size, black):
     with pytest.raises(ValueError): ColorComponentSize(size,black)
 
 
-def test_unsupported_area_and_oversized_component_fail_before_enumeration(monkeypatch):
-    module = importlib.import_module("puzzle_defs.puzzles.component_size")
-    monkeypatch.setattr(module,"enumerate_connected_regions",lambda *a,**k: pytest.fail("Must validate first"))
-    for recipe in [ShadingRecipe(2,5,(ColorComponentSize(3),)),ShadingRecipe(2,3,(ColorComponentSize(7),))]:
+def test_unsupported_area_and_oversized_component_fail():
+    for recipe in [ShadingRecipe(1,101,(ColorComponentSize(3),)),ShadingRecipe(2,3,(ColorComponentSize(7),))]:
         with pytest.raises(ValueError): recipe.create_empty()
         with pytest.raises(ValueError): codec.recipe_record(recipe)
 

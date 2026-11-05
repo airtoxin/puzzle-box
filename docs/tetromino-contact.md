@@ -37,7 +37,7 @@ uv run --no-sync python examples/generate_shading.py verify lits-variant.json
 
 ## Web と入力の範囲
 
-この断片のPython実装と保存CLIは25セル以下です。Webと有限診断は既存の9セル上限を維持します。
+この断片のPython実装と保存CLIは25セル以下です。Webも25セル以下です。有限診断は9セル以下です。
 したがって、上の4×4例はPython/CLIで試してください。ルールは既存の部屋入力と境界表示を共有し、異なる部屋分割の併用は拒否します。
 
 Webの3×3で、部屋黒数4・部屋内連結・同形接触禁止を選び、部屋配置を次の3行にすると、O形とL形なので接触できます。

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import platform
 import sys
+import time
 from typing import Any
 
 import ortools
@@ -59,17 +60,21 @@ def _check_clue_kinds(recipe: ShadingRecipe, clues: list[Clue]) -> None:
             raise ValueError("Stored clue type is not enabled by clue_kinds")
 
 
-def _check_irreducible(recipe: ShadingRecipe, clues: list[Clue]) -> None:
+def _check_irreducible(recipe: ShadingRecipe, clues: list[Clue], *, deadline: float | None = None) -> None:
     for idx in range(len(clues)):
         trial = recipe.build_from_clues(clues[:idx] + clues[idx + 1:])
-        trial.add(unique())
-        if trial.solve() is not None:
+        result = trial.solve_result(check_unique=True,
+            time_limit=None if deadline is None else max(0.0, deadline-time.monotonic()))
+        if result.uniqueness == "unique":
             raise ValueError("Stored clues are not irreducible: a clue can still be removed")
+        if result.uniqueness != "multiple":
+            raise TimeoutError("Clue necessity was not proven")
 
 
 def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
-                  selection: str = "solver") -> dict[str, Any]:
+                  selection: str = "solver", time_limit: float | None = None) -> dict[str, Any]:
     """Serialize a unique, irreducible puzzle accepted by the built-in reader."""
+    deadline = None if time_limit is None else time.monotonic() + time_limit
     if type(recipe) is not ShadingRecipe:
         raise ValueError("This format requires an exact ShadingRecipe; composed recipes and subclasses need their own codec")
     check_demo_size(recipe)
@@ -93,17 +98,31 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     # bool/float coordinates equal to ints, but the file format rejects them.
     clues = [read_clue(clue, legacy=legacy) for clue in encoded_clues]
     puzzle = recipe.build_from_clues(clues)
-    puzzle.add(unique())
-    solution = puzzle.solve()
-    if solution is None:
+    result = puzzle.solve_result(seed=seed, check_unique=True,
+        time_limit=None if deadline is None else max(0.0, deadline-time.monotonic()))
+    if result.status == "unknown" or result.uniqueness == "unknown":
+        raise TimeoutError("Uniqueness was not proven")
+    solution = result.solution
+    if result.uniqueness != "unique" or solution is None:
         raise ValueError("Generated clues did not determine a unique answer")
-    _check_irreducible(recipe, clues)
+    _check_irreducible(recipe, clues, deadline=deadline)
+    return encode_record(recipe, clues, puzzle.result(solution), seed=seed, selection=selection)
+
+
+def encode_record(recipe: ShadingRecipe, clues: list[Clue], answer: list[list[int]], *, seed: int,
+                  selection: str = "solver") -> dict[str, Any]:
+    """Encode an already verified result, without repeating solver queries.
+
+    This is serialization only. Call puzzle_record to verify arbitrary clues;
+    bounded generation supplies its own uniqueness and irreducibility proofs.
+    """
+    legacy = recipe.clue_kinds == ("cell",)
     record = {
         "format": FORMAT if legacy else MIXED_FORMAT,
         "rows": recipe.rows, "cols": recipe.cols,
-        "rules": rules, "seed": seed,
-        "clues": encoded_clues,
-        "solution": puzzle.result(solution),
+        "rules": [rule_record(rule) for rule in recipe.rules], "seed": seed,
+        "clues": [clue_record(clue, legacy=legacy) for clue in clues],
+        "solution": answer,
         "environment": {"python": platform.python_version(), "ortools": ortools.__version__,
                         "seeded_search_workers": 1},
     }

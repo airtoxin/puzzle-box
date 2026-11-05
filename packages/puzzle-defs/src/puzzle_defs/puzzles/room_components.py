@@ -1,7 +1,7 @@
 """Bounded room-local component count and size equality, from Nuritwin."""
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import ClassVar
 
 from puzzle import Cell, Puzzle, SquareGrid, VarMap, sum_expr
@@ -53,7 +53,7 @@ class RoomComponentCount:
         "room-component-count", "各部屋の対象色の成分数を固定",
         "部屋内だけを通る上下左右の連結成分を数えます。0は対象色なし。部屋外を通ってつながっていても別成分です。9セル以下の実験的な部品です。",
         (ROOM_PARAMETER, UiParameter("count", "各部屋の対象色の成分数", "integer", 2),
-         UiParameter("black", "成分を数える色は黒（オフなら白）", "boolean", True)), ROOM_UI,
+         UiParameter("black", "成分を数える色は黒（オフなら白）", "boolean", True)), replace(ROOM_UI, max_cells=9),
     )
     rooms: RoomMap
     count: int = 2
@@ -84,7 +84,7 @@ class EqualRoomComponentSizes:
     ui: ClassVar[RuleUi] = RuleUi(
         "equal-room-component-sizes", "成分の大きさを部屋ごとにそろえる",
         "各部屋内の対象色の成分を同じマス数にします。0個・1個は許し、部屋ごとに大きさは変えられます。形の一致は不要。9セル以下の実験的な部品です。",
-        (ROOM_PARAMETER, UiParameter("black", "サイズをそろえる色は黒（オフなら白）", "boolean", True)), ROOM_UI,
+        (ROOM_PARAMETER, UiParameter("black", "サイズをそろえる色は黒（オフなら白）", "boolean", True)), replace(ROOM_UI, max_cells=9),
     )
     rooms: RoomMap
     black: bool = True

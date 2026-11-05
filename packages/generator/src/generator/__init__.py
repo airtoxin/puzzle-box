@@ -164,8 +164,8 @@ def reduce_clues[P: Puzzle, C](
     the uniqueness check, including multiple solutions or no solution.
     """
     initial = puzzle_class.build_from_clues(list(clues))
-    initial.add(UniqueConstraint())
-    if initial.solve() is None:
+    initial_result = initial.solve_result(check_unique=True)
+    if initial_result.uniqueness != "unique":
         raise InitialCluesNotUniqueError("Initial clues must define a uniquely solvable puzzle")
 
     rng = random.Random(seed)
@@ -177,9 +177,11 @@ def reduce_clues[P: Puzzle, C](
         trial_indices = [i for i in remaining if i != idx]
         trial = [clues[i] for i in trial_indices]
         instance = puzzle_class.build_from_clues(trial)
-        instance.add(UniqueConstraint())
-        if instance.solve() is not None:
+        result = instance.solve_result(check_unique=True)
+        if result.uniqueness == "unique":
             remaining = trial_indices
+        elif result.uniqueness != "multiple":
+            raise RuntimeError("Clue necessity was not proven; reduction is unconfirmed")
 
     return [clues[i] for i in remaining]
 

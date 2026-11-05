@@ -148,7 +148,7 @@ def test_five_rule_paint_area_example_has_an_editable_black_number_and_no_extra_
 def test_only_existing_resource_limits_apply():
     recipe=ShadingRecipe(5,5,(OrthogonalBlackCounts(((None,)*5,)*5),))
     assert codec.read_recipe(codec.recipe_record(recipe)) == recipe
-    with pytest.raises(ValueError,match="at most 9"): api.read_request(request(recipe))
+    assert api.read_request(request(recipe)).recipe == recipe
     with pytest.raises(ValueError,match="at most 9"): oracle.analyze(recipe)
-    with pytest.raises(ValueError,match="at most 25"):
-        codec.recipe_record(ShadingRecipe(6,5,(OrthogonalBlackCounts(((None,)*5,)*6),)))
+    with pytest.raises(ValueError,match="at most 100"):
+        codec.recipe_record(ShadingRecipe(11,10,(OrthogonalBlackCounts(((None,)*10,)*11),)))

@@ -176,10 +176,10 @@ def test_three_rule_example_contributes_generates_and_checks_with_existing_ui():
 def test_existing_file_and_web_bounds_and_oversized_majority_before_display():
     recipe=ShadingRecipe(5,5,(RoomMajorityCount(((0,)*5,)*5,13),DirectionalRunLimit()))
     assert codec.read_recipe(codec.recipe_record(recipe)) == recipe
-    with pytest.raises(ValueError,match="at most 9"): api.read_request(request(recipe))
+    assert api.read_request(request(recipe)).recipe == recipe
     with pytest.raises(ValueError,match="at most 9"): oracle.analyze(recipe)
-    with pytest.raises(ValueError,match="at most 25"):
-        codec.recipe_record(ShadingRecipe(6,5,(DirectionalRunLimit(),)))
+    with pytest.raises(ValueError,match="at most 100"):
+        codec.recipe_record(ShadingRecipe(11,10,(DirectionalRunLimit(),)))
     record={"format":saved.FORMAT,"rows":1,"cols":2,"rules":[{
         "type":"room-majority-count","rooms":[[0,0]],"count":10**100}],"clues":[],"solution":[[0,0]]}
     with pytest.raises(ValueError,match="cannot exceed"): saved.show(record)

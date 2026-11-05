@@ -37,7 +37,7 @@ def run_job(data: Any, *, check: bool = False) -> dict[str, Any]:
             return {"status": "unconfirmed"}
         response = json.loads(result.stdout)
         if type(response) is not dict or response.get("status") not in (
-                "ok", "unsatisfiable", "insufficient_hints", "unconfirmed"):
+                "ok", "unsatisfiable", "insufficient_hints", "search_exhausted", "unconfirmed"):
             return {"status": "unconfirmed"}
         return response
     except subprocess.TimeoutExpired:

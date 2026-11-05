@@ -74,14 +74,11 @@ def check_answer(data: Any) -> dict[str, Any]:
         puzzle = recipe.build_from_clues(clues)
         for edge, bit in zip(edges, data["answer"]): puzzle.add(puzzle.edge_on[edge] == bit)
     else:
-        from analyze_shading import finite_space, full_clues as shading_full_clues
-        _, boards, masks = finite_space(recipe)
         answer = tuple(data["answer"])
         clues = [shading_clue(c) for c in data["clues"]]
-        index = boards.index(answer)
-        correct = all(index in mask for mask in masks) and set(clues) <= set(shading_full_clues(recipe, answer))
-        if not correct: return {"status": "ok", "correct": False}
         puzzle = recipe.build_from_clues(clues)
         for cell, bit in zip(puzzle.board.cells, answer): puzzle.add(puzzle.black[cell] == bit)
-    # A failed/inconclusive solver confirmation is not a verdict against the user.
-    return {"status": "ok", "correct": True} if puzzle.solve(seed=request.seed) is not None else {"status": "unconfirmed"}
+    result = puzzle.solve_result(seed=request.seed, time_limit=request.budget)
+    if result.status == "unknown":
+        return {"status": "unconfirmed"}
+    return {"status": "ok", "correct": result.status == "sat"}

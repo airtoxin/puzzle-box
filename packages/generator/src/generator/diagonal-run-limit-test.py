@@ -138,5 +138,4 @@ def test_web_metadata_and_resource_limits_reject_other_profiles():
         with pytest.raises(ValueError): api.read_request(broken)
     for family in ["slitherlink","coupled"]:
         with pytest.raises(ValueError): api.read_request({**data,"family":family})
-    with pytest.raises(ValueError,match="at most 9"):
-        api.read_request(request(ShadingRecipe(4,3,(DiagonalRunLimit(),))))
+    assert api.read_request(request(ShadingRecipe(4,3,(DiagonalRunLimit(),)))).recipe.rows == 4
