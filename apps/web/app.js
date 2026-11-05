@@ -362,7 +362,12 @@ function buildControls() {
       } else fields.append(wrapper);
     }
     card.append(fields); groups.get(groupName).append(card); selected.set(rule.identifier, {toggle, parameters});
-    toggle.addEventListener('input', updateRuleView);
+    toggle.addEventListener('input', () => {
+      const query = $('rule-search').value.trim().toLocaleLowerCase();
+      if (document.activeElement === toggle && !toggle.checked && query && !card.dataset.search.includes(query))
+        $('rule-search').focus();
+      updateRuleView();
+    });
   }
   updateRuleView();
   for (const hint of profile.clues) {
@@ -454,6 +459,9 @@ function chooseProfile(startRefresh = true, isolated = false) {
 }
 $('family').addEventListener('change', () => chooseProfile());
 $('rule-search').addEventListener('input', event => {event.stopPropagation(); updateRuleView();});
+$('rule-search').addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.isComposing) event.preventDefault();
+});
 form.addEventListener('invalid', event => {
   const group = event.target.closest('.rule-group');
   if (group) group.open = true;

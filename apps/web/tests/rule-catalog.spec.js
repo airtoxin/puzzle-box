@@ -42,10 +42,66 @@ test('all board families and narrow screens retain accessible search and groups'
     await page.locator('#family').selectOption(family);
     await expect(page.locator('#generate')).toBeEnabled();
     await expect(page.getByLabel('ルールを検索')).toBeVisible();
+    const searchStyle = await page.locator('#rule-search').evaluate(el => ({height: el.getBoundingClientRect().height, fontSize: parseFloat(getComputedStyle(el).fontSize)}));
+    expect(searchStyle.height).toBeGreaterThanOrEqual(44); expect(searchStyle.fontSize).toBeGreaterThanOrEqual(16);
     await expect(page.locator('.rule-group summary').first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByLabel('ルールを検索').fill('一致なしxyz');
     await expect(page.locator('#rule-empty')).toBeVisible();
     await page.getByLabel('ルールを検索').fill('');
   }
+});
+
+test('Enter in rule search does not submit or replace an in-progress puzzle', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#generate').click();
+  await expect(page.locator('#actions')).toBeVisible({timeout:45000});
+  const cell = page.locator('#board .cell:enabled').first();
+  await cell.click();
+  const answer = await cell.getAttribute('data-value');
+  await page.locator('#share-settings').click();
+  const url = await page.locator('#share-url').inputValue();
+  expect(url).toContain('#settings-v1=');
+  let generationRequests = 0;
+  page.on('request', request => {if (request.url().endsWith('/api/generate')) generationRequests++;});
+  await page.evaluate(() => {
+    window.searchSubmitCount = 0;
+    document.querySelector('#recipe-form').addEventListener('submit', () => window.searchSubmitCount++);
+  });
+  const search = page.locator('#rule-search');
+  await search.fill('connected'); await search.press('Enter');
+  expect(await page.evaluate(() => window.searchSubmitCount)).toBe(0);
+  expect(generationRequests).toBe(0);
+  await expect(page.locator('#share-url')).toHaveValue(url);
+  await expect(page.locator('#actions')).toBeVisible();
+  await expect(page.locator('#generated-rules')).toBeVisible();
+  await expect(cell).toHaveAttribute('data-value', answer);
+});
+
+
+test('unchecking a retained selection moves focus to search', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  const search = page.locator('#rule-search');
+  await search.fill('不一致xyz');
+  const toggle = page.locator('[data-rule-id="count"] input[type=checkbox]');
+  await toggle.focus(); await page.keyboard.press('Space');
+  await expect(search).toBeFocused();
+  await expect(page.locator('[data-rule-id="count"]')).toBeHidden();
+});
+
+test('loading shared settings while searching retains the query and selected rules', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  const toggle = page.locator('[data-rule-id="no-black-2x2"] input[type=checkbox]');
+  await toggle.check(); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#share-settings').click();
+  const url = await page.locator('#share-url').inputValue();
+  expect(url).toContain('#settings-v1=');
+  await toggle.uncheck();
+  const search = page.locator('#rule-search'); await search.fill('不一致xyz');
+  await page.evaluate(hash => {location.hash = hash;}, new URL(url).hash);
+  await page.locator('#load-shared-settings').click();
+  await expect(page.locator('#share-status')).toContainText('読み込みました');
+  await expect(search).toHaveValue('不一致xyz');
+  await expect(page.locator('[data-rule-id="no-black-2x2"]')).toBeVisible();
+  await expect(page.locator('[data-rule-id="no-black-2x2"] input[type=checkbox]')).toBeChecked();
 });
