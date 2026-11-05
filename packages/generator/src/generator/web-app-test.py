@@ -13,7 +13,7 @@ import threading
 
 import pytest
 
-from puzzle_defs import BlackCount, ConnectedWhite, NoWhite2x2, NonTouchingBlack
+from puzzle_defs import BlackCount, ConnectedWhite, NoWhite2x2, NonTouchingBlack, ShadingRecipe
 from puzzle_defs.ui import UiChannel, UiRequirements, merge_requirements
 
 EXAMPLES = Path(__file__).resolve().parents[4] / "examples"
@@ -23,6 +23,7 @@ with pytest.MonkeyPatch.context() as patch:
     worker = importlib.import_module("web_worker")
     server_api = importlib.import_module("web_server")
     saved = importlib.import_module("generate_shading")
+    hosted = importlib.import_module("web_hosted")
 
 
 def request():
@@ -231,10 +232,10 @@ def test_oversized_declared_body_reads_only_one_byte_beyond_the_limit(local_serv
         connection.sendall(headers + b"x"*(server_api.MAX_BODY+1))
         response = http.client.HTTPResponse(connection); response.begin()
         assert response.status == 400
-        assert "8192 bytes" in json.loads(response.read())["message"]
+        assert str(server_api.MAX_BODY) in json.loads(response.read())["message"]
 
 
-@pytest.mark.parametrize("body", ['{"seed":0,"seed":1}', '{"x":NaN}', "["*1100, "x"*8193, b"\xff"],
+@pytest.mark.parametrize("body", ['{"seed":0,"seed":1}', '{"x":NaN}', "["*1100, "x"*(server_api.MAX_BODY+1), b"\xff"],
                          ids=["duplicate", "nonfinite", "deep", "oversize", "encoding"])
 def test_http_rejects_ambiguous_oversize_or_invalid_json(local_server, body):
     assert send(local_server, "/api/generate", body, origin=local_server.origin)[0] == 400
@@ -265,3 +266,46 @@ def test_http_answer_validation_is_origin_protected_bounded_and_uses_a_real_work
     assert status == 200 and json.loads(body) == {"status": "ok", "correct": False}
     data["answer"] = [True]*6
     assert send(local_server, "/api/check", json.dumps(data), origin=local_server.origin)[0] == 400
+
+
+def test_check_validation_never_builds_models_before_lock_or_worker(local_server, monkeypatch):
+    data = {"format": "puzzle-box/web-answer-v1", "request": {**request(), "rows": 10, "cols": 10,
+        "rules": [{"id": "color-component-size", "parameters": {"size": 3, "black": True}}]},
+        "clues": [{"type": "cell", "row": 0, "col": 0, "value": 1}], "answer": [0] * 100}
+    monkeypatch.setattr(ShadingRecipe, "build_from_clues",
+                        lambda *a, **k: pytest.fail("Preflight must not build a solver model"))
+    with local_server.generation_lock:
+        assert send(local_server, "/api/check", json.dumps(data), origin=local_server.origin)[0] == 409
+    monkeypatch.setattr(server_api, "run_job", lambda *a, **k: {"status": "unconfirmed"})
+    assert send(local_server, "/api/check", json.dumps(data), origin=local_server.origin)[0] == 200
+    data["clues"][0]["row"] = 10
+    assert send(local_server, "/api/check", json.dumps(data), origin=local_server.origin)[0] == 400
+
+
+def test_large_check_body_reaches_real_worker_locally_and_hosted(local_server, monkeypatch):
+    from io import BytesIO
+    grid = lambda value: [[value for _ in range(10)] for _ in range(10)]
+    data = {"format": "puzzle-box/web-answer-v1", "request": {**request(), "rows": 10, "cols": 10,
+        "rules": [
+            {"id": "count", "parameters": {"count": 0}},
+            {"id": "uniform-rooms", "parameters": {"rooms": grid(0)}},
+            {"id": "adjacent-black-counts", "parameters": {"neighbor_counts": grid(0), "diagonal": False}},
+            {"id": "orthogonal-black-counts", "parameters": {"orthogonal_counts": grid(0)}},
+            {"id": "adjacent-black-runs", "parameters": {"run_clues": grid(None)}},
+            {"id": "distinct-white-numbers", "parameters": {"numbers": [[10*r+c for c in range(10)] for r in range(10)]}},
+        ]},
+        "clues": ([{"type": "cell", "row": i//10, "col": i%10, "value": 0} for i in range(100)]
+                  + [{"type": "row-count", "row": i, "count": 0} for i in range(10)]
+                  + [{"type": "column-count", "col": i, "count": 0} for i in range(10)]),
+        "answer": [0]*100}
+    body = json.dumps(data).encode()
+    assert 8192 < len(body) < server_api.MAX_BODY
+    status, _, response = send(local_server, "/api/check", body, origin=local_server.origin)
+    assert status == 200 and json.loads(response) == {"status": "ok", "correct": True}
+    monkeypatch.setenv("VERCEL_PROJECT_PRODUCTION_URL", "demo.vercel.app")
+    environ = {"REQUEST_METHOD": "POST", "QUERY_STRING": "operation=check", "HTTP_HOST": "demo.vercel.app",
+               "HTTP_ORIGIN": "https://demo.vercel.app", "CONTENT_TYPE": "application/json",
+               "CONTENT_LENGTH": str(len(body)), "wsgi.input": BytesIO(body)}
+    status_headers = []
+    response = b"".join(hosted.app(environ, lambda status, headers: status_headers.append(status)))
+    assert status_headers == ["200 OK"] and json.loads(response) == {"status": "ok", "correct": True}

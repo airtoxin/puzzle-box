@@ -55,7 +55,7 @@ def test_catalog_advertises_hosted_budget_and_plan_matches_local_contract():
 @pytest.mark.parametrize("override", [
     {"HTTP_HOST": "evil.example"}, {"HTTP_HOST": "demo.vercel.app,evil.example"},
     {"HTTP_ORIGIN": "https://evil.example"}, {"HTTP_ORIGIN": "null"}, {"HTTP_ORIGIN": "http://demo.vercel.app"},
-    {"CONTENT_TYPE": "text/plain"}, {"CONTENT_LENGTH": ""}, {"CONTENT_LENGTH": "8193"},
+    {"CONTENT_TYPE": "text/plain"}, {"CONTENT_LENGTH": ""}, {"CONTENT_LENGTH": "32769"},
     {"CONTENT_LENGTH": "-1"}, {"CONTENT_LENGTH": "2,2"}, {"HTTP_TRANSFER_ENCODING": "chunked"},
     {"wsgi.input": BytesIO(b"{")}, {"QUERY_STRING": "operation=plan&operation=generate"},
     {"QUERY_STRING": "operation=plan&extra=1"}, {"QUERY_STRING": "operation=" + "x"*300},

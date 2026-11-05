@@ -8,6 +8,7 @@ from puzzle_defs import SlitherlinkRecipe, YajilinRecipe
 from generator.search import generate_bounded
 from generate_shading import clue_record, encode_record
 from web_catalog import read_request
+from web_server import MAX_BODY
 
 
 def generate_request(data: Any) -> dict[str, Any]:
@@ -34,7 +35,9 @@ def generate_request(data: Any) -> dict[str, Any]:
 
 if __name__ == "__main__":
     try:
-        data = json.loads(sys.stdin.read(8193))
+        # The parent re-encodes JSON with ASCII escapes, which can expand a
+        # single UTF-8 byte into at most six characters. Keep stdin bounded.
+        data = json.loads(sys.stdin.read(6 * MAX_BODY + 1))
         if sys.argv[1:] == ["--check"]:
             from web_answers import check_answer
             result = check_answer(data)
