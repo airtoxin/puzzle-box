@@ -123,6 +123,23 @@ test('shared endpoints retain visibility explanation', async ({page, browser}) =
 });
 
 test('sharing cancels a pending puzzle restore', async ({page, browser}) => {
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      if (String(args[0]).endsWith('/api/restore')) {
+        const originalJson = response.json.bind(response);
+        response.json = async () => {
+          const body = await originalJson();
+          // The restoration handler has no further asynchronous work after
+          // JSON parsing; the next task runs after its continuation completes.
+          setTimeout(() => { window.restoreHandlerSettled = true; }, 0);
+          return body;
+        };
+      }
+      return response;
+    };
+  });
   await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled(); await page.locator('#generate').click(); await expect(page.locator('#actions')).toBeVisible();
   const context=await browser.newContext(); const other=await context.newPage(); await other.goto('/'); await expect(other.locator('#generate')).toBeEnabled();
   await other.locator('#seed').fill('7'); await expect(other.locator('#generate')).toBeEnabled(); await other.locator('#generate').click();
@@ -131,8 +148,10 @@ test('sharing cancels a pending puzzle restore', async ({page, browser}) => {
   await page.route('**/api/restore',async route=>{started(); await gate; await route.continue();});
   await page.evaluate(hash=>{location.hash=hash;},new URL(url).hash); const restored=page.waitForResponse('**/api/restore');
   await page.locator('#load-shared-settings').click(); await waiting; await page.locator('#share-puzzle').click();
-  const current=await page.locator('#puzzle-url').inputValue(); release(); await restored;
+  const current=await page.locator('#puzzle-url').inputValue(); release(); await (await restored).finished();
+  await page.waitForFunction(() => window.restoreHandlerSettled === true);
   await expect(page.locator('#navigation-status')).toContainText('中止'); await expect(page.locator('#puzzle-url')).toHaveValue(current);
+  await expect(page.locator('#seed')).toHaveValue('0');
   expect(current).not.toBe(url); await context.close();
 });
 
