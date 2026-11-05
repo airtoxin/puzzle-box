@@ -10,6 +10,9 @@ from generator import GeneratablePuzzle
 from puzzle import Puzzle, Solution
 
 
+DEFAULT_MAX_CANDIDATES = 64
+
+
 @dataclass(frozen=True)
 class GenerationResult[P: Puzzle, C]:
     status: Literal["ok", "unsatisfiable", "insufficient_hints", "search_exhausted", "unconfirmed"]
@@ -22,7 +25,7 @@ class GenerationResult[P: Puzzle, C]:
 
 
 def generate_bounded[P: Puzzle, C](recipe: GeneratablePuzzle[P, C], *, seed: int = 42,
-                                    budget: float = 10, max_candidates: int = 64) -> GenerationResult[P, C]:
+                                    budget: float = 10, max_candidates: int = DEFAULT_MAX_CANDIDATES) -> GenerationResult[P, C]:
     """Retry distinct visible answers and reduce only with solver proofs.
 
     UNSAT before any candidate proves no completion. Exhausting all rejected

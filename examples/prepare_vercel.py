@@ -10,7 +10,7 @@ from web_assets import ASSET_TYPES
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = {"analyze_shading", "finite_shading", "generate_shading", "generate_slitherlink", "generate_yajilin",
            "shading_recipe", "edge_answers", "json_records", "web_answers", "web_catalog", "web_coupled",
-           "web_loop", "web_server", "web_worker", "web_hosted", "web_assets"}
+           "web_loop", "web_server", "web_worker", "web_hosted", "web_assets", "web_result", "web_limits"}
 PACKAGES = ("puzzle", "puzzle-defs", "generator")
 DEPENDENCIES = {"absl-py", "immutabledict", "numpy", "ortools", "pandas", "protobuf", "python-dateutil", "six", "typing-extensions"}
 

@@ -8,7 +8,7 @@ from puzzle_defs import SlitherlinkRecipe, YajilinRecipe
 from generator.search import generate_bounded
 from generate_shading import clue_record, encode_record
 from web_catalog import read_request
-from web_server import MAX_BODY
+from web_limits import MAX_BODY
 
 
 def generate_request(data: Any) -> dict[str, Any]:

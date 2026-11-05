@@ -14,9 +14,10 @@ from json_records import _constant, _finite_float, _object
 from web_catalog import catalog, read_request
 from web_answers import read_check
 from web_assets import ASSET_TYPES
+from web_result import worker_response
+from web_limits import MAX_BODY
 
 ROOT = Path(__file__).resolve().parents[1]
-MAX_BODY = 32768
 ASSETS = {"/": ("index.html", ASSET_TYPES["index.html"]),
           **{f"/{name}": (name, mime) for name, mime in ASSET_TYPES.items() if name != "index.html"}}
 
@@ -36,16 +37,14 @@ def run_job(data: Any, *, check: bool = False) -> dict[str, Any]:
         )
         if result.returncode != 0:
             return {"status": "unconfirmed"}
-        response = json.loads(result.stdout)
-        if type(response) is not dict or response.get("status") not in (
-                "ok", "unsatisfiable", "insufficient_hints", "search_exhausted", "unconfirmed"):
-            return {"status": "unconfirmed"}
-        return response
+        response = json.loads(result.stdout, object_pairs_hook=_object,
+                              parse_constant=_constant, parse_float=_finite_float)
+        return worker_response(response, request, data, check=check)
     except subprocess.TimeoutExpired:
         # run() kills and reaps the worker. OS startup/cleanup may exceed the
         # budget; this is not a CPU, memory, or arbitrary-code sandbox.
         return {"status": "timeout", "budget_seconds": request.budget}
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return {"status": "unconfirmed"}
 
 
