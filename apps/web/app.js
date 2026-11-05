@@ -131,7 +131,7 @@ async function refresh() {
     if (numericLegend.length) $('plan-note').textContent += ` ${numericLegend.join('、')}。`;
     if (plan.endpoint_markers && plan.sight_counts) $('plan-note').textContent += ' 端点上の可視数は丸自身を含む直線長です。';
     $('status').textContent = '生成前のプレビューです。';
-    renderBoard(); $('generate').disabled = false; rememberCurrentSettings();
+    renderBoard(); $('generate').disabled = false;
   } catch (error) {
     if (current === revision) {
       if (error instanceof UnsupportedUiError) rejectUnsupportedUi();
@@ -371,8 +371,8 @@ function chooseProfile(startRefresh = true, isolated = false) {
   $('size-note').textContent = `最大${profile.board.max_cells}セル。選ぶルールにより上限が下がります。大きさとルールによっては時間内に生成できません。Seedが同じでも、環境の変更をまたぐ一致は保証しません。`;
   buildControls(); $('recipe-fields').disabled = false; if (startRefresh) refresh();
 }
-$('family').addEventListener('change', () => {chooseProfile(); rememberCurrentSettings();});
-form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(true); rememberCurrentSettings(); clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
+$('family').addEventListener('change', () => chooseProfile());
+form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(); clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
   timer = setTimeout(refresh, 120);});
 form.addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(timer);
@@ -469,8 +469,8 @@ async function loadCatalog() {
     $('recipe-fields').disabled = true;
     let loadingHash;
     do { loadingHash = location.hash; await restoreSharedSettings(); } while (loadingHash !== location.hash);
-    currentEntryId = ensureEntryId(); catalogReady = true;
-    $('recipe-fields').disabled = false; rememberCurrentSettings();
+    catalogReady = true;
+    $('recipe-fields').disabled = false;
     refresh();
   } catch {
     $('recipe-fields').disabled = true;
@@ -556,65 +556,27 @@ function validateSharedControls(request) {
     ({$, form, profile, selected, hints, artifact} = saved); validatingShare = false;
   }
 }
-let shareNavigation = 0, catalogReady = false, sharePending = false, currentEntryId, divergedFromCurrentEntry = false;
-const historyKey = 'puzzleBoxShareSettingsV1', historyEntryKey = 'puzzleBoxEntryIdV1';
-const entrySettings = new Map();
-let historyTimer;
-function historyFailure() {
-  $('share-status').textContent = '履歴に設定を保存できません。戻る・進むでは設定を復元できない場合があります。';
-}
-function ensureEntryId() {
-  try {
-    const state = history.state;
-    if (state !== null && (typeof state !== 'object' || Array.isArray(state))) throw new Error('unsupported history state');
-    if (typeof state?.[historyEntryKey] === 'string') return state[historyEntryKey];
-    const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
-    history.replaceState({...state, [historyEntryKey]: id}, '');
-    return id;
-  } catch {historyFailure(); return undefined;}
-}
-function flushHistorySettings() {
-  clearTimeout(historyTimer); historyTimer = undefined;
-  try {
-    const state = history.state, id = state?.[historyEntryKey];
-    if (!id || !entrySettings.has(id)) return;
-    history.replaceState({...state, [historyKey]: entrySettings.get(id)}, '');
-  } catch {historyFailure();}
-}
-function rememberCurrentSettings() {
-  if (!catalogReady || !currentEntryId || history.state?.[historyEntryKey] !== currentEntryId || form.inert) return;
-  try {
-    if (!form.checkValidity()) return;
-    entrySettings.set(currentEntryId, readRequest());
-    // Keep same-document history accurate immediately without calling
-    // replaceState for every keystroke; persist once editing settles.
-    if (entrySettings.size > 200) entrySettings.delete(entrySettings.keys().next().value);
-    clearTimeout(historyTimer); historyTimer = setTimeout(flushHistorySettings, 500);
-  } catch {} // An unfinished grid is not a restorable setting.
-}
-window.addEventListener('pagehide', flushHistorySettings);
-function cancelPendingShare(changed = false) {
-  if (changed && history.state?.[historyEntryKey] !== currentEntryId) divergedFromCurrentEntry = true;
+let shareNavigation = 0, catalogReady = false, sharePending = false;
+function cancelPendingShare() {
   if (!sharePending) return false;
   ++shareNavigation; sharePending = false;
-  $('share-status').textContent = '作業が変更されたため、共有設定の読み込みを中止しました。';
+  $('navigation-status').textContent = '作業が変更されたため、共有設定の読み込みを中止しました。';
   return true;
 }
 async function restoreSharedSettings() {
   const hash = location.hash, navigation = ++shareNavigation;
-  const remembered = !hash ? (entrySettings.get(history.state?.[historyEntryKey]) || history.state?.[historyKey]) : undefined;
-  if (!hash && !remembered) {sharePending = false; currentEntryId = ensureEntryId(); divergedFromCurrentEntry = false; rememberCurrentSettings(); return;}
+  if (!hash) {sharePending = false; return;}
   sharePending = true;
   try {
-    const request = remembered || decodeSharedSettings(hash);
+    const request = decodeSharedSettings(hash);
     validateSharedControls(request);
     const result = await post('/api/plan', request);
     if (result.status !== 'ok') throw new Error('invalid plan');
     assertRenderablePlan(result.plan, request);
     if (navigation !== shareNavigation || hash !== location.hash || form.inert) return;
     applySharedSettings(request);
-    currentEntryId = ensureEntryId(); divergedFromCurrentEntry = false; $('share-url').value = ''; rememberCurrentSettings();
-    if (currentEntryId) $('share-status').textContent = '共有された設定を読み込みました。';
+    $('share-url').value = ''; $('load-shared-settings').hidden = true;
+    $('navigation-status').textContent = ''; $('share-status').textContent = '共有された設定を読み込みました。';
     return true;
   } catch {
     if (navigation === shareNavigation && hash === location.hash)
@@ -640,13 +602,18 @@ $('share-settings').addEventListener('click', async () => {
     if (cancelledShare) $('share-status').textContent += ' 共有設定の読み込みは中止しました。';
   } catch { $('share-status').textContent = '設定を確認してください。URLが長すぎる場合は設定を減らしてください。'; $('share-url').value = ''; }
 });
-// Leave the current work intact unless the destination passes validation.
-window.addEventListener('hashchange', async event => {
+// Hash navigation never replaces the current work without an explicit action.
+window.addEventListener('hashchange', () => {
   if (!catalogReady) return; // Initial loading reads the latest location.
-  const destinationId = ensureEntryId();
-  if (!destinationId) {++shareNavigation; sharePending = false; return;}
-  if (destinationId === currentEntryId && !divergedFromCurrentEntry) {++shareNavigation; sharePending = false; rememberCurrentSettings(); return;}
-  if (form.inert) {++shareNavigation; sharePending = false; $('share-status').textContent = '処理中は共有設定に移動できません。処理後にURLを開き直してください。'; return;}
+  ++shareNavigation; sharePending = false;
+  $('share-url').value = ''; $('share-status').textContent = '';
+  $('load-shared-settings').hidden = !location.hash;
+  $('navigation-status').textContent = location.hash
+    ? 'URLが変わりました。現在の設定と解答は維持されています。新しいURLの設定はまだ読み込まれていません。読み込むと現在の問題と回答は消えます。'
+    : 'URLが変わりました。現在の設定と解答は維持されています。';
+});
+$('load-shared-settings').addEventListener('click', async () => {
+  if (form.inert) return;
   if (await restoreSharedSettings()) refresh();
 });
 
