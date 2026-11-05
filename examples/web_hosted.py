@@ -8,6 +8,7 @@ from urllib.parse import parse_qs
 
 from json_records import _constant, _finite_float, _object
 from web_answers import read_check
+from web_restore import read_restore
 from web_catalog import catalog, read_request
 from web_server import MAX_BODY, run_job
 
@@ -44,7 +45,7 @@ def app(environ, start_response):
         data["hosting"] = {"label": "WEB DEMO", "budget_seconds": MAX_BUDGET,
                            "concurrency_scope": "instance", "persistent_jobs": False}
         return respond(200, data)
-    if operation not in ("plan", "generate", "check"):
+    if operation not in ("plan", "generate", "check", "restore"):
         return respond(404, {"status": "not_found"})
     if method != "POST": return respond(405, {"status": "method_not_allowed"})
     if (environ.get("HTTP_ORIGIN") != f"https://{host}"
@@ -59,7 +60,7 @@ def app(environ, start_response):
         if len(raw) != int(length): raise ValueError("Incomplete request body")
         data = json.loads(raw.decode("utf-8"), object_pairs_hook=_object,
                           parse_constant=_constant, parse_float=_finite_float)
-        request = read_check(data) if operation == "check" else read_request(data)
+        request = read_restore(data) if operation == "restore" else read_check(data) if operation == "check" else read_request(data)
         if request.budget > MAX_BUDGET: raise ValueError("Hosted computation budget must be 1..10 seconds")
     except (ValueError, RecursionError):
         # Do not echo arbitrary input or environment values to clients or logs.
@@ -67,6 +68,6 @@ def app(environ, start_response):
     if operation == "plan": return respond(200, {"status": "ok", "plan": request.plan})
     if not JOB_LOCK.acquire(blocking=False): return respond(409, {"status": "busy"})
     try:
-        return respond(200, run_job(data, check=operation == "check"))
+        return respond(200, run_job(data, restore=True) if operation == "restore" else run_job(data, check=operation == "check"))
     finally:
         JOB_LOCK.release()

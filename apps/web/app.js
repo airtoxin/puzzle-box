@@ -69,7 +69,7 @@ async function fetchJsonWithTimeout(path, options = {}, timeoutMs = 15000) {
       controller.abort(); // Do not leave an unread error response streaming.
       throw new Error('Service temporarily unavailable');
     }
-    if ((path === '/api/generate' || path === '/api/check') && !response.ok) {
+    if ((path === '/api/generate' || path === '/api/check' || path === '/api/restore') && !response.ok) {
       // Only the API's explicit 409 busy response is actionable. A proxy or
       // server error must never supply a definitive puzzle or answer verdict.
       if (response.status === 409) {
@@ -87,10 +87,11 @@ async function post(path, data) {
   if (path === '/api/plan') return fetchJsonWithTimeout(path, options);
   // The worker budget starts on the server; allow 15 seconds more for network,
   // cold start and cleanup. Aborting the fetch does not cancel server work.
-  const budget = path === '/api/check' ? data.request.budget_seconds : data.budget_seconds;
+  const budget = (path === '/api/check' || path === '/api/restore') ? data.request.budget_seconds : data.budget_seconds;
   return fetchJsonWithTimeout(path, options, (budget + 15) * 1000);
 }
 function clearArtifact() {
+  $('puzzle-url').value = ''; $('puzzle-share-status').textContent = '';
   artifact = undefined; $('generated-rules').hidden = true; $('generated-rules-list').replaceChildren(); $('generated-clues-list').replaceChildren(); $('generated-clues').hidden = true; $('actions').hidden = true; $('answer-status').textContent = '';
   $('reveal').textContent = '答えを表示';
 }
@@ -412,6 +413,33 @@ function chooseProfile(startRefresh = true, isolated = false) {
 $('family').addEventListener('change', () => chooseProfile());
 form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(); ++settingsRevision; clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
   timer = setTimeout(refresh, 120);});
+function installPuzzle(request, result, restored = false) {
+$('download').disabled = restored;
+$('download-note').hidden = !restored;
+assertRenderablePlan(result.plan, request);
+assertRenderableClues(result.clues, result.plan, request);
+artifact = result; plan = result.plan; fixed = new Set();
+const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
+const area = plan.rows * plan.cols;
+input = Array(isCoupled() ? area + loopEdges().length : isLoop ? loopEdges().length : area).fill(-1);
+for (const grid of [plan.sight_counts, plan.island_areas, plan.endpoint_markers]) if (grid) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
+  if (grid[r][c] > 0) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
+}
+for (const grid of [plan.neighbor_counts,plan.component_counts,plan.black_run_clues]) if (grid) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
+  if (grid[r][c] !== null) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
+}
+for (const clue of result.clues) {
+  let index, value;
+  if (clue.type === 'edge' && (isLoop || isCoupled())) {
+    index = (isCoupled() ? area : 0) + loopEdges().findIndex(e => e.join(',') === clue.edge.join(',')); value = clue.used;
+  } else if (isCoupled() && clue.type === 'black') {index = clue.cell[0]*plan.cols+clue.cell[1]; value = clue.black;}
+  else if (!isCoupled() && !isLoop && clue.type === 'cell') {index = clue.row*plan.cols+clue.col; value = clue.value;}
+  else continue;
+  input[index] = value; fixed.add(index);
+}
+$('entry-note').textContent = isCoupled() ? 'セルは未入力 → 白 → 黒、辺は未入力 → 線なし（×）→ 線あり。両方を入力してください。固定ヒントは変更できません。' : isLoop ? '辺を押すと、未入力 → 線なし（×）→ 線ありの順に切り替わります。固定ヒントは変更できません。' : '未知のマスを押すと、未入力 → 白 → 黒の順に切り替わります。固定ヒントは変更できません。';
+renderBoard(); renderGeneratedRules(request, result.clues); $('actions').hidden = false;
+}
 form.addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(timer);
   if (!plan || !form.reportValidity()) return;
@@ -423,32 +451,8 @@ form.addEventListener('submit', async event => {
       if (result.evidence?.unique !== true || result.evidence?.irreducible !== true) {
         $('status').textContent = messages.unconfirmed; return;
       }
-      assertRenderablePlan(result.plan, request);
-      assertRenderableClues(result.clues, result.plan, request);
-      artifact = result; plan = result.plan; fixed = new Set();
-      const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
-      const area = plan.rows * plan.cols;
-      input = Array(isCoupled() ? area + loopEdges().length : isLoop ? loopEdges().length : area).fill(-1);
-      for (const grid of [plan.sight_counts, plan.island_areas, plan.endpoint_markers]) if (grid) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
-        if (grid[r][c] > 0) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
-      }
-      for (const grid of [plan.neighbor_counts,plan.component_counts,plan.black_run_clues]) if (grid) for (let r = 0; r < plan.rows; r++) for (let c = 0; c < plan.cols; c++) {
-        if (grid[r][c] !== null) {const index = r*plan.cols+c; input[index] = 0; fixed.add(index);}
-      }
-      for (const clue of result.clues) {
-        let index, value;
-        if (clue.type === 'edge' && (isLoop || isCoupled())) {
-          index = (isCoupled() ? area : 0) + loopEdges().findIndex(e => e.join(',') === clue.edge.join(',')); value = clue.used;
-        } else if (isCoupled() && clue.type === 'black') {index = clue.cell[0]*plan.cols+clue.cell[1]; value = clue.black;}
-        else if (!isCoupled() && !isLoop && clue.type === 'cell') {index = clue.row*plan.cols+clue.col; value = clue.value;}
-        else continue;
-        input[index] = value; fixed.add(index);
-      }
-      $('entry-note').textContent = isCoupled() ? 'セルは未入力 → 白 → 黒、辺は未入力 → 線なし（×）→ 線あり。両方を入力してください。固定ヒントは変更できません。' : isLoop ? '辺を押すと、未入力 → 線なし（×）→ 線ありの順に切り替わります。固定ヒントは変更できません。' : '未知のマスを押すと、未入力 → 白 → 黒の順に切り替わります。固定ヒントは変更できません。';
-      renderBoard(); renderGeneratedRules(request, result.clues); $('actions').hidden = false;
-      $('status').textContent = `生成しました。唯一解・ヒント既約性を検証済み。\n${result.clues.length}個のヒント / ` + (result.evidence.method === 'cp-sat'
-        ? `ソルバーで別解がないことを証明。${result.evidence.candidates}候補を探索。`
-        : `${result.evidence.enumerated_boards}盤面を独立列挙して照合。`);
+      installPuzzle(request, result);
+      $('status').textContent = '生成しました。唯一解とヒントの既約性を検証済みです。';
     } else $('status').textContent = messages[result.status] || `設定を確認してください。${result.message || ''}`;
   } catch (error) {
     if (error instanceof UnsupportedUiError) rejectUnsupportedUi();
@@ -505,11 +509,11 @@ async function loadCatalog() {
     for (const p of catalog.profiles) {const option = node('option', p.label); option.value = p.id; $('family').append(option);}
     chooseProfile(false);
     $('recipe-fields').disabled = true;
-    let loadingHash;
-    do { loadingHash = location.hash; await restoreSharedSettings(); } while (loadingHash !== location.hash);
+    let loadingHash, loaded;
+    do { loadingHash = location.hash; loaded = await restoreSharedSettings(); } while (loadingHash !== location.hash);
     catalogReady = true;
     $('recipe-fields').disabled = false;
-    refresh();
+    if (loaded !== 'puzzle') refresh();
   } catch {
     $('recipe-fields').disabled = true;
     $('status').textContent = 'ルールを読み込めません。接続を確認して再試行してください。';
@@ -519,6 +523,7 @@ async function loadCatalog() {
 }
 // The fragment stays in the browser, rather than being sent on every HTTP request.
 const sharePrefix = '#settings-v1=';
+const puzzlePrefix = '#puzzle-v1=';
 const shareLimit = 8192;
 function sameJson(a, b) {
   if (a === b) return true;
@@ -527,18 +532,18 @@ function sameJson(a, b) {
   const keys = Object.keys(a), other = Object.keys(b);
   return keys.length === other.length && keys.every(key => Object.hasOwn(b, key) && sameJson(a[key], b[key]));
 }
-function decodeSharedSettings(hash = location.hash) {
+function decodeSharedSettings(hash = location.hash, prefix = sharePrefix) {
   if (!hash) return null;
-  if (!hash.startsWith(sharePrefix) || hash.length > shareLimit) throw new Error('unsupported link');
-  const encoded = hash.slice(sharePrefix.length);
+  if (!hash.startsWith(prefix) || hash.length > shareLimit) throw new Error('unsupported link');
+  const encoded = hash.slice(prefix.length);
   if (!encoded || !/^[A-Za-z0-9_-]+$/.test(encoded)) throw new Error('invalid encoding');
   const bytes = Uint8Array.from(atob(encoded.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
   return JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(bytes));
 }
-function shareHash(request) {
+function shareHash(request, prefix = sharePrefix) {
   const bytes = new TextEncoder().encode(JSON.stringify(request));
   const encoded = btoa(Array.from(bytes, b => String.fromCharCode(b)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const hash = sharePrefix + encoded;
+  const hash = prefix + encoded;
   if (hash.length > shareLimit) throw new Error('too long');
   return hash;
 }
@@ -598,7 +603,7 @@ let shareNavigation = 0, catalogReady = false, sharePending = false;
 function cancelPendingShare() {
   if (!sharePending) return false;
   ++shareNavigation; sharePending = false;
-  $('navigation-status').textContent = '作業が変更されたため、共有設定の読み込みを中止しました。';
+  $('navigation-status').textContent = '作業が変更されたため、共有URLの読み込みを中止しました。';
   return true;
 }
 async function restoreSharedSettings() {
@@ -606,21 +611,32 @@ async function restoreSharedSettings() {
   if (!hash) {sharePending = false; return;}
   sharePending = true;
   try {
-    const request = decodeSharedSettings(hash);
+    const isPuzzle = hash.startsWith(puzzlePrefix);
+    const payload = decodeSharedSettings(hash, isPuzzle ? puzzlePrefix : sharePrefix);
+    if (isPuzzle && (!payload || Object.keys(payload).sort().join(',') !== 'clues,format,request' || payload.format !== 'puzzle-box/web-puzzle-v1')) throw new Error('invalid puzzle');
+    const request = isPuzzle ? payload.request : payload;
     validateSharedControls(request);
-    const result = await post('/api/plan', request);
-    if (result.status !== 'ok') throw new Error('invalid plan');
+    const result = await post(isPuzzle ? '/api/restore' : '/api/plan', isPuzzle ? payload : request);
+    if (result.status !== 'ok') {
+      if (isPuzzle && ['timeout', 'unconfirmed', 'busy'].includes(result.status)) throw new Error('unconfirmed puzzle');
+      throw new Error('invalid plan');
+    }
     assertRenderablePlan(result.plan, request);
+    if (isPuzzle) {
+      if (!sameJson(result.request, request) || !sameJson(result.clues, payload.clues) || !result.record?.solution) throw new Error('invalid restored result');
+      assertRenderableClues(result.clues, result.plan, request);
+    }
     if (navigation !== shareNavigation || hash !== location.hash || form.inert) return;
     applySharedSettings(request); ++settingsRevision;
+    if (isPuzzle) { ++revision; clearArtifact(); installPuzzle(request, result, true); $('generate').disabled = false; $('shape').textContent = `${plan.rows} × ${plan.cols}`; $('plan-note').textContent = '共有された問題の盤面とヒントです。'; $('status').textContent = '共有された問題を開きました。唯一解を検証済みです。'; }
     $('share-url').value = ''; $('load-shared-settings').hidden = true;
-    $('navigation-status').textContent = ''; $('share-status').textContent = '共有された設定を読み込みました。';
-    return true;
-  } catch {
+    $('navigation-status').textContent = ''; $('share-status').textContent = isPuzzle ? '共有された問題を読み込みました。' : '共有された設定を読み込みました。';
+    return isPuzzle ? 'puzzle' : true;
+  } catch (error) {
     if (navigation === shareNavigation && hash === location.hash) {
-      $('share-status').textContent = '共有URLを読み込めませんでした。URL、接続、対応バージョンを確認してください。';
+      $('share-status').textContent = error.message === 'unconfirmed puzzle' ? '時間切れまたは通信等により唯一解を確認できませんでした。問題が無効とは限りません。後でもう一度お試しください。' : '共有URLを読み込めませんでした。URL、接続、対応バージョンを確認してください。';
       $('load-shared-settings').hidden = false;
-      $('navigation-status').textContent = '共有設定はまだ読み込まれていません。現在の設定と解答は維持されています。';
+      $('navigation-status').textContent = '共有URLはまだ読み込まれていません。現在の設定と解答は維持されています。';
     }
   } finally {
     if (navigation === shareNavigation) sharePending = false;
@@ -644,19 +660,31 @@ $('share-settings').addEventListener('click', async () => {
     if (cancelledShare) $('share-status').textContent += ' 共有設定の読み込みは中止しました。';
   } catch { $('share-status').textContent = '設定を確認してください。URLが長すぎる場合は設定を減らしてください。'; $('share-url').value = ''; }
 });
+$('share-puzzle').addEventListener('click', async () => {
+  if (!artifact) return;
+  try {
+    const payload = {format: 'puzzle-box/web-puzzle-v1', request: artifact.request, clues: artifact.clues};
+    const url = new URL(location.pathname, location.origin); url.hash = shareHash(payload, puzzlePrefix);
+    $('puzzle-url').value = url.href; $('puzzle-url').select();
+    try { await navigator.clipboard.writeText(url.href); $('puzzle-share-status').textContent = '問題のURLをコピーしました。'; }
+    catch { $('puzzle-share-status').textContent = '問題のURLを手動でコピーしてください。'; }
+  } catch { $('puzzle-url').value = ''; $('puzzle-share-status').textContent = 'URLが長すぎるため共有できません。'; }
+});
 // Hash navigation never replaces the current work without an explicit action.
 window.addEventListener('hashchange', () => {
   if (!catalogReady) return; // Initial loading reads the latest location.
   ++shareNavigation; sharePending = false;
   $('share-url').value = ''; $('share-status').textContent = '';
   $('load-shared-settings').hidden = !location.hash;
+  $('load-shared-settings').textContent = location.hash.startsWith(puzzlePrefix) ? 'URLの問題を読み込む（現在の問題・解答は消えます）' : 'URLの設定を読み込む（現在の問題・解答は消えます）';
   $('navigation-status').textContent = location.hash
-    ? 'URLが変わりました。現在の設定と解答は維持されています。新しいURLの設定はまだ読み込まれていません。読み込むと現在の問題と回答は消えます。'
+    ? 'URLが変わりました。現在の設定と解答は維持されています。新しいURLはまだ読み込まれていません。読み込むと現在の問題と回答は消えます。'
     : 'URLが変わりました。現在の設定と解答は維持されています。';
 });
 $('load-shared-settings').addEventListener('click', async () => {
   if (form.inert) return;
-  if (await restoreSharedSettings()) refresh();
+  const loaded = await restoreSharedSettings();
+  if (loaded && loaded !== 'puzzle') refresh();
 });
 
 $('retry-catalog').addEventListener('click', loadCatalog);
