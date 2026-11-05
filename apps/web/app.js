@@ -361,17 +361,17 @@ function renderCoupled(reveal) {
   }
   $('board').replaceChildren(table);
 }
-function chooseProfile() {
+function chooseProfile(startRefresh = true) {
   clearTimeout(timer); ++revision;
   profile = catalog.profiles.find(p => p.id === $('family').value);
   $('rows').value = profile.defaults.rows; $('cols').value = profile.defaults.cols;
   $('rows').max = $('cols').max = profile.board.max_cells;
   $('rows').min = profile.board.min_rows; $('cols').min = profile.board.min_cols;
   $('size-note').textContent = `最大${profile.board.max_cells}セル。選ぶルールにより上限が下がります。大きさとルールによっては時間内に生成できません。Seedが同じでも、環境の変更をまたぐ一致は保証しません。`;
-  buildControls(); $('recipe-fields').disabled = false; refresh();
+  buildControls(); $('recipe-fields').disabled = false; if (startRefresh) refresh();
 }
-$('family').addEventListener('change', chooseProfile);
-form.addEventListener('input', () => {clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
+$('family').addEventListener('change', () => chooseProfile());
+form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
   timer = setTimeout(refresh, 120);});
 form.addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(timer);
@@ -461,7 +461,9 @@ async function loadCatalog() {
       node('li', `${p.label}：${p.rules.length}ルール、最大${p.board.max_cells}セル`)));
     $('family').replaceChildren();
     for (const p of catalog.profiles) {const option = node('option', p.label); option.value = p.id; $('family').append(option);}
-    chooseProfile();
+    chooseProfile(false);
+    await restoreSharedSettings();
+    refresh();
   } catch {
     $('recipe-fields').disabled = true;
     $('status').textContent = 'ルールを読み込めません。接続を確認して再試行してください。';
@@ -469,6 +471,94 @@ async function loadCatalog() {
     $('retry-catalog').hidden = false;
   } finally { form.setAttribute('aria-busy', 'false'); }
 }
+// The fragment stays in the browser, rather than being sent on every HTTP request.
+const sharePrefix = '#settings-v1=';
+const shareLimit = 8192;
+function sameJson(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+function decodeSharedSettings() {
+  const hash = location.hash;
+  if (!hash) return null;
+  if (!hash.startsWith(sharePrefix) || hash.length > shareLimit) throw new Error('unsupported link');
+  const encoded = hash.slice(sharePrefix.length);
+  if (!encoded || !/^[A-Za-z0-9_-]+$/.test(encoded)) throw new Error('invalid encoding');
+  const bytes = Uint8Array.from(atob(encoded.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(bytes));
+}
+function shareHash(request) {
+  const bytes = new TextEncoder().encode(JSON.stringify(request));
+  const encoded = btoa(Array.from(bytes, b => String.fromCharCode(b)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const hash = sharePrefix + encoded;
+  if (hash.length > shareLimit) throw new Error('too long');
+  return hash;
+}
+function applySharedSettings(request) {
+  // Reconstruct through the actual controls and require an exact round trip.
+  // This rejects unknown fields, changed catalog parameters and rule order.
+  if (!request || typeof request !== 'object' || Array.isArray(request)) throw new Error('invalid request');
+  const candidate = catalog.profiles.find(p => p.id === request.family);
+  if (!candidate || !Array.isArray(request.rules) || !Array.isArray(request.clue_kinds)) throw new Error('unknown profile');
+  $('family').value = candidate.id; chooseProfile(false);
+  for (const name of ['rows', 'cols', 'seed', 'budget_seconds']) {
+    if (!Number.isSafeInteger(request[name])) throw new Error('invalid number');
+    $(name === 'budget_seconds' ? 'budget' : name).value = request[name];
+  }
+  for (const state of selected.values()) state.toggle.checked = false;
+  const shared = new Map();
+  for (const rule of request.rules) {
+    const state = selected.get(rule?.id);
+    if (!state || state.toggle.checked || !rule.parameters || typeof rule.parameters !== 'object' || Array.isArray(rule.parameters)) throw new Error('unknown rule');
+    state.toggle.checked = true;
+    for (const [name, field] of state.parameters) {
+      if (!Object.hasOwn(rule.parameters, name)) throw new Error('missing parameter');
+      const value = rule.parameters[name];
+      if (gridKinds.includes(field.dataset.kind)) {
+        if (!Array.isArray(value) || value.length > 100 || value.some(row => !Array.isArray(row) || row.length > 100 || row.some(n => !(n === null || Number.isSafeInteger(n) || (Array.isArray(n) && n.length <= 8 && n.every(Number.isSafeInteger)))))) throw new Error('invalid grid');
+        const text = value.map(row => row.map(n => n === null ? '.' : Array.isArray(n) ? n.join(',') : n).join(' ')).join('\n');
+        if (text.length > 512 || (shared.has(field) && shared.get(field) !== text)) throw new Error('invalid shared grid');
+        shared.set(field, text); field.value = text;
+      } else if (field.type === 'checkbox') {
+        if (typeof value !== 'boolean') throw new Error('invalid boolean'); field.checked = value;
+      } else {
+        if (!Number.isSafeInteger(value)) throw new Error('invalid parameter'); field.value = value;
+      }
+    }
+  }
+  for (const rule of profile.rules) if (rule.required && !selected.get(rule.identifier).toggle.checked) throw new Error('missing required rule');
+  for (const [id, toggle] of hints) toggle.checked = request.clue_kinds.includes(id);
+  syncParameters();
+  if (!form.checkValidity() || !sameJson(readRequest(), request)) throw new Error('settings cannot be represented');
+}
+async function restoreSharedSettings() {
+  if (!location.hash) return;
+  const oldSeed = $('seed').value, oldBudget = $('budget').value;
+  try {
+    const request = decodeSharedSettings();
+    applySharedSettings(request);
+    $('recipe-fields').disabled = true;
+    const result = await post('/api/plan', request);
+    if (result.status !== 'ok') throw new Error('invalid plan');
+    assertRenderablePlan(result.plan, request);
+    $('share-status').textContent = '共有された設定を読み込みました。';
+    $('recipe-fields').disabled = false;
+  } catch {
+    $('seed').value = oldSeed; $('budget').value = oldBudget;
+    $('family').selectedIndex = 0; chooseProfile(false);
+    $('share-status').textContent = '共有URLを読み込めませんでした。URL、接続、対応バージョンを確認してください。';
+  }
+}
+$('share-settings').addEventListener('click', async () => {
+  try {
+    if (!plan || $('generate').disabled || !form.reportValidity()) throw new Error('invalid');
+    const url = new URL(location.href); url.hash = shareHash(readRequest());
+    $('share-url').value = url.href;
+    $('share-url').select();
+    try { await navigator.clipboard.writeText(url.href); $('share-status').textContent = '共有URLをコピーしました。'; }
+    catch { $('share-status').textContent = '共有URLを選択しました。コピーして共有してください。'; }
+  } catch { $('share-status').textContent = '設定を確認してください。URLが長すぎる場合は設定を減らしてください。'; $('share-url').value = ''; }
+});
+// A history traversal must not race an in-flight preview or generation.
+window.addEventListener('hashchange', () => location.reload());
+
 $('retry-catalog').addEventListener('click', loadCatalog);
 $('retry-plan').addEventListener('click', () => {clearTimeout(timer); refresh();});
 loadCatalog();
