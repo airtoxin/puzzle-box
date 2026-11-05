@@ -1,10 +1,10 @@
 import {UnsupportedUiError, canonicalRunClues, assertRenderablePlan, assertRenderableClues} from './plan-contract.js';
 
-const $ = id => document.getElementById(id);
-const form = $('recipe-form');
+let $ = id => document.getElementById(id);
+let form = $('recipe-form');
 let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, timer;
-const selected = new Map();
-const hints = new Map();
+let selected = new Map();
+let hints = new Map();
 const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid', 'run-clue-grid'];
 $('board').addEventListener('focusin', event => {
   // Account for a sticky row clue even when the cell was already within the
@@ -361,8 +361,8 @@ function renderCoupled(reveal) {
   }
   $('board').replaceChildren(table);
 }
-function chooseProfile(startRefresh = true) {
-  clearTimeout(timer); ++revision;
+function chooseProfile(startRefresh = true, isolated = false) {
+  if (!isolated) {clearTimeout(timer); ++revision;}
   profile = catalog.profiles.find(p => p.id === $('family').value);
   $('rows').value = profile.defaults.rows; $('cols').value = profile.defaults.cols;
   $('rows').max = $('cols').max = profile.board.max_cells;
@@ -444,6 +444,7 @@ $('download').addEventListener('click', () => {
   const link = node('a'); link.href = url; link.download = 'puzzle.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 async function loadCatalog() {
+  catalogReady = false;
   $('retry-catalog').hidden = true;
   $('recipe-fields').disabled = true; form.setAttribute('aria-busy', 'true');
   $('status').textContent = 'ルールを読み込んでいます…';
@@ -462,7 +463,11 @@ async function loadCatalog() {
     $('family').replaceChildren();
     for (const p of catalog.profiles) {const option = node('option', p.label); option.value = p.id; $('family').append(option);}
     chooseProfile(false);
-    await restoreSharedSettings();
+    $('recipe-fields').disabled = true;
+    let loadingHash;
+    do { loadingHash = location.hash; await restoreSharedSettings(); } while (loadingHash !== location.hash);
+    catalogReady = true;
+    $('recipe-fields').disabled = false;
     refresh();
   } catch {
     $('recipe-fields').disabled = true;
@@ -474,9 +479,14 @@ async function loadCatalog() {
 // The fragment stays in the browser, rather than being sent on every HTTP request.
 const sharePrefix = '#settings-v1=';
 const shareLimit = 8192;
-function sameJson(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
-function decodeSharedSettings() {
-  const hash = location.hash;
+function sameJson(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) return a.length === b.length && a.every((item, i) => sameJson(item, b[i]));
+  const keys = Object.keys(a), other = Object.keys(b);
+  return keys.length === other.length && keys.every(key => Object.hasOwn(b, key) && sameJson(a[key], b[key]));
+}
+function decodeSharedSettings(hash = location.hash) {
   if (!hash) return null;
   if (!hash.startsWith(sharePrefix) || hash.length > shareLimit) throw new Error('unsupported link');
   const encoded = hash.slice(sharePrefix.length);
@@ -491,13 +501,14 @@ function shareHash(request) {
   if (hash.length > shareLimit) throw new Error('too long');
   return hash;
 }
+let validatingShare = false;
 function applySharedSettings(request) {
   // Reconstruct through the actual controls and require an exact round trip.
   // This rejects unknown fields, changed catalog parameters and rule order.
   if (!request || typeof request !== 'object' || Array.isArray(request)) throw new Error('invalid request');
   const candidate = catalog.profiles.find(p => p.id === request.family);
   if (!candidate || !Array.isArray(request.rules) || !Array.isArray(request.clue_kinds)) throw new Error('unknown profile');
-  $('family').value = candidate.id; chooseProfile(false);
+  $('family').value = candidate.id; chooseProfile(false, validatingShare);
   for (const name of ['rows', 'cols', 'seed', 'budget_seconds']) {
     if (!Number.isSafeInteger(request[name])) throw new Error('invalid number');
     $(name === 'budget_seconds' ? 'budget' : name).value = request[name];
@@ -528,36 +539,60 @@ function applySharedSettings(request) {
   syncParameters();
   if (!form.checkValidity() || !sameJson(readRequest(), request)) throw new Error('settings cannot be represented');
 }
-async function restoreSharedSettings() {
-  if (!location.hash) return;
-  const oldSeed = $('seed').value, oldBudget = $('budget').value;
+// Validate against a detached copy of the real controls. Invalid links never
+// touch the live form, generated puzzle, or answer. This section is synchronous.
+function validateSharedControls(request) {
+  const saved = {$, form, profile, selected, hints, artifact};
+  const detached = document.implementation.createHTMLDocument('');
+  detached.replaceChild(detached.importNode(document.documentElement, true), detached.documentElement);
   try {
-    const request = decodeSharedSettings();
+    $ = id => detached.getElementById(id); form = $('recipe-form');
+    selected = new Map(); hints = new Map(); validatingShare = true;
     applySharedSettings(request);
-    $('recipe-fields').disabled = true;
+  } finally {
+    ({$, form, profile, selected, hints, artifact} = saved); validatingShare = false;
+  }
+}
+let shareNavigation = 0, catalogReady = false;
+async function restoreSharedSettings() {
+  const hash = location.hash, navigation = ++shareNavigation, currentRevision = revision;
+  if (!hash) return;
+  try {
+    const request = decodeSharedSettings(hash);
+    validateSharedControls(request);
     const result = await post('/api/plan', request);
     if (result.status !== 'ok') throw new Error('invalid plan');
     assertRenderablePlan(result.plan, request);
+    if (navigation !== shareNavigation || hash !== location.hash || currentRevision !== revision || form.inert) return;
+    applySharedSettings(request);
     $('share-status').textContent = '共有された設定を読み込みました。';
-    $('recipe-fields').disabled = false;
+    return true;
   } catch {
-    $('seed').value = oldSeed; $('budget').value = oldBudget;
-    $('family').selectedIndex = 0; chooseProfile(false);
-    $('share-status').textContent = '共有URLを読み込めませんでした。URL、接続、対応バージョンを確認してください。';
+    if (navigation === shareNavigation && hash === location.hash)
+      $('share-status').textContent = '共有URLを読み込めませんでした。URL、接続、対応バージョンを確認してください。';
   }
 }
 $('share-settings').addEventListener('click', async () => {
   try {
     if (!plan || $('generate').disabled || !form.reportValidity()) throw new Error('invalid');
-    const url = new URL(location.href); url.hash = shareHash(readRequest());
+    const url = new URL(location.pathname, location.origin); url.hash = shareHash(readRequest());
+    const copiedRevision = revision;
     $('share-url').value = url.href;
     $('share-url').select();
-    try { await navigator.clipboard.writeText(url.href); $('share-status').textContent = '共有URLをコピーしました。'; }
-    catch { $('share-status').textContent = '共有URLを選択しました。コピーして共有してください。'; }
+    try {
+      await navigator.clipboard.writeText(url.href);
+      $('share-status').textContent = copiedRevision === revision ? '共有URLをコピーしました。' : '設定変更前のURLがコピーされました。現在の設定で作り直してください。';
+    } catch {
+      $('share-status').textContent = copiedRevision === revision ? '共有URLを選択しました。コピーして共有してください。' : '設定が変更されました。URLを作り直してください。';
+    }
   } catch { $('share-status').textContent = '設定を確認してください。URLが長すぎる場合は設定を減らしてください。'; $('share-url').value = ''; }
 });
-// A history traversal must not race an in-flight preview or generation.
-window.addEventListener('hashchange', () => location.reload());
+// Leave the current work intact unless the destination passes validation.
+window.addEventListener('hashchange', async () => {
+  if (!catalogReady) return; // Initial loading reads the latest location.
+  if (form.inert) {++shareNavigation; $('share-status').textContent = '処理中は共有設定に移動できません。処理後にURLを開き直してください。'; return;}
+  if (await restoreSharedSettings()) refresh();
+});
 
 $('retry-catalog').addEventListener('click', loadCatalog);
 $('retry-plan').addEventListener('click', () => {clearTimeout(timer); refresh();});

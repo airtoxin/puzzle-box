@@ -78,3 +78,88 @@ test('history traversal restores the settings in each URL', async ({page}) => {
   await page.goBack(); await expect(page.locator('#seed')).toHaveValue('0');
   await page.goForward(); await expect(page.locator('#seed')).toHaveValue('7');
 });
+
+test('invalid hash navigation preserves a generated puzzle and entered answer', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  const response = page.waitForResponse('**/api/generate'); await page.locator('#generate').click();
+  expect((await (await response).json()).status).toBe('ok');
+  const cell = page.locator('.cell:enabled').first(); await cell.click();
+  const before = await cell.getAttribute('data-value');
+  await page.evaluate(() => {location.hash = '#settings-v1=invalid';});
+  await expect(page.locator('#share-status')).toContainText('読み込めませんでした');
+  await expect(page.locator('#actions')).toBeVisible();
+  await expect(cell).toHaveAttribute('data-value', before);
+  await page.evaluate(() => history.back());
+  await expect(page.locator('#actions')).toBeVisible();
+  await expect(cell).toHaveAttribute('data-value', before);
+  await page.evaluate(() => history.forward());
+  await expect(page.locator('#share-status')).toContainText('読み込めませんでした');
+  await expect(cell).toHaveAttribute('data-value', before);
+});
+
+test('key order does not affect links, and unrelated query parameters are excluded', async ({page}) => {
+  const catalogResponse = page.waitForResponse('**/api/catalog');
+  await page.goto('/'); const catalog = await (await catalogResponse).json();
+  await expect(page.locator('#generate')).toBeEnabled();
+  const index = catalog.profiles.find(p => p.id === 'shading').rules.findIndex(r => r.identifier === 'room-black-count');
+  await page.locator('#rules .rule-card').nth(index).locator('input[type=checkbox]').first().check();
+  await page.locator('textarea[data-kind=region-map]').fill('0 0 0\n1 1 1');
+  await page.evaluate(() => history.replaceState(null, '', '/?token=sentinel')); const url = await share(page);
+  expect(new URL(url).search).toBe('');
+  const request = JSON.parse(Buffer.from(new URL(url).hash.slice('#settings-v1='.length), 'base64url').toString());
+  expect(request.rules.some(rule => Object.keys(rule.parameters).length > 1)).toBe(true);
+  request.rules = request.rules.map(rule => ({parameters: Object.fromEntries(Object.entries(rule.parameters).reverse()), id:rule.id}));
+  const reordered = Object.fromEntries(Object.entries(request).reverse());
+  await page.goto('/#settings-v1=' + Buffer.from(JSON.stringify(reordered)).toString('base64url'));
+  await expect(page.locator('#share-status')).toContainText('読み込みました');
+});
+
+test('a delayed clipboard completion reports that an old link was copied', async ({page, context}) => {
+  await context.grantPermissions(['clipboard-write']);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {value: {writeText: () => new Promise(resolve => {window.finishCopy = resolve;})}});
+  });
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#share-settings').click();
+  await page.locator('#seed').fill('9');
+  await page.evaluate(() => window.finishCopy());
+  await expect(page.locator('#share-status')).toContainText('設定変更前');
+  await expect(page.locator('#share-url')).toHaveValue('');
+});
+
+for (const family of ['slitherlink', 'coupled']) {
+  test(`${family} settings restore and generate in a separate browser context`, async ({page, browser}) => {
+    await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+    await page.locator('#family').selectOption(family);
+    const url = await share(page);
+    const context = await browser.newContext(); const recipient = await context.newPage();
+    await recipient.goto(url); await expect(recipient.locator('#share-status')).toContainText('読み込みました');
+    await expect(recipient.locator('#family')).toHaveValue(family);
+    await expect(recipient.locator('#generate')).toBeEnabled();
+    const response = recipient.waitForResponse('**/api/generate'); await recipient.locator('#generate').click();
+    const result = await (await response).json();
+    expect(result.status).toBe('ok');
+    const request = JSON.parse(Buffer.from(new URL(url).hash.slice('#settings-v1='.length), 'base64url').toString());
+    expect(result.request).toEqual(request);
+    await context.close();
+  });
+}
+
+test('the latest hash wins while initial shared settings are loading', async ({page, browser}) => {
+  await page.goto('/'); const first = await share(page);
+  await page.locator('#seed').fill('7'); const second = await share(page);
+  const context = await browser.newContext(); const recipient = await context.newPage();
+  let release, started; const gate = new Promise(r => {release = r;});
+  const waiting = new Promise(r => {started = r;}); let firstPlan = true;
+  await recipient.route('**/api/plan', async route => {
+    if (firstPlan) {firstPlan = false; started(); await gate;}
+    await route.continue();
+  });
+  await recipient.goto(first, {waitUntil:'domcontentloaded'}); await waiting;
+  await recipient.evaluate(hash => {location.hash = hash;}, new URL(second).hash);
+  release();
+  await expect(recipient.locator('#share-status')).toContainText('読み込みました');
+  await expect(recipient.locator('#seed')).toHaveValue('7');
+  await expect(recipient.locator('#generate')).toBeEnabled();
+  await context.close();
+});
