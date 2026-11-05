@@ -601,7 +601,7 @@ $('share-settings').addEventListener('click', async () => {
       $('share-status').textContent = copiedRevision === settingsRevision ? '共有URLをコピーしました。' : '設定変更前のURLがコピーされました。現在の設定で作り直してください。';
     } catch {
       $('share-status').textContent = copiedRevision === settingsRevision && $('share-url').value === url.href
-        ? '共有URLを選択しました。コピーして共有してください。' : '設定またはURLが変更されました。共有URLを作り直してください。';
+        ? '共有URL欄からコピーして共有してください。' : '設定またはURLが変更されました。共有URLを作り直してください。';
     }
     if (cancelledShare) $('share-status').textContent += ' 共有設定の読み込みは中止しました。';
   } catch { $('share-status').textContent = '設定を確認してください。URLが長すぎる場合は設定を減らしてください。'; $('share-url').value = ''; }

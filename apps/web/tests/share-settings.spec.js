@@ -235,3 +235,13 @@ test('delayed clipboard rejection after navigation does not claim the cleared UR
   await expect(page.locator('#share-status')).toContainText('作り直してください');
   await expect(page.locator('#share-status')).not.toContainText('選択しました');
 });
+
+test('clipboard fallback remains accurate after focus moves elsewhere', async ({page}) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', {value: {writeText: () => new Promise((_, reject) => {window.rejectCopy = reject;})}}));
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#share-settings').click(); await page.locator('#generate').focus();
+  await page.evaluate(() => window.rejectCopy(new Error('clipboard rejected')));
+  await expect(page.locator('#share-status')).toContainText('共有URL欄からコピー');
+  await expect(page.locator('#share-status')).not.toContainText('選択しました');
+  await expect(page.locator('#share-url')).not.toHaveValue('');
+});
