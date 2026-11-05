@@ -33,8 +33,9 @@ test('invalid, unknown, and oversized links fail without applying partial settin
     await expect(recipient.locator('#generate')).toBeEnabled(); await recipient.close();
   }
 });
-test('failed shared preview leaves defaults usable', async ({page}) => {
-  await page.goto('/'); const url = await share(page);
+test('failed shared preview can be retried without reloading', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#seed').fill('7'); const url = await share(page);
   let failed = false;
   await page.route('**/api/plan', route => {
     if (!failed) {failed = true; return route.fulfill({status:503});}
@@ -46,6 +47,11 @@ test('failed shared preview leaves defaults usable', async ({page}) => {
     return route.continue();
   });
   await recipient.goto(url); await expect(recipient.locator('#share-status')).toContainText('読み込めませんでした');
+  await expect(recipient.locator('#generate')).toBeEnabled();
+  await expect(recipient.locator('#seed')).toHaveValue('0');
+  await recipient.locator('#load-shared-settings').click();
+  await expect(recipient.locator('#share-status')).toContainText('読み込みました');
+  await expect(recipient.locator('#seed')).toHaveValue('7');
   await expect(recipient.locator('#generate')).toBeEnabled(); await recipient.close();
 });
 
@@ -110,6 +116,18 @@ test('invalid hash navigation and failed explicit load preserve the current puzz
 });
 
 test('loading a link cancels safely when the user edits the current board', async ({page}) => {
+  await page.addInitScript(() => {
+    const original = window.fetch; window.__planRequests = []; window.__planBodies = [];
+    window.fetch = (...args) => {
+      if (args[0] !== '/api/plan') return original(...args);
+      const result = original(...args).then(response => {
+        const readJson = response.json.bind(response);
+        response.json = (...jsonArgs) => {const body = readJson(...jsonArgs); window.__planBodies.push(body); return body;};
+        return response;
+      });
+      window.__planRequests.push(result); return result;
+    };
+  });
   await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
   await page.locator('#seed').fill('7'); const url = await share(page);
   await page.locator('#seed').fill('0'); await expect(page.locator('#generate')).toBeEnabled();
@@ -120,10 +138,16 @@ test('loading a link cancels safely when the user edits the current board', asyn
   await page.evaluate(hash => {location.hash = hash;}, new URL(url).hash);
   await page.locator('#load-shared-settings').click(); await waiting;
   const cell = page.locator('.cell:enabled').first(); await cell.click(); const before = await cell.getAttribute('data-value');
-  await expect(page.locator('#navigation-status')).toContainText('中止');
   const pending = page.waitForResponse('**/api/plan'); release(); await pending;
+  await page.evaluate(async () => {
+    for (let i = 0; i < 3; i++) {
+      await Promise.allSettled([...window.__planRequests]); await Promise.allSettled([...window.__planBodies]);
+      await new Promise(requestAnimationFrame);
+    }
+  });
   await expect(page.locator('#actions')).toBeVisible(); await expect(cell).toHaveAttribute('data-value', before);
   await expect(page.locator('#seed')).toHaveValue('0');
+  await expect(page.locator('#navigation-status')).toContainText('中止');
 });
 
 test('shared URL excludes query parameters and tolerates object key order', async ({page}) => {
@@ -174,9 +198,15 @@ test('the latest hash wins while initial settings are loading', async ({page, br
 });
 
 test('sharing works when history writes are unavailable', async ({page}) => {
-  await page.addInitScript(() => {history.replaceState = () => {throw new DOMException('blocked', 'SecurityError');};});
+  await page.context().addInitScript(() => {history.replaceState = () => {throw new DOMException('blocked', 'SecurityError');};});
   await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
   const url = await share(page); const recipient = await page.context().newPage(); await recipient.goto(url);
+  await expect(recipient.locator('#share-status')).toContainText('読み込みました');
+  await expect(recipient.locator('#generate')).toBeEnabled();
+  await recipient.evaluate(() => {location.hash = '#invalid';});
+  await expect(recipient.locator('#load-shared-settings')).toBeVisible();
+  await recipient.evaluate(hash => {location.hash = hash;}, new URL(url).hash);
+  await recipient.locator('#load-shared-settings').click();
   await expect(recipient.locator('#share-status')).toContainText('読み込みました');
   await expect(recipient.locator('#generate')).toBeEnabled(); await recipient.close();
 });

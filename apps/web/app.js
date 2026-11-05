@@ -579,8 +579,11 @@ async function restoreSharedSettings() {
     $('navigation-status').textContent = ''; $('share-status').textContent = '共有された設定を読み込みました。';
     return true;
   } catch {
-    if (navigation === shareNavigation && hash === location.hash)
+    if (navigation === shareNavigation && hash === location.hash) {
       $('share-status').textContent = '共有URLを読み込めませんでした。URL、接続、対応バージョンを確認してください。';
+      $('load-shared-settings').hidden = false;
+      $('navigation-status').textContent = '共有設定はまだ読み込まれていません。現在の設定と解答は維持されています。';
+    }
   } finally {
     if (navigation === shareNavigation) sharePending = false;
   }
