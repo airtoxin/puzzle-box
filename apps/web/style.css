@@ -463,3 +463,11 @@ footer {
 #generated-rules .rule-settings { font-size: 0.9em; }
 
 #generated-clues h4 { margin: 1rem 0 0.5rem; font-size: 1em; }
+
+.rule-search-label { display:block; margin-top: .75rem; font-weight: 650; }
+#rule-search { width:100%; box-sizing:border-box; }
+.rule-group { border-top:1px solid #d9e4dc; margin-top:.8rem; }
+.rule-group summary { cursor:pointer; padding:.75rem 0; font-weight:650; }
+.rule-group-count { float:right; font-size:.8rem; font-weight:400; color:#526c60; }
+.rule-group .rule-card { padding: .75rem 0; }
+.rule-group summary:focus-visible { outline:2px solid #267a60; outline-offset:3px; }

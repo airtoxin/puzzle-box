@@ -144,6 +144,7 @@ function syncParameters() {
       if (spec.kind === 'integer') field.max = spec.maximum === 'area' ? area : spec.maximum === 'edges' ? edges : spec.maximum;
     }
   }
+  updateRuleView();
 }
 async function refresh() {
   const current = ++revision;
@@ -283,11 +284,51 @@ function cellButton(index, r, c, value, reveal) {
   });
   return button;
 }
+// Categories only affect presentation; selected remains in catalog order for URL compatibility.
+const ruleGroups = [
+  ['部屋', ['room-black-count', 'room-connected-black', 'no-white-across-three-rooms', 'room-rotational-symmetry', 'no-touching-equal-tetrominoes', 'uniform-rooms', 'room-fill-levels', 'no-color-across-rooms', 'adjacent-room-counts-differ', 'room-component-count', 'equal-room-component-sizes', 'one-false-adjacent-count-per-room', 'room-majority-count']],
+  ['数字・ヒント', ['distinct-white-numbers', 'white-visibility-counts', 'white-island-areas', 'adjacent-black-counts', 'adjacent-black-component-sum', 'white-area-clues', 'white-endpoint-markers', 'adjacent-black-runs', 'component-area-clues', 'orthogonal-black-counts']],
+  ['つながり・形', ['connected-white', 'connected-black', 'black-dominoes', 'rectangular-components', 'nonrectangular-components', 'color-component-size', 'components-touch-border', 'color-degree-range', 'color-endpoint-count', 'acyclic-color', 'corner-connected-color', 'corner-linked-components', 'unequal-corner-component-sizes']],
+  ['行・列・連続', ['no-three-consecutive', 'balanced-lines', 'distinct-lines', 'line-black-count', 'run-length-limit', 'directional-run-limit', 'diagonal-run-limit']],
+  ['配置の基本', ['count', 'non-touching', 'no-white-2x2', 'no-black-2x2']],
+];
+function ruleGroup(rule) {
+  if (profile.id !== 'shading') return '盤面のルール';
+  return ruleGroups.find(([, ids]) => ids.includes(rule.identifier))?.[0] || 'その他';
+}
+function updateRuleView() {
+  const query = $('rule-search').value.trim().toLocaleLowerCase();
+  let matches = 0, chosen = 0;
+  for (const group of $('rules').querySelectorAll('.rule-group')) {
+    let visible = 0, groupChosen = 0;
+    for (const card of group.querySelectorAll('.rule-card')) {
+      const state = selected.get(card.dataset.ruleId);
+      const match = !query || card.dataset.search.includes(query);
+      if (match) matches++;
+      if (state.toggle.checked) {chosen++; groupChosen++;}
+      card.hidden = !match && !state.toggle.checked;
+      if (!card.hidden) visible++;
+    }
+    group.hidden = visible === 0;
+    group.querySelector('.rule-group-count').textContent = `選択中 ${groupChosen} / ${group.querySelectorAll('.rule-card').length}`;
+    if (query && visible) group.open = true;
+  }
+  $('rule-count').textContent = `選択中 ${chosen} 件${query ? `・検索結果 ${matches} 件（選択中も表示）` : ''}`;
+  $('rule-empty').hidden = !query || matches !== 0;
+}
 function buildControls() {
   selected.clear(); hints.clear(); $('rules').replaceChildren(); $('hints').replaceChildren();
-  const sharedGrids = new Map();
+  const sharedGrids = new Map(), groups = new Map();
   for (const rule of profile.rules) {
-    const card = node('div', undefined, 'rule-card'); const label = node('label', undefined, 'rule-title');
+    const groupName = ruleGroup(rule);
+    if (!groups.has(groupName)) {
+      const group = node('details', undefined, 'rule-group'); group.open = true;
+      const summary = node('summary'); summary.append(node('span', groupName), node('span', '', 'rule-group-count'));
+      group.append(summary); groups.set(groupName, group); $('rules').append(group);
+    }
+    const card = node('div', undefined, 'rule-card');
+    card.dataset.ruleId = rule.identifier; card.dataset.search = `${rule.label} ${rule.summary} ${rule.identifier} ${groupName}`.toLocaleLowerCase();
+    const label = node('label', undefined, 'rule-title');
     const toggle = document.createElement('input'); toggle.type = 'checkbox';
     toggle.checked = rule.required || profile.defaults.rules.includes(rule.identifier); toggle.disabled = rule.required;
     label.append(toggle, document.createTextNode(rule.label)); card.append(label, node('p', rule.summary));
@@ -320,8 +361,10 @@ function buildControls() {
         $('rules').prepend(common);
       } else fields.append(wrapper);
     }
-    card.append(fields); $('rules').append(card); selected.set(rule.identifier, {toggle, parameters});
+    card.append(fields); groups.get(groupName).append(card); selected.set(rule.identifier, {toggle, parameters});
+    toggle.addEventListener('input', updateRuleView);
   }
+  updateRuleView();
   for (const hint of profile.clues) {
     const toggle = document.createElement('input'); toggle.type = 'checkbox'; toggle.checked = true;
     const label = node('label', undefined, 'hint'); label.append(toggle, document.createTextNode(hint.label));
@@ -410,6 +453,11 @@ function chooseProfile(startRefresh = true, isolated = false) {
   buildControls(); $('recipe-fields').disabled = false; if (startRefresh) refresh();
 }
 $('family').addEventListener('change', () => chooseProfile());
+$('rule-search').addEventListener('input', event => {event.stopPropagation(); updateRuleView();});
+form.addEventListener('invalid', event => {
+  const group = event.target.closest('.rule-group');
+  if (group) group.open = true;
+}, true);
 form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(); ++settingsRevision; clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
   timer = setTimeout(refresh, 120);});
 form.addEventListener('submit', async event => {

@@ -22,7 +22,11 @@
             <label>Seed<input id="seed" type="number" min="0" max="2147483647" value="0" required></label>
             <label>計算予算（秒）<input id="budget" type="number" min="1" max="30" value="10" required></label></div>
           <p class="note" id="size-note"></p></section>
-        <section class="panel"><h2><span>02</span> 組み合わせるルール</h2><div id="rules"></div></section>
+        <section class="panel"><h2><span>02</span> 組み合わせるルール</h2><label class="rule-search-label" for="rule-search">ルールを検索</label>
+          <input id="rule-search" type="search" autocomplete="off" placeholder="名前や説明で検索">
+          <p id="rule-count" class="note" role="status" aria-live="polite"></p>
+          <p id="rule-empty" class="note" hidden>一致するルールはありません。検索語を変えてください。</p>
+          <div id="rules"></div></section>
         <section class="panel"><h2><span>03</span> 候補にするヒント</h2><div id="hints"></div>
           <p class="note">不要なヒントは生成時に削減します。数だけで一意にならないときは、セルや辺の固定ヒントも選んでください。</p></section>
         <div class="share-settings"><button id="share-settings" type="button">設定の共有URLを作成</button>
