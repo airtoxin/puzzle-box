@@ -205,7 +205,9 @@ test('sharing works when history writes are unavailable', async ({page}) => {
   await expect(recipient.locator('#generate')).toBeEnabled();
   await recipient.evaluate(() => {location.hash = '#invalid';});
   await expect(recipient.locator('#load-shared-settings')).toBeVisible();
-  await recipient.evaluate(hash => {location.hash = hash;}, new URL(url).hash);
+  await recipient.evaluate(hash => new Promise(resolve => {
+    window.addEventListener('hashchange', resolve, {once:true}); location.hash = hash;
+  }), new URL(url).hash);
   await recipient.locator('#load-shared-settings').click();
   await expect(recipient.locator('#share-status')).toContainText('読み込みました');
   await expect(recipient.locator('#generate')).toBeEnabled(); await recipient.close();
