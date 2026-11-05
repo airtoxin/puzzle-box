@@ -1,4 +1,4 @@
-import {UnsupportedUiError, canonicalRunClues, assertRenderablePlan} from './plan-contract.js';
+import {UnsupportedUiError, canonicalRunClues, assertRenderablePlan, assertRenderableClues} from './plan-contract.js';
 
 const $ = id => document.getElementById(id);
 const form = $('recipe-form');
@@ -377,6 +377,7 @@ form.addEventListener('submit', async event => {
         $('status').textContent = messages.unconfirmed; return;
       }
       assertRenderablePlan(result.plan, request);
+      assertRenderableClues(result.clues, result.plan, request);
       artifact = result; plan = result.plan; fixed = new Set();
       const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
       const area = plan.rows * plan.cols;

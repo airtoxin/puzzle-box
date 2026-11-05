@@ -7,7 +7,23 @@ const renderers = {
   coupled: {topology: 'rectangular-cell-centers', maxCells: 9, minSide: 2, required: ['answer-cells', 'answer-edges'],
     channels: {'answer-cells': 'binary-cells', 'answer-edges': 'binary-edges', givens: 'cell-givens', 'edge-givens': 'edge-givens'}},
 };
+// These are browser capabilities, not server declarations. A known channel
+// alone is insufficient if a selected clue needs a different, missing channel.
+const clueChannels = {
+  shading: {cell: 'givens', 'row-count': 'row-counts', 'column-count': 'column-counts'},
+  slitherlink: {'cell-count': 'cell-counts', edge: 'edge-givens'},
+  coupled: {black: 'givens', edge: 'edge-givens'},
+};
 export class UnsupportedUiError extends Error {}
+// Called after assertRenderablePlan: each returned clue must be one the user
+// selected and must have a channel that this browser knows how to display.
+export function assertRenderableClues(clues, plan, request) {
+  const supported = clueChannels[request.family];
+  const channels = new Set(plan.requirements.channels.map(channel => channel.name));
+  if (!Array.isArray(clues) || clues.some(clue => !clue || typeof clue.type !== 'string'
+      || !Object.hasOwn(supported, clue.type) || !request.clue_kinds.includes(clue.type)
+      || !channels.has(supported[clue.type]))) throw new UnsupportedUiError();
+}
 function checkedGrid(value, rows, cols, maximum, nullable = false) {
   if (!Array.isArray(value) || value.length !== rows || value.some(row => !Array.isArray(row)
       || row.length !== cols || row.some(n => !(nullable && n === null) && (!Number.isInteger(n) || n < 0 || n > maximum)))) throw new UnsupportedUiError();
@@ -48,6 +64,8 @@ export function assertRenderablePlan(candidate, request) {
     seen.add(channel.name);
   }
   if (renderer.required.some(name => !seen.has(name))) throw new UnsupportedUiError();
+  if (!Array.isArray(request.clue_kinds) || request.clue_kinds.some(clue =>
+    !Object.hasOwn(clueChannels[request.family], clue) || !seen.has(clueChannels[request.family][clue]))) throw new UnsupportedUiError();
   const requestedRuns = request.rules.filter(r => Object.hasOwn(r.parameters,'run_clues')).map(r => r.parameters.run_clues);
   if (seen.has('black-runs') !== (requestedRuns.length > 0) || !seen.has('black-runs') && candidate.black_run_clues !== undefined) throw new UnsupportedUiError();
   if (seen.has('black-runs')) {
