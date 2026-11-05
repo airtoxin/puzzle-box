@@ -290,6 +290,9 @@ dev = [{ name = "pytest", specifier = ">=9.0.3" }]
 name = "puzzle-box"
 version = "0.1.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "ortools" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -297,6 +300,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "ortools", specifier = ">=9.15.6755" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pyright", specifier = ">=1.1.408" }]

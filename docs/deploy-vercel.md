@@ -27,7 +27,30 @@ python examples/prepare_vercel.py build/vercel-artifact
 
 ## デプロイ先と実行方式
 
-既存のVercelプロジェクトを確認し、配信物のディレクトリを対象にデプロイします。リポジトリ全体を直接デプロイする設定ではありません。
+### Git連携からビルドする
+
+リポジトリのルートにも `vercel.json` と `api/index.py` があります。Git連携ではルートを対象に、
+既存プロジェクトの Settings → Git からリポジトリを接続し、Production Branch を `main` に指定します。
+Root Directory はリポジトリのルート、Framework Preset は Other を使い、ビルド・出力・関数設定は
+ルートの `vercel.json` に従います。[正式な接続手順](https://vercel.com/docs/git/vercel-for-github)は
+Vercel側の所有権と既存GitHub Appのアクセス権が必要です。設定ファイルを追加するだけでは接続や自動デプロイは有効になりません。
+
+Gitビルドはレビュー対象のリポジトリをVercelへ渡します。実行時依存はルートの `pyproject.toml` と `uv.lock` から解決し、
+開発環境のコピーを使いません。`api/index.py` は配信物方式と同じWSGI入口を再利用します。
+ルートの `package.json` は静的ビルドの検出用で、追加のnpm実行時依存はありません。
+静的ビルドは `python3 examples/prepare_web_static.py` でHTML・CSS・JavaScriptの3ファイルだけを
+`build/vercel-public` へコピーするため、`apps/web/tests` や `node_modules` を公開しません。
+関数からも静的画面・文書・テスト・開発環境を除外します。Gitビルドのソース集合は、次の専用エクスポート方式と異なります。
+
+既存プロジェクトを再利用し、接続のために同名の新規プロジェクトを作らないでください。
+認証済みCLIを使う場合は、対象を確認して `vercel git connect` を実行する方法もあります。
+新しいログイン・トークン・GitHub Appのアクセス権が必要なときは、接続操作と権限付与を区別してください。
+CIからの独自デプロイとGit連携の二重設定は避けます。接続後は、まずプレビューのビルド・カタログ・小盤面生成を検証し、
+本番への反映と配信元コミットを確認してください。Git連携だけでGitHubのCIやレビューが本番配信の前提になるわけではありません。
+
+### 専用配信物を送る
+
+Git連携を使わない場合は、既存のVercelプロジェクトを確認し、上で作った配信物のディレクトリを対象にデプロイします。
 APIからファイルを送る方法でも、認証済みのVercel CLIで配信物をリンクして送る方法でも利用できます。
 CLIでは、対象チームと既存プロジェクトを明示します。
 

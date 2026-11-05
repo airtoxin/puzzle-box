@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "python3 examples/prepare_web_static.py",
+  "outputDirectory": "build/vercel-public",
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 30,
+      "excludeFiles": "{apps/**,docs/**,.github/**,packages/**/*-test.py,packages/solvers/**,**/__pycache__/**,build/**,dist/**,.git/**,.venv/**}"
+    }
+  },
+  "rewrites": [
+    {"source": "/api/catalog", "destination": "/api/index?operation=catalog"},
+    {"source": "/api/plan", "destination": "/api/index?operation=plan"},
+    {"source": "/api/generate", "destination": "/api/index?operation=generate"},
+    {"source": "/api/check", "destination": "/api/index?operation=check"}
+  ],
+  "headers": [{"source": "/(.*)", "headers": [
+    {"key": "X-Content-Type-Options", "value": "nosniff"},
+    {"key": "Referrer-Policy", "value": "same-origin"},
+    {"key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"}
+  ]}]
+}

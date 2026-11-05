@@ -1,0 +1,15 @@
+# Git builds read the reviewed repository; CLI uploads must also omit local data.
+.git
+.venv
+.env
+.env.*
+**/.env
+**/.env.*
+.codex
+.agents
+**/__pycache__
+**/node_modules
+**/test-results
+**/playwright-report
+build
+dist

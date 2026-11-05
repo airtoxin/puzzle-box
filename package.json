@@ -1,0 +1,7 @@
+{
+  "name": "puzzle-box-web-build",
+  "private": true,
+  "scripts": {
+    "build": "python3 examples/prepare_web_static.py"
+  }
+}
