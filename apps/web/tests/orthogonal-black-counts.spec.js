@@ -15,6 +15,17 @@ async function start(page) {
 
 function separate(a,b) {return a.x+a.width<=b.x || b.x+b.width<=a.x || a.y+a.height<=b.y || b.y+b.height<=a.y;}
 
+test('editor guidance preserves the distinct color contracts',async({page})=>{
+  await start(page);
+  const help=page.getByLabel(field,{exact:true}).locator('..').locator('..').locator('p');
+  await expect(help).toContainText('この数字だけではセルの色を固定しません');
+  await expect(help).toContainText('他のルールや固定ヒントで色が決まることはあります');
+  await expect(help).not.toContainText('白として固定');
+  await page.getByLabel('数字の周囲の黒マス数を固定',{exact:true}).check();
+  const oldHelp=page.getByLabel('周囲の黒数（. は数字なし、0も有効）',{exact:true}).locator('..').locator('..').locator('p');
+  await expect(oldHelp).toContainText('数字マスは白として固定します');
+});
+
 async function enterAndCheck(page,data) {
   for(let i=0;i<data.record.solution.flat().length;i++) {
     const cell=page.locator(`[data-cell-index="${i}"]`);
