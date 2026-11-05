@@ -23,7 +23,7 @@ from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
 from puzzle_defs import NoColorAcrossRooms, AdjacentRoomCountsDiffer
 from puzzle_defs import RoomComponentCount, EqualRoomComponentSizes
 from puzzle_defs import ComponentAreaClues
-from puzzle_defs import CornerLinkedComponents, OneFalseAdjacentCountPerRoom
+from puzzle_defs import CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount
 from puzzle_defs.puzzles.corner_linked_components import MAX_CORNER_LINK_CELLS
 from puzzle_defs.puzzles.component_area_clues import DEFAULT_COMPONENT_AREAS
 from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
@@ -52,7 +52,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
                       AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues, WhiteEndpointMarkers, AdjacentBlackRuns, RoomFillLevels,
-                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents, OneFalseAdjacentCountPerRoom)
+                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -88,6 +88,8 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "equal-room-component-sizes": EqualRoomComponentSizes(DEFAULT_ROOMS),
             "component-area-clues": ComponentAreaClues(DEFAULT_COMPONENT_AREAS),
             "corner-linked-components": CornerLinkedComponents(),
+            "directional-run-limit": DirectionalRunLimit(),
+            "room-majority-count": RoomMajorityCount(DEFAULT_ROOMS),
             "one-false-adjacent-count-per-room": OneFalseAdjacentCountPerRoom(DEFAULT_ROOMS, DEFAULT_NEIGHBOR_COUNTS),
             "adjacent-black-component-sum": AdjacentBlackComponentSum(DEFAULT_COMPONENT_COUNTS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
@@ -95,6 +97,10 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
 
 def rule_record(rule: ShadingRule) -> dict[str, Any]:
     # A subclass may change apply(); serializing only its parent would lose rules.
+    if type(rule) is DirectionalRunLimit:
+        return {"type":rule.ui.identifier,"max_length":rule.max_length,"horizontal_black":rule.horizontal_black}
+    if type(rule) is RoomMajorityCount:
+        return {"type":rule.ui.identifier,"rooms":[list(row) for row in rule.rooms],"count":rule.count}
     if type(rule) is OneFalseAdjacentCountPerRoom:
         return {"type":rule.ui.identifier,"rooms":[list(row) for row in rule.rooms],
                 "neighbor_counts":[list(row) for row in rule.neighbor_counts]}
@@ -162,6 +168,12 @@ def read_rule(data: Any) -> ShadingRule:
     if not isinstance(data, dict):
         raise ValueError("A rule must be an object")
     kind = data.get("type")
+    if kind == "directional-run-limit" and set(data) == {"type", "max_length", "horizontal_black"}:
+        return DirectionalRunLimit(data["max_length"],data["horizontal_black"])
+    if kind == "room-majority-count" and set(data) == {"type", "rooms", "count"}:
+        if type(data["rooms"]) is not list or any(type(row) is not list for row in data["rooms"]):
+            raise ValueError("Rooms must be an array of arrays")
+        return RoomMajorityCount(room_map(data["rooms"]),data["count"])
     if kind == "one-false-adjacent-count-per-room" and set(data) == {"type", "rooms", "neighbor_counts"}:
         if (type(data["rooms"]) is not list or any(type(row) is not list for row in data["rooms"])
                 or type(data["neighbor_counts"]) is not list or any(type(row) is not list for row in data["neighbor_counts"])):
@@ -288,7 +300,7 @@ def shared_rooms(recipe: ShadingRecipe) -> RoomMap | None:
                or type(rule) is NoTouchingEqualTetrominoes or type(rule) is UniformRooms or type(rule) is RoomFillLevels
                or type(rule) is NoColorAcrossRooms or type(rule) is AdjacentRoomCountsDiffer
                or type(rule) is RoomComponentCount or type(rule) is EqualRoomComponentSizes
-               or type(rule) is OneFalseAdjacentCountPerRoom]
+               or type(rule) is OneFalseAdjacentCountPerRoom or type(rule) is RoomMajorityCount]
     for layout in layouts:
         room_map(layout, rows=recipe.rows, cols=recipe.cols)
     if layouts and any(layout != layouts[0] for layout in layouts):

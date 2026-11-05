@@ -32,7 +32,7 @@ from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
 from puzzle_defs import NoColorAcrossRooms, AdjacentRoomCountsDiffer
 from puzzle_defs import RoomComponentCount, EqualRoomComponentSizes
 from puzzle_defs import ComponentAreaClues
-from puzzle_defs import CornerLinkedComponents, OneFalseAdjacentCountPerRoom
+from puzzle_defs import CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount
 from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
@@ -62,6 +62,17 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is RoomMajorityCount:
+        for label in {n for row in rule.rooms for n in row}:
+            values = [bits[r*cols+c] for r in range(rows) for c in range(cols) if rule.rooms[r][c] == label]
+            if max(values.count(0),values.count(1)) != rule.count:
+                return False
+        return True
+    if type(rule) is DirectionalRunLimit:
+        lines = [(bits[r*cols:(r+1)*cols],int(not rule.horizontal_black)) for r in range(rows)]
+        lines += [(bits[c::cols],int(rule.horizontal_black)) for c in range(cols)]
+        return all(color != target or sum(1 for _ in run) <= rule.max_length
+                   for line,target in lines for color,run in groupby(line))
     if type(rule) is OneFalseAdjacentCountPerRoom:
         errors = {n:0 for row in rule.rooms for n in row}
         for r in range(rows):
