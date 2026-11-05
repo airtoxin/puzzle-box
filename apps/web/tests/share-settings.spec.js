@@ -361,3 +361,31 @@ test('back after cancelling a link with a board edit preserves the puzzle and an
   await expect(cell).toHaveAttribute('data-value', before);
   await expect(page.locator('#seed')).toHaveValue('0');
 });
+
+test('distinct entries with the same URL restore their own settings', async ({page}) => {
+  await page.goto('/#'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#seed').fill('1'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.evaluate(() => {location.hash = '#invalid';});
+  await expect(page.locator('#share-status')).toContainText('読み込めませんでした');
+  await page.evaluate(() => {location.hash = '';}); await expect(page).toHaveURL(/\/#$/);
+  await page.locator('#seed').fill('2'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.goBack(); await expect(page).toHaveURL(/#invalid$/);
+  await page.goBack(); await expect(page.locator('#seed')).toHaveValue('1');
+});
+
+test('family change is saved before its pending preview completes', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#seed').fill('7'); const url = await share(page);
+  let release, started; const gate = new Promise(r => {release = r;});
+  const waiting = new Promise(r => {started = r;});
+  await page.route('**/api/plan', async route => {
+    if (route.request().postDataJSON().family === 'slitherlink') {started(); await gate;}
+    await route.continue();
+  });
+  await page.locator('#family').selectOption('slitherlink'); await waiting;
+  await page.evaluate(hash => {location.hash = hash;}, new URL(url).hash);
+  await expect(page.locator('#family')).toHaveValue('shading'); await expect(page.locator('#generate')).toBeEnabled();
+  release(); await page.goBack();
+  await expect(page.locator('#family')).toHaveValue('slitherlink');
+  await expect(page.locator('#generate')).toBeEnabled();
+});
