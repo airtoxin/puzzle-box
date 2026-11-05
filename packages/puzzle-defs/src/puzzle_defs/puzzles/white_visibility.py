@@ -23,7 +23,7 @@ class WhiteVisibilityCounts:
         "white-visibility-counts", "数字から見える白マス数を固定",
         "正の数字のマスは白。自身を1回含み、黒か外枠まで上下左右に見える白の合計を指定します。0は指定なしです。",
         (UiParameter("counts", "見える白マス数（0は指定なし）", "number-grid", DEFAULT_SIGHT_COUNTS, maximum=99),),
-        UiRequirements(max_cells=25, channels=(UiChannel("answer", "binary-cells"), UiChannel("sight-counts", "cell-sight-counts"))),
+        UiRequirements(max_cells=100, channels=(UiChannel("answer", "binary-cells"), UiChannel("sight-counts", "cell-sight-counts"))),
     )
     counts: NumberGrid
 
@@ -31,8 +31,8 @@ class WhiteVisibilityCounts:
         object.__setattr__(self, "counts", number_grid(self.counts))
 
     def apply(self, puzzle: Puzzle, board: SquareGrid, black: VarMap) -> None:
-        if len(board.cells) > 25:
-            raise ValueError("White visibility supports at most 25 board cells")
+        if len(board.cells) > 100:
+            raise ValueError("White visibility supports at most 100 board cells")
         number_grid(self.counts, rows=len(board.rows()), cols=len(board.cols()))
         cells = set(board.cells)
         for origin in board.cells:
