@@ -165,6 +165,17 @@ def test_returned_request_and_plan_distinguish_booleans_from_integers(monkeypatc
     assert server.run_generation(shading_request()) == {'status': 'unconfirmed'}
 
 
+@pytest.mark.parametrize('field,key,value', [
+    ('request', 'seed', False), ('request', 'rows', 2.0),
+    ('plan', 'rows', 2.0), ('plan', 'cols', True),
+])
+def test_integer_fields_reject_boolean_and_float_substitutions(monkeypatch, shading_success, field, key, value):
+    result = deepcopy(shading_success)
+    result[field][key] = value
+    fake_worker(monkeypatch, json.dumps(result))
+    assert server.run_generation(shading_request()) == {'status': 'unconfirmed'}
+
+
 @pytest.mark.parametrize('status,count,unique,irreducible', [
     ('unsatisfiable', 1, None, None), ('unsatisfiable', 0, True, None),
     ('insufficient_hints', 0, None, None), ('search_exhausted', 1, None, None),
