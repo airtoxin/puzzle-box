@@ -230,3 +230,21 @@ for (const action of ['edit', 'generate']) {
     if (action === 'generate') await expect(page.locator('#actions')).toBeVisible();
   });
 }
+
+test('a pending preview does not cancel a valid link navigation', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#seed').fill('7'); const url = await share(page);
+  let release, started; const gate = new Promise(r => {release = r;});
+  const waiting = new Promise(r => {started = r;});
+  await page.route('**/api/plan', async route => {
+    if (route.request().postDataJSON().seed === 7) {started(); await gate;}
+    await route.continue();
+  });
+  const preview = page.waitForResponse(response => response.url().endsWith('/api/plan') && response.request().postDataJSON().seed === 3);
+  await page.locator('#seed').fill('3');
+  await page.evaluate(hash => {location.hash = hash;}, new URL(url).hash);
+  await waiting; await preview; release();
+  await expect(page.locator('#share-status')).toContainText('読み込みました');
+  await expect(page.locator('#seed')).toHaveValue('7');
+  await expect(page.locator('#generate')).toBeEnabled();
+});

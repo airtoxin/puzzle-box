@@ -564,7 +564,7 @@ function cancelPendingShare() {
   $('share-status').textContent = '作業が変更されたため、共有設定の読み込みを中止しました。';
 }
 async function restoreSharedSettings() {
-  const hash = location.hash, navigation = ++shareNavigation, currentRevision = revision;
+  const hash = location.hash, navigation = ++shareNavigation;
   const remembered = !hash ? historySettings.get(location.href) : undefined;
   if (!hash && !remembered) {sharePending = false; return;}
   sharePending = true;
@@ -574,7 +574,7 @@ async function restoreSharedSettings() {
     const result = await post('/api/plan', request);
     if (result.status !== 'ok') throw new Error('invalid plan');
     assertRenderablePlan(result.plan, request);
-    if (navigation !== shareNavigation || hash !== location.hash || currentRevision !== revision || form.inert) return;
+    if (navigation !== shareNavigation || hash !== location.hash || form.inert) return;
     applySharedSettings(request);
     currentSettingsUrl = location.href; $('share-url').value = '';
     $('share-status').textContent = '共有された設定を読み込みました。';
