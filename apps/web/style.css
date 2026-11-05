@@ -454,3 +454,10 @@ footer {
 .orthogonal-count-board .numbered-cell > .orthogonal-number:first-child:nth-last-child(2) {grid-column:1 / -1; font-size:1rem;}
 .orthogonal-count-board .numbered-cell .cell-mark {display:block; position:absolute; left:50%; right:auto; bottom:1px; transform:translateX(-50%); font-size:.65rem;}
 .orthogonal-count-board .numbered-cell.fixed::after {display:none;}
+
+#generated-rules { margin: 1.25rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 0.6rem; overflow-wrap: anywhere; }
+#generated-rules h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+#generated-rules ul { margin: 0; padding-left: 1.25rem; }
+#generated-rules li + li { margin-top: 0.75rem; }
+#generated-rules p { margin: 0.25rem 0 0; }
+#generated-rules .rule-settings { font-size: 0.9em; }
