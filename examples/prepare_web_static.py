@@ -1,9 +1,11 @@
-"""Copy only the three public Web assets for a repository-root Vercel build."""
+"""Copy only the public Web assets for a repository-root Vercel build."""
 
 from pathlib import Path
 
+from web_assets import ASSET_TYPES
+
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ("index.html", "app.js", "style.css")
+ASSETS = tuple(ASSET_TYPES)
 
 
 def build(destination: Path) -> None:

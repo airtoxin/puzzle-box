@@ -85,7 +85,9 @@ def test_per_instance_lock_is_shared_by_generate_and_check_and_released_on_timeo
 def test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, rule_group):
     output = tmp_path / "artifact"
     payload = prepare.export(output)
-    assert set(name for name in payload if name.startswith("public/")) == {"public/index.html", "public/app.js", "public/style.css"}
+    assert set(name for name in payload if name.startswith("public/")) == {"public/index.html", "public/app.js", "public/plan-contract.js", "public/style.css"}
+    for name in ("index.html", "app.js", "plan-contract.js", "style.css"):
+        assert payload[f"public/{name}"] == (ROOT / "apps/web" / name).read_bytes()
     assert not any(".git/" in name or ".venv/" in name or name.endswith("-test.py") or ".env" in name for name in payload)
     versions = {p["name"]: p["version"] for p in tomllib.loads((ROOT/"uv.lock").read_text())["package"]}
     for line in payload["requirements.txt"].decode().splitlines():
