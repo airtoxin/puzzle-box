@@ -240,7 +240,7 @@ function cellButton(index, r, c, value, reveal) {
   };
   paint(value);
   button.addEventListener('click', () => {
-    cancelPendingShare(true);
+    cancelPendingShare();
     input[index] = (input[index]+2)%3-1; paint(input[index]); $('answer-status').textContent = '';
   });
   return button;
@@ -310,7 +310,7 @@ function edgeButton(edge, index, value, reveal, offset = 0) {
     button.setAttribute('aria-label', `${horizontal ? '横辺' : '縦辺'} ${edge[0]+1}行${edge[1]+1}列: ${value === -1 ? '未入力' : value === 0 ? '線なし' : '線あり'}${artifact && fixed.has(target) ? '（固定ヒント）' : ''}`);
   };
   paint(value);
-  button.addEventListener('click', () => {cancelPendingShare(true); input[target] = (input[target]+2)%3-1; paint(input[target]); $('answer-status').textContent = '';});
+  button.addEventListener('click', () => {cancelPendingShare(); input[target] = (input[target]+2)%3-1; paint(input[target]); $('answer-status').textContent = '';});
   return button;
 }
 function renderLoop(reveal, channels) {
@@ -377,7 +377,7 @@ form.addEventListener('input', () => {$('share-url').value = ''; $('share-status
 form.addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(timer);
   if (!plan || !form.reportValidity()) return;
-  cancelPendingShare(true); ++revision; clearArtifact(); renderBoard(); form.inert = true; $('generate').disabled = true;
+  cancelPendingShare(); ++revision; clearArtifact(); renderBoard(); form.inert = true; $('generate').disabled = true;
   $('status').textContent = '生成・唯一解検証中…';
   try {
     const request = readRequest(), result = await post('/api/generate', request);
@@ -420,7 +420,7 @@ form.addEventListener('submit', async event => {
 });
 $('check').addEventListener('click', async () => {
   if (!artifact) return;
-  cancelPendingShare(true);
+  cancelPendingShare();
   if (input.includes(-1)) {$('answer-status').textContent = '未入力のマスまたは辺があります。'; return;}
   form.inert = $('board').inert = $('answer-buttons').inert = true;
   $('answer-status').textContent = 'サーバーでルールとヒントを確認中…';
@@ -437,7 +437,7 @@ $('check').addEventListener('click', async () => {
 });
 $('reveal').addEventListener('click', () => {
   if (!artifact) return;
-  cancelPendingShare(true);
+  cancelPendingShare();
   const show = $('reveal').textContent === '答えを表示'; renderBoard(show);
   $('reveal').textContent = show ? '自分の解答へ戻る' : '答えを表示';
 });
