@@ -49,17 +49,27 @@ function readGrid(field) {
     throw new GridInputError(`${field.dataset.label}は、0（丸なし）か1（丸あり）で入力してください。`);
   return values;
 }
-// Catalog and preview requests are safe to retry. Their timeout includes both
-// headers and JSON body; generation and checking keep their existing budgets.
-async function fetchJsonWithTimeout(path, options = {}) {
+// Bound the whole response, including the JSON body. A transport timeout does
+// not prove that the server stopped its worker or that the puzzle is impossible.
+async function fetchJsonWithTimeout(path, options = {}, timeoutMs = 15000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(path, {...options, signal: controller.signal});
     if (path === '/api/catalog' ? !response.ok
-      : response.status === 408 || response.status === 429 || response.status >= 500) {
+      : path === '/api/plan' && (response.status === 408 || response.status === 429 || response.status >= 500)) {
       controller.abort(); // Do not leave an unread error response streaming.
       throw new Error('Service temporarily unavailable');
+    }
+    if ((path === '/api/generate' || path === '/api/check') && !response.ok) {
+      // Only the API's explicit 409 busy response is actionable. A proxy or
+      // server error must never supply a definitive puzzle or answer verdict.
+      if (response.status === 409) {
+        const result = await response.json();
+        return result?.status === 'busy' ? {status: 'busy'} : {status: 'unconfirmed'};
+      }
+      controller.abort();
+      return {status: 'unconfirmed'};
     }
     return await response.json();
   } finally {clearTimeout(timeout);}
@@ -67,8 +77,10 @@ async function fetchJsonWithTimeout(path, options = {}) {
 async function post(path, data) {
   const options = {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)};
   if (path === '/api/plan') return fetchJsonWithTimeout(path, options);
-  const response = await fetch(path, options);
-  return response.json();
+  // The worker budget starts on the server; allow 15 seconds more for network,
+  // cold start and cleanup. Aborting the fetch does not cancel server work.
+  const budget = path === '/api/check' ? data.request.budget_seconds : data.budget_seconds;
+  return fetchJsonWithTimeout(path, options, (budget + 15) * 1000);
 }
 function clearArtifact() {
   artifact = undefined; $('actions').hidden = true; $('answer-status').textContent = '';
@@ -392,7 +404,7 @@ form.addEventListener('submit', async event => {
     } else $('status').textContent = messages[result.status] || `設定を確認してください。${result.message || ''}`;
   } catch (error) {
     if (error instanceof UnsupportedUiError) rejectUnsupportedUi();
-    else $('status').textContent = '通信が途切れました。生成の成否は未確認です。予算内でサーバーの処理が終了するまでお待ちください。';
+    else $('status').textContent = '通信が途切れたか、待ち時間の上限に達しました。生成の成否は未確認です。サーバーで処理が続く場合は、終了後にもう一度お試しください。';
   }
   finally { form.inert = false; $('generate').disabled = !plan; }
 });
@@ -409,7 +421,7 @@ $('check').addEventListener('click', async () => {
       : result.status === 'ok' || result.status === 'unconfirmed'
         ? '解答を検証できませんでした。正誤は未確定です。'
         : messages[result.status] || '解答を検証できませんでした。正誤は未確定です。';
-  } catch {$('answer-status').textContent = '通信が途切れました。解答の正しさは未確認です。';}
+  } catch {$('answer-status').textContent = '通信が途切れたか、待ち時間の上限に達しました。解答の正しさは未確認です。';}
   finally {form.inert = $('board').inert = $('answer-buttons').inert = false; $('check').focus();}
 });
 $('reveal').addEventListener('click', () => {
