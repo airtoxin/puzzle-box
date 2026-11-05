@@ -33,7 +33,7 @@ from puzzle_defs import (
     NoColorAcrossRooms, AdjacentRoomCountsDiffer,
     RoomComponentCount, EqualRoomComponentSizes,
     ComponentAreaClues,
-    CornerLinkedComponents, OneFalseAdjacentCountPerRoom,
+    CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -236,6 +236,12 @@ def _rule_text(rule: ShadingRule) -> str:
         return "Numbered cells are white. Each white component has zero or one number; if present it equals the area. Unnumbered components are allowed; zero means no number."
     if type(rule) is WhiteIslandAreas:
         return "Every white island contains exactly one positive area number and that many cells; numbered cells are white, and zero means no number."
+    if type(rule) is DirectionalRunLimit:
+        horizontal = "black" if rule.horizontal_black else "white"
+        vertical = "white" if rule.horizontal_black else "black"
+        return f"Treat {horizontal} as horizontal and {vertical} as vertical. Their straight runs perpendicular to that direction have length at most {rule.max_length}; parallel runs are unrestricted. Answers remain black/white cells, not edges."
+    if type(rule) is RoomMajorityCount:
+        return f"In every room the larger of its black and white counts is {rule.count}. Ties are allowed, and the majority color may differ between rooms."
     if type(rule) is OneFalseAdjacentCountPerRoom:
         return "Numbered cells are white. In every room exactly one given count differs from its four orthogonally adjacent black cells; all other counts are correct. Neighbors across room borders count; zero is a clue, and a room without clues is unsatisfiable."
     if type(rule) is AdjacentBlackCounts:

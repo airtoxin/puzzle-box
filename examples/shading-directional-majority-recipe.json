@@ -1,0 +1,11 @@
+{
+  "format": "puzzle-box/shading-recipe-v1",
+  "rows": 3,
+  "cols": 3,
+  "rules": [
+    {"type": "directional-run-limit", "max_length": 2, "horizontal_black": true},
+    {"type": "room-majority-count", "rooms": [[0,0,1],[0,0,1],[2,2,1]], "count": 2},
+    {"type": "count", "count": 3}
+  ],
+  "clue_kinds": ["cell"]
+}
