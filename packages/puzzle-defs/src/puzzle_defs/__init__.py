@@ -59,6 +59,7 @@ from puzzle_defs.puzzles.component_area_clues import ComponentAreaClues
 from puzzle_defs.puzzles.corner_linked_components import CornerLinkedComponents
 from puzzle_defs.puzzles.one_false_neighbor_count import OneFalseAdjacentCountPerRoom
 from puzzle_defs.puzzles.directional_majority import DirectionalRunLimit, RoomMajorityCount
+from puzzle_defs.puzzles.orthogonal_black_counts import OrthogonalBlackCounts
 
 __all__ = [
     "AdjacentBlackRuns",
@@ -72,6 +73,7 @@ __all__ = [
     "OneFalseAdjacentCountPerRoom",
     "DirectionalRunLimit",
     "RoomMajorityCount",
+    "OrthogonalBlackCounts",
     "numbered_white_endpoints",
     "WhiteEndpointMarkers",
     "WhiteAreaClues",

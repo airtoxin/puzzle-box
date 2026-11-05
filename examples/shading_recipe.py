@@ -16,7 +16,8 @@ from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs import WhiteVisibilityCounts
 from puzzle_defs import ComponentsTouchBorder
 from puzzle_defs import WhiteIslandAreas, WhiteAreaClues
-from puzzle_defs import AdjacentBlackCounts
+from puzzle_defs import AdjacentBlackCounts, OrthogonalBlackCounts
+from puzzle_defs.puzzles.orthogonal_black_counts import DEFAULT_ORTHOGONAL_COUNTS
 from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
@@ -52,7 +53,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
                       AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues, WhiteEndpointMarkers, AdjacentBlackRuns, RoomFillLevels,
-                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount)
+                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount, OrthogonalBlackCounts)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -88,6 +89,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "equal-room-component-sizes": EqualRoomComponentSizes(DEFAULT_ROOMS),
             "component-area-clues": ComponentAreaClues(DEFAULT_COMPONENT_AREAS),
             "corner-linked-components": CornerLinkedComponents(),
+            "orthogonal-black-counts": OrthogonalBlackCounts(DEFAULT_ORTHOGONAL_COUNTS),
             "directional-run-limit": DirectionalRunLimit(),
             "room-majority-count": RoomMajorityCount(DEFAULT_ROOMS),
             "one-false-adjacent-count-per-room": OneFalseAdjacentCountPerRoom(DEFAULT_ROOMS, DEFAULT_NEIGHBOR_COUNTS),
@@ -97,6 +99,8 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
 
 def rule_record(rule: ShadingRule) -> dict[str, Any]:
     # A subclass may change apply(); serializing only its parent would lose rules.
+    if type(rule) is OrthogonalBlackCounts:
+        return {"type":rule.ui.identifier,"orthogonal_counts":[list(row) for row in rule.orthogonal_counts]}
     if type(rule) is DirectionalRunLimit:
         return {"type":rule.ui.identifier,"max_length":rule.max_length,"horizontal_black":rule.horizontal_black}
     if type(rule) is RoomMajorityCount:
@@ -168,6 +172,10 @@ def read_rule(data: Any) -> ShadingRule:
     if not isinstance(data, dict):
         raise ValueError("A rule must be an object")
     kind = data.get("type")
+    if kind == "orthogonal-black-counts" and set(data) == {"type", "orthogonal_counts"}:
+        if type(data["orthogonal_counts"]) is not list or any(type(row) is not list for row in data["orthogonal_counts"]):
+            raise ValueError("Orthogonal counts must be an array of arrays")
+        return OrthogonalBlackCounts(clue_grid(data["orthogonal_counts"],maximum=4))
     if kind == "directional-run-limit" and set(data) == {"type", "max_length", "horizontal_black"}:
         return DirectionalRunLimit(data["max_length"],data["horizontal_black"])
     if kind == "room-majority-count" and set(data) == {"type", "rooms", "count"}:
@@ -334,6 +342,7 @@ def read_recipe(data: Any) -> ShadingRecipe:
     shared_endpoint_markers(recipe)
     shared_black_runs(recipe)
     shared_component_areas(recipe)
+    shared_orthogonal_counts(recipe)
     shared_neighbor_counts(recipe)
     shared_component_counts(recipe)
     if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
@@ -436,4 +445,13 @@ def shared_component_areas(recipe: ShadingRecipe) -> NumberGrid | None:
         number_grid(grid,rows=recipe.rows,cols=recipe.cols)
     if grids and any(grid != grids[0] for grid in grids):
         raise ValueError("Component area rules must share the same numbers for this file/UI format")
+    return grids[0] if grids else None
+
+
+def shared_orthogonal_counts(recipe: ShadingRecipe) -> ClueGrid | None:
+    grids = [r.orthogonal_counts for r in recipe.rules if type(r) is OrthogonalBlackCounts]
+    for grid in grids:
+        clue_grid(grid,rows=recipe.rows,cols=recipe.cols,maximum=4)
+    if grids and any(grid != grids[0] for grid in grids):
+        raise ValueError("Orthogonal-count rules must share the same counts for this file/UI format")
     return grids[0] if grids else None

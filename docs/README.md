@@ -17,6 +17,7 @@ Puzzle Box は、ルールを制約として記述し、回答とヒントの意
 | 数字ごとに白い島の面積を指定する | [ぬりかべの島](white-island-areas.md) |
 | 数字なしの白成分も許して面積を指定する | [モチコロ型の面積ヒント](white-area-clues.md) |
 | 数字セルの色を固定せず、所属する成分の面積を指定する | [チョコバナナ型の面積ヒント](component-area-clues.md) |
+| 数字マスを黒にもできる隣接黒数を指定する | [ペイントエリアの数字](orthogonal-black-counts.md) |
 | 0と数字なしを区別して隣接黒数を指定する | [マインスイーパーの隣接黒数](adjacent-black-counts.md) |
 | 各部屋の隣接黒数にウソを1つだけ置く | [ウソワンの部屋と数字](one-false-neighbor-count.md) |
 | 周囲8マスの黒い連続区間を指定する | [Tapa の局所ヒント](adjacent-black-runs.md) |
