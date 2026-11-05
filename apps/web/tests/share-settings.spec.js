@@ -222,3 +222,16 @@ test('delayed clipboard completion does not treat generation as a settings chang
   await expect(page.locator('#share-status')).toContainText('コピーしました');
   expect((await (await generation).json()).status).toBe('ok');
 });
+
+test('delayed clipboard rejection after navigation does not claim the cleared URL is selected', async ({page}) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', {value: {writeText: () => new Promise((_, reject) => {window.rejectCopy = reject;})}}));
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#share-settings').click();
+  await page.evaluate(() => new Promise(resolve => {
+    window.addEventListener('hashchange', resolve, {once:true}); location.hash = '#invalid';
+  }));
+  await expect(page.locator('#share-url')).toHaveValue('');
+  await page.evaluate(() => window.rejectCopy(new Error('clipboard rejected')));
+  await expect(page.locator('#share-status')).toContainText('作り直してください');
+  await expect(page.locator('#share-status')).not.toContainText('選択しました');
+});
