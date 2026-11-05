@@ -240,7 +240,7 @@ function cellButton(index, r, c, value, reveal) {
   };
   paint(value);
   button.addEventListener('click', () => {
-    cancelPendingShare();
+    cancelPendingShare(true);
     input[index] = (input[index]+2)%3-1; paint(input[index]); $('answer-status').textContent = '';
   });
   return button;
@@ -310,7 +310,7 @@ function edgeButton(edge, index, value, reveal, offset = 0) {
     button.setAttribute('aria-label', `${horizontal ? '横辺' : '縦辺'} ${edge[0]+1}行${edge[1]+1}列: ${value === -1 ? '未入力' : value === 0 ? '線なし' : '線あり'}${artifact && fixed.has(target) ? '（固定ヒント）' : ''}`);
   };
   paint(value);
-  button.addEventListener('click', () => {cancelPendingShare(); input[target] = (input[target]+2)%3-1; paint(input[target]); $('answer-status').textContent = '';});
+  button.addEventListener('click', () => {cancelPendingShare(true); input[target] = (input[target]+2)%3-1; paint(input[target]); $('answer-status').textContent = '';});
   return button;
 }
 function renderLoop(reveal, channels) {
@@ -372,12 +372,12 @@ function chooseProfile(startRefresh = true, isolated = false) {
   buildControls(); $('recipe-fields').disabled = false; if (startRefresh) refresh();
 }
 $('family').addEventListener('change', () => chooseProfile());
-form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(); rememberCurrentSettings(); clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
+form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(true); rememberCurrentSettings(); clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
   timer = setTimeout(refresh, 120);});
 form.addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(timer);
   if (!plan || !form.reportValidity()) return;
-  cancelPendingShare(); ++revision; clearArtifact(); renderBoard(); form.inert = true; $('generate').disabled = true;
+  cancelPendingShare(true); ++revision; clearArtifact(); renderBoard(); form.inert = true; $('generate').disabled = true;
   $('status').textContent = '生成・唯一解検証中…';
   try {
     const request = readRequest(), result = await post('/api/generate', request);
@@ -420,7 +420,7 @@ form.addEventListener('submit', async event => {
 });
 $('check').addEventListener('click', async () => {
   if (!artifact) return;
-  cancelPendingShare();
+  cancelPendingShare(true);
   if (input.includes(-1)) {$('answer-status').textContent = '未入力のマスまたは辺があります。'; return;}
   form.inert = $('board').inert = $('answer-buttons').inert = true;
   $('answer-status').textContent = 'サーバーでルールとヒントを確認中…';
@@ -437,7 +437,7 @@ $('check').addEventListener('click', async () => {
 });
 $('reveal').addEventListener('click', () => {
   if (!artifact) return;
-  cancelPendingShare();
+  cancelPendingShare(true);
   const show = $('reveal').textContent === '答えを表示'; renderBoard(show);
   $('reveal').textContent = show ? '自分の解答へ戻る' : '答えを表示';
 });
@@ -556,7 +556,7 @@ function validateSharedControls(request) {
     ({$, form, profile, selected, hints, artifact} = saved); validatingShare = false;
   }
 }
-let shareNavigation = 0, catalogReady = false, sharePending = false, currentSettingsUrl;
+let shareNavigation = 0, catalogReady = false, sharePending = false, currentSettingsUrl, divergedFromCurrentEntry = false;
 const historyKey = 'puzzleBoxShareSettingsV1';
 function rememberCurrentSettings() {
   if (!catalogReady || location.href !== currentSettingsUrl || form.inert) return;
@@ -567,7 +567,8 @@ function rememberCurrentSettings() {
     history.replaceState({...state, [historyKey]: readRequest()}, '');
   } catch {} // The browser may reject history updates or an unfinished grid.
 }
-function cancelPendingShare() {
+function cancelPendingShare(changed = false) {
+  if (changed && location.href !== currentSettingsUrl) divergedFromCurrentEntry = true;
   if (!sharePending) return false;
   ++shareNavigation; sharePending = false;
   $('share-status').textContent = '作業が変更されたため、共有設定の読み込みを中止しました。';
@@ -576,7 +577,7 @@ function cancelPendingShare() {
 async function restoreSharedSettings() {
   const hash = location.hash, navigation = ++shareNavigation;
   const remembered = !hash ? history.state?.[historyKey] : undefined;
-  if (!hash && !remembered) {sharePending = false; currentSettingsUrl = location.href; rememberCurrentSettings(); return;}
+  if (!hash && !remembered) {sharePending = false; currentSettingsUrl = location.href; divergedFromCurrentEntry = false; rememberCurrentSettings(); return;}
   sharePending = true;
   try {
     const request = remembered || decodeSharedSettings(hash);
@@ -586,7 +587,7 @@ async function restoreSharedSettings() {
     assertRenderablePlan(result.plan, request);
     if (navigation !== shareNavigation || hash !== location.hash || form.inert) return;
     applySharedSettings(request);
-    currentSettingsUrl = location.href; $('share-url').value = ''; rememberCurrentSettings();
+    currentSettingsUrl = location.href; divergedFromCurrentEntry = false; $('share-url').value = ''; rememberCurrentSettings();
     $('share-status').textContent = '共有された設定を読み込みました。';
     return true;
   } catch {
@@ -616,7 +617,7 @@ $('share-settings').addEventListener('click', async () => {
 // Leave the current work intact unless the destination passes validation.
 window.addEventListener('hashchange', async event => {
   if (!catalogReady) return; // Initial loading reads the latest location.
-  if (location.href === currentSettingsUrl) {++shareNavigation; sharePending = false; rememberCurrentSettings(); return;}
+  if (location.href === currentSettingsUrl && !divergedFromCurrentEntry) {++shareNavigation; sharePending = false; rememberCurrentSettings(); return;}
   if (form.inert) {++shareNavigation; sharePending = false; $('share-status').textContent = '処理中は共有設定に移動できません。処理後にURLを開き直してください。'; return;}
   if (await restoreSharedSettings()) refresh();
 });
