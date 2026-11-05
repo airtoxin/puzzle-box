@@ -31,7 +31,7 @@
           <p class="note">不要なヒントは生成時に削減します。数だけで一意にならないときは、セルや辺の固定ヒントも選んでください。</p></section>
         <div class="share-settings"><button id="share-settings" type="button">設定の共有URLを作成</button>
           <label class="parameter" for="share-url">共有URL</label><input id="share-url" type="text" readonly>
-          <p class="note">URLには選択した設定が含まれます。公開してよい内容だけを共有してください。完成問題や解答途中の状態は含まれません。</p>
+          <p class="note">設定URLは同じ条件で新しい問題を生成します。URLには選択した設定が含まれます。公開してよい内容だけを共有してください。完成問題や解答途中の状態は含まれません。</p>
           <p id="share-status" role="status" aria-live="polite"></p>
           <p id="navigation-status" role="status" aria-live="polite"></p>
           <button id="load-shared-settings" type="button" hidden>URLの設定を読み込む（現在の問題・回答は消えます）</button></div>
@@ -55,7 +55,8 @@
         <button id="retry-plan" type="button" hidden>プレビューを再試行</button>
         <div id="actions" hidden><p class="note" id="entry-note"></p>
           <div class="actions" id="answer-buttons"><button type="button" id="check">解答を確認</button><button type="button" id="reveal">答えを表示</button>
-            <button type="button" id="download">問題JSONを保存</button></div><p id="answer-status" role="status"></p></div>
+            <button type="button" id="share-puzzle">この問題の共有URLを作成</button>
+              <button type="button" id="download">問題JSONを保存</button></div><label for="puzzle-url">問題の共有URL</label><input id="puzzle-url" type="text" readonly><p class="note">同じ盤面とヒント、設定をURLに含めます。公開してよい内容だけ共有してください。途中の回答や答えは含まれません。開く際に唯一解を検証します。</p><p id="puzzle-share-status" role="status"></p><p id="download-note" class="note" hidden>共有問題は唯一解を確認しますが、ヒントの既約性は再検証しないためJSON保存はできません。</p><p id="answer-status" role="status"></p></div>
         <details><summary>この実験でできること・できないこと</summary>
           <ul id="capabilities"><li>対応する盤面とルールを読み込み中です。</li></ul>
           <p>各盤面のカタログからルールとヒントを選びます。数字・部屋・丸などの指定欄は、必要とするルールを選ぶと表示されます。盤面の種類をまたぐ自由な混在、矢印配置の編集、自作Pythonのアップロードは未対応です。選べる組合せでも、条件の矛盾や計算予算により生成できない場合があります。</p>

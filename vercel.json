@@ -13,6 +13,7 @@
     {"source": "/api/catalog", "destination": "/api/index?operation=catalog"},
     {"source": "/api/plan", "destination": "/api/index?operation=plan"},
     {"source": "/api/generate", "destination": "/api/index?operation=generate"},
+    {"source": "/api/restore", "destination": "/api/index?operation=restore"},
     {"source": "/api/check", "destination": "/api/index?operation=check"}
   ],
   "headers": [{"source": "/(.*)", "headers": [
