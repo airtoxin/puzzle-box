@@ -39,9 +39,11 @@ for (const operation of ['generate', 'check']) for (const stage of ['headers', '
     await page.evaluate(({operation, stage}) => {window.__stallOperation = operation; window.__stallStage = stage;}, {operation, stage});
     await page.locator(operation === 'generate' ? '#generate' : '#check').click();
     await page.waitForFunction(() => window.__jobStarted);
-    await page.clock.fastForward((budget + 15) * 1000 - 1);
+    // The timer starts just before the mocked fetch; leave room for the few
+    // milliseconds spent observing that the request has started.
+    await page.clock.fastForward((budget + 15) * 1000 - 1000);
     expect(await page.evaluate(() => window.__jobAborted === true)).toBe(false);
-    await page.clock.fastForward(2);
+    await page.clock.fastForward(1001);
     await expect.poll(() => page.evaluate(() => window.__jobAborted)).toBe(true);
     const status = page.locator(operation === 'generate' ? '#status' : '#answer-status');
     await expect(status).toContainText('未確認');

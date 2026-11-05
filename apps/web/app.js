@@ -61,6 +61,16 @@ async function fetchJsonWithTimeout(path, options = {}, timeoutMs = 15000) {
       controller.abort(); // Do not leave an unread error response streaming.
       throw new Error('Service temporarily unavailable');
     }
+    if ((path === '/api/generate' || path === '/api/check') && !response.ok) {
+      // Only the API's explicit 409 busy response is actionable. A proxy or
+      // server error must never supply a definitive puzzle or answer verdict.
+      if (response.status === 409) {
+        const result = await response.json();
+        return result?.status === 'busy' ? {status: 'busy'} : {status: 'unconfirmed'};
+      }
+      controller.abort();
+      return {status: 'unconfirmed'};
+    }
     return await response.json();
   } finally {clearTimeout(timeout);}
 }
