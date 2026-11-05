@@ -42,6 +42,24 @@ test('one declared room editor renders boundaries and keeps rules through answer
   await page.locator('#rules textarea[data-kind="region-map"]').fill('0 x 0\n1 1 1');
   await expect(page.locator('#status')).toContainText('整数を空白');
   await expect(page.locator('#generate')).toBeDisabled();
+  // Restore a real generated and checked puzzle before changing its rooms, so
+  // the invalid preview must clear an existing board and answer verdict.
+  await configure(page);
+  const regenerated = page.waitForResponse('**/api/generate');
+  await page.locator('#generate').click();
+  const saved = await (await regenerated).json();
+  expect(saved.status).toBe('ok');
+  for (const [index, value] of saved.record.solution.flat().entries()) {
+    const cell = page.locator(`[data-cell-index="${index}"]`);
+    while (await cell.getAttribute('data-value') !== String(value)) await cell.click();
+  }
+  const rechecked = page.waitForResponse('**/api/check');
+  await page.locator('#check').click();
+  expect(await (await rechecked).json()).toEqual({status:'ok', correct:true});
+  await expect(page.locator('#actions')).toBeVisible();
+  await expect(page.locator('#board .cell')).toHaveCount(6);
+  await expect(page.locator('#answer-status')).not.toBeEmpty();
+
   const invalidRooms = [[0,1,0],[0,1,0]];
   const invalidPlan = page.waitForResponse(response => {
     if (!response.url().endsWith('/api/plan') || response.request().method() !== 'POST') return false;
