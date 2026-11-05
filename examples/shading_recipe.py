@@ -22,6 +22,8 @@ from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
 from puzzle_defs import NoColorAcrossRooms, AdjacentRoomCountsDiffer
 from puzzle_defs import RoomComponentCount, EqualRoomComponentSizes
+from puzzle_defs import ComponentAreaClues
+from puzzle_defs.puzzles.component_area_clues import DEFAULT_COMPONENT_AREAS
 from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
 from puzzle_defs.marker_layout import DEFAULT_ENDPOINT_MARKERS, MarkerGrid, marker_grid
 from puzzle_defs.run_clue_layout import DEFAULT_BLACK_RUN_CLUES, RunClueGrid, run_clue_grid
@@ -48,7 +50,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
                       AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues, WhiteEndpointMarkers, AdjacentBlackRuns, RoomFillLevels,
-                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes)
+                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -82,12 +84,15 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "adjacent-room-counts-differ": AdjacentRoomCountsDiffer(DEFAULT_ROOMS),
             "room-component-count": RoomComponentCount(DEFAULT_ROOMS),
             "equal-room-component-sizes": EqualRoomComponentSizes(DEFAULT_ROOMS),
+            "component-area-clues": ComponentAreaClues(DEFAULT_COMPONENT_AREAS),
             "adjacent-black-component-sum": AdjacentBlackComponentSum(DEFAULT_COMPONENT_COUNTS),
             **{kind.ui.identifier: kind() for kind in PARAMETERLESS_RULE_TYPES}}
 
 
 def rule_record(rule: ShadingRule) -> dict[str, Any]:
     # A subclass may change apply(); serializing only its parent would lose rules.
+    if type(rule) is ComponentAreaClues:
+        return {"type":rule.ui.identifier,"component_areas":[list(row) for row in rule.component_areas]}
     if type(rule) is RoomComponentCount:
         return {"type":rule.ui.identifier,"rooms":[list(row) for row in rule.rooms],"count":rule.count,"black":rule.black}
     if type(rule) is RoomFillLevels or type(rule) is NoColorAcrossRooms or type(rule) is AdjacentRoomCountsDiffer or type(rule) is EqualRoomComponentSizes:
@@ -180,6 +185,11 @@ def read_rule(data: Any) -> ShadingRule:
         return AcyclicColor(data["black"])
     if kind == "components-touch-border" and set(data) == {"type", "black"}:
         return ComponentsTouchBorder(data["black"])
+    if kind == "component-area-clues":
+        if (set(data) != {"type","component_areas"} or type(data["component_areas"]) is not list
+                or any(type(row) is not list for row in data["component_areas"])):
+            raise ValueError("Component areas must be an array of arrays")
+        return ComponentAreaClues(number_grid(data["component_areas"]))
     if kind == "room-component-count":
         if (set(data) != {"type","rooms","count","black"} or type(data["rooms"]) is not list
                 or any(type(row) is not list for row in data["rooms"])):
@@ -291,6 +301,7 @@ def read_recipe(data: Any) -> ShadingRecipe:
     shared_island_areas(recipe)
     shared_endpoint_markers(recipe)
     shared_black_runs(recipe)
+    shared_component_areas(recipe)
     shared_neighbor_counts(recipe)
     shared_component_counts(recipe)
     if any((type(r) is BlackCount or type(r) is RoomBlackCount or type(r) is LineBlackCount)
@@ -384,4 +395,13 @@ def shared_black_runs(recipe: ShadingRecipe) -> RunClueGrid | None:
         run_clue_grid(grid, rows=recipe.rows, cols=recipe.cols)
     if grids and any(grid != grids[0] for grid in grids):
         raise ValueError("Black-run rules must share the same clues for this file/UI format")
+    return grids[0] if grids else None
+
+
+def shared_component_areas(recipe: ShadingRecipe) -> NumberGrid | None:
+    grids = [r.component_areas for r in recipe.rules if type(r) is ComponentAreaClues]
+    for grid in grids:
+        number_grid(grid,rows=recipe.rows,cols=recipe.cols)
+    if grids and any(grid != grids[0] for grid in grids):
+        raise ValueError("Component area rules must share the same numbers for this file/UI format")
     return grids[0] if grids else None

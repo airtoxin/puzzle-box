@@ -55,6 +55,7 @@ from puzzle_defs.puzzles.adjacent_black_runs import AdjacentBlackRuns
 from puzzle_defs.puzzles.room_fill_levels import RoomFillLevels
 from puzzle_defs.puzzles.room_neighbors import NoColorAcrossRooms, AdjacentRoomCountsDiffer
 from puzzle_defs.puzzles.room_components import RoomComponentCount, EqualRoomComponentSizes
+from puzzle_defs.puzzles.component_area_clues import ComponentAreaClues
 
 __all__ = [
     "AdjacentBlackRuns",
@@ -63,6 +64,7 @@ __all__ = [
     "AdjacentRoomCountsDiffer",
     "RoomComponentCount",
     "EqualRoomComponentSizes",
+    "ComponentAreaClues",
     "numbered_white_endpoints",
     "WhiteEndpointMarkers",
     "WhiteAreaClues",

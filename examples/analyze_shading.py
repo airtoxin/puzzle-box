@@ -31,6 +31,7 @@ from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
 from puzzle_defs import NoColorAcrossRooms, AdjacentRoomCountsDiffer
 from puzzle_defs import RoomComponentCount, EqualRoomComponentSizes
+from puzzle_defs import ComponentAreaClues
 from puzzle_defs import CornerConnectedColor, WhiteEndpointMarkers, AdjacentBlackRuns
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from generate_shading import RULES, clue_record, rule_record
@@ -60,6 +61,23 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is ComponentAreaClues:
+        for r in range(rows):
+            for c in range(cols):
+                area = rule.component_areas[r][c]
+                if not area:
+                    continue
+                color = (r,c) in black
+                seen,pending = set(),[(r,c)]
+                while pending:
+                    s,t = pending.pop()
+                    if ((s,t) in seen or not 0 <= s < rows or not 0 <= t < cols
+                            or (((s,t) in black) != color)):
+                        continue
+                    seen.add((s,t));pending.extend([(s-1,t),(s+1,t),(s,t-1),(s,t+1)])
+                if len(seen) != area:
+                    return False
+        return True
     if type(rule) is RoomComponentCount or type(rule) is EqualRoomComponentSizes:
         for label in {n for row in rule.rooms for n in row}:
             remaining = {(r,c) for r in range(rows) for c in range(cols)

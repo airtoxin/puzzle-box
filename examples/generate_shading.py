@@ -32,6 +32,7 @@ from puzzle_defs import (
     AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, RoomFillLevels,
     NoColorAcrossRooms, AdjacentRoomCountsDiffer,
     RoomComponentCount, EqualRoomComponentSizes,
+    ComponentAreaClues,
 )
 from puzzle_defs.puzzles.shading import CLUE_KINDS, Clue, ShadingRule
 from puzzle_defs.room_layout import RoomMap
@@ -40,7 +41,7 @@ from puzzle_defs.clue_layout import ClueGrid
 from puzzle_defs.run_clue_layout import RunClueGrid
 from shading_recipe import (RULES, DEFAULT_RULES, rule_choices, check_demo_size, check_distinct_paths,
                             load_recipe, read_rule, rule_record, shared_rooms, shared_numbers,
-                            shared_sight_counts, shared_island_areas, shared_neighbor_counts, shared_component_counts, shared_endpoint_markers, shared_black_runs)
+                            shared_sight_counts, shared_island_areas, shared_neighbor_counts, shared_component_counts, shared_endpoint_markers, shared_black_runs, shared_component_areas)
 from json_records import encode_json, load_json, read_array
 
 FORMAT = "puzzle-box/shading-v1"
@@ -78,6 +79,7 @@ def puzzle_record(recipe: ShadingRecipe, clues: list[Clue], *, seed: int,
     shared_island_areas(recipe)
     shared_endpoint_markers(recipe)
     shared_black_runs(recipe)
+    shared_component_areas(recipe)
     shared_neighbor_counts(recipe)
     shared_component_counts(recipe)
     _check_clue_kinds(recipe, clues)
@@ -161,6 +163,7 @@ def _read_record(data: dict[str, Any]) -> tuple[ShadingRecipe, list[Clue], list[
     shared_island_areas(recipe)
     shared_endpoint_markers(recipe)
     shared_black_runs(recipe)
+    shared_component_areas(recipe)
     shared_neighbor_counts(recipe)
     shared_component_counts(recipe)
     clues = [read_clue(clue, legacy=legacy) for clue in read_array(data["clues"], "clues")]
@@ -245,6 +248,8 @@ def _rule_text(rule: ShadingRule) -> str:
         color = "black" if rule.black else "white"
         empty = "at least one is required" if rule.nonempty else "absence is allowed"
         return f"All {color} cells connect through edges or corners (eight neighbors); {empty}. Other rules still use their own adjacency definitions."
+    if type(rule) is ComponentAreaClues:
+        return "Each positive clue fixes the area of its own same-color component; clue cells may be black or white, zero is absent, and repeated/unnumbered components are allowed."
     if type(rule) is RoomComponentCount:
         color = "black" if rule.black else "white"
         return f"Each room contains exactly {rule.count} {color} components using only edges inside that room."
@@ -295,14 +300,16 @@ def show(data: dict[str, Any], *, reveal: bool = False) -> str:
                           [_rule_text(rule) for rule in recipe.rules], reveal=reveal,
                           rooms=shared_rooms(recipe), numbers=shared_numbers(recipe), sight_counts=shared_sight_counts(recipe),
                           island_areas=shared_island_areas(recipe), neighbor_counts=shared_neighbor_counts(recipe),
-                          component_counts=shared_component_counts(recipe), endpoint_markers=shared_endpoint_markers(recipe), black_run_clues=shared_black_runs(recipe))
+                          component_counts=shared_component_counts(recipe), endpoint_markers=shared_endpoint_markers(recipe), black_run_clues=shared_black_runs(recipe),
+                          component_areas=shared_component_areas(recipe))
 
 
 def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[int]],
                    rules: list[str], *, reveal: bool = False, rooms: RoomMap | None = None,
                    numbers: NumberGrid | None = None, sight_counts: NumberGrid | None = None,
                    island_areas: NumberGrid | None = None, neighbor_counts: ClueGrid | None = None,
-                   component_counts: ClueGrid | None = None, endpoint_markers: NumberGrid | None = None, black_run_clues: RunClueGrid | None = None) -> str:
+                   component_counts: ClueGrid | None = None, endpoint_markers: NumberGrid | None = None, black_run_clues: RunClueGrid | None = None,
+                   component_areas: NumberGrid | None = None) -> str:
     """Presentation only: each format's caller must verify its full recipe first."""
     cells = [["?" for _ in range(cols)] for _ in range(rows)]
     for grid in (sight_counts, island_areas, endpoint_markers):
@@ -375,6 +382,9 @@ def _render_puzzle(rows: int, cols: int, clues: list[Clue], answer: list[list[in
     if component_counts is not None:
         lines.extend(["", "Fixed adjacent black-component area sums (. = no circle; 0 is a clue):"])
         lines.extend(" ".join("." if n is None else str(n) for n in row) for row in component_counts)
+    if component_areas is not None:
+        lines.extend(["", "Fixed containing-component areas (0 = absent; clue colors remain free):"])
+        lines.extend(" ".join(str(n) for n in row) for row in component_areas)
     return "\n".join(lines)
 
 
