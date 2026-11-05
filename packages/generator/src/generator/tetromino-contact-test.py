@@ -200,8 +200,9 @@ def test_full_100_cell_board_preserves_rotated_shape_contacts():
     rule = NoTouchingEqualTetrominoes(rooms)
     first = {(3,0),(4,0),(4,1),(4,2)}
     same_touching = {(5,0),(6,0),(6,1),(6,2)}
+    rotated_touching = {(5,1),(6,1),(7,0),(7,1)}
     different_touching = {(5,1),(6,0),(6,1),(6,2)}
-    for second, expected in [(same_touching, False), (different_touching, True)]:
+    for second, expected in [(same_touching, False), (rotated_touching, False), (different_touching, True)]:
         bits = tuple(int((r,c) in first|second) for r in range(10) for c in range(10))
         assert oracle.accepts(rule,bits,10,10) == expected
         puzzle = ShadingRecipe(10,10,(rule,)).build_from_clues(
