@@ -42,8 +42,46 @@ test('one declared room editor renders boundaries and keeps rules through answer
   await page.locator('#rules textarea[data-kind="region-map"]').fill('0 x 0\n1 1 1');
   await expect(page.locator('#status')).toContainText('整数を空白');
   await expect(page.locator('#generate')).toBeDisabled();
+  // Restore a real generated and checked puzzle before changing its rooms, so
+  // the invalid preview must clear an existing board and answer verdict.
+  await configure(page);
+  const regenerated = page.waitForResponse('**/api/generate');
+  await page.locator('#generate').click();
+  const saved = await (await regenerated).json();
+  expect(saved.status).toBe('ok');
+  for (const [index, value] of saved.record.solution.flat().entries()) {
+    const cell = page.locator(`[data-cell-index="${index}"]`);
+    while (await cell.getAttribute('data-value') !== String(value)) await cell.click();
+  }
+  const rechecked = page.waitForResponse('**/api/check');
+  await page.locator('#check').click();
+  expect(await (await rechecked).json()).toEqual({status:'ok', correct:true});
+  await expect(page.locator('#actions')).toBeVisible();
+  await expect(page.locator('#board .cell')).toHaveCount(6);
+  await expect(page.locator('#answer-status')).not.toBeEmpty();
+
+  const invalidRooms = [[0,1,0],[0,1,0]];
+  const invalidPlan = page.waitForResponse(response => {
+    if (!response.url().endsWith('/api/plan') || response.request().method() !== 'POST') return false;
+    const request = response.request().postDataJSON();
+    return request.rules.some(rule => JSON.stringify(rule.parameters.rooms) === JSON.stringify(invalidRooms));
+  });
   await page.locator('#rules textarea[data-kind="region-map"]').fill('0 1 0\n0 1 0');
-  await expect(page.locator('#status')).toContainText('orthogonally connected');
+  const rejected = await invalidPlan;
+  expect(rejected.status()).toBe(400);
+  const rejection = await rejected.json();
+  expect(rejection.status).toBe('invalid');
+  if (process.env.PUZZLE_WEB_URL) {
+    // The public API intentionally omits internal exception details.
+    expect(rejection).toEqual({status:'invalid', message:'Invalid request, unsupported recipe, or budget outside 1..10 seconds'});
+  } else {
+    expect(rejection.message).toContain('orthogonally connected');
+  }
+  await expect(page.locator('#status')).toContainText(rejection.message);
+  await expect(page.locator('#generate')).toBeDisabled();
+  await expect(page.locator('#board')).toBeEmpty();
+  await expect(page.locator('#actions')).toBeHidden();
+  await expect(page.locator('#answer-status')).toBeEmpty();
   await page.locator('#rules textarea[data-kind="region-map"]').fill('0 0 0\n1 1 1');
   await expect(page.locator('#generate')).toBeEnabled();
   await page.setViewportSize({width:390,height:844});
