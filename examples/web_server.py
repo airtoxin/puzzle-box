@@ -13,6 +13,7 @@ from typing import Any, cast
 from json_records import _constant, _finite_float, _object
 from web_catalog import catalog, read_request
 from web_answers import read_check
+from web_restore import read_restore
 from web_assets import ASSET_TYPES
 from web_result import worker_response
 from web_limits import MAX_BODY
@@ -26,11 +27,11 @@ def run_generation(data: Any) -> dict[str, Any]:
     return run_job(data)
 
 
-def run_job(data: Any, *, check: bool = False) -> dict[str, Any]:
-    request = read_check(data) if check else read_request(data)
+def run_job(data: Any, *, check: bool = False, restore: bool = False) -> dict[str, Any]:
+    request = read_restore(data) if restore else read_check(data) if check else read_request(data)
     try:
         result = subprocess.run(
-            [sys.executable, str(ROOT / "examples/web_worker.py"), *( ["--check"] if check else [])], input=json.dumps(data),
+            [sys.executable, str(ROOT / "examples/web_worker.py"), *( ["--restore"] if restore else ["--check"] if check else [])], input=json.dumps(data),
             capture_output=True, text=True, encoding="utf-8", cwd=ROOT, timeout=request.budget,
             env=dict(os.environ, PYTHONHASHSEED="0", PYTHONIOENCODING="utf-8"),
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
@@ -39,7 +40,7 @@ def run_job(data: Any, *, check: bool = False) -> dict[str, Any]:
             return {"status": "unconfirmed"}
         response = json.loads(result.stdout, object_pairs_hook=_object,
                               parse_constant=_constant, parse_float=_finite_float)
-        return worker_response(response, request, data, check=check)
+        return worker_response(response, request, data, check=check, restore=restore)
     except subprocess.TimeoutExpired:
         # run() kills and reaps the worker. OS startup/cleanup may exceed the
         # budget; this is not a CPU, memory, or arbitrary-code sandbox.
@@ -138,13 +139,13 @@ class Handler(BaseHTTPRequestHandler):
                 or self.headers.get_content_type() != "application/json"):
             self.json_response(403, {"status": "forbidden"})
             return
-        if self.path not in ("/api/plan", "/api/generate", "/api/check"):
+        if self.path not in ("/api/plan", "/api/generate", "/api/check", "/api/restore"):
             self.json_response(404, {"status": "not_found"})
             return
         try:
             data = json.loads(raw.decode("utf-8"), object_pairs_hook=_object,
                               parse_constant=_constant, parse_float=_finite_float)
-            request = read_check(data) if self.path == "/api/check" else read_request(data)
+            request = read_restore(data) if self.path == "/api/restore" else read_check(data) if self.path == "/api/check" else read_request(data)
         except (ValueError, RecursionError, TimeoutError) as exc:
             self.json_response(400, {"status": "invalid", "message": str(exc)})
             return
@@ -154,7 +155,7 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response(409, {"status": "busy"})
         else:
             try:
-                self.json_response(200, run_job(data, check=True) if self.path == "/api/check" else run_generation(data))
+                self.json_response(200, run_job(data, restore=True) if self.path == "/api/restore" else run_job(data, check=True) if self.path == "/api/check" else run_generation(data))
             finally:
                 self.application.generation_lock.release()
 

@@ -126,12 +126,20 @@ def _record_ok(response: dict[str, Any], request: Request) -> bool:
             and set(clues) <= set(possible))
 
 
-def worker_response(response: Any, request: Request, data: Any, *, check: bool) -> dict[str, Any]:
+def worker_response(response: Any, request: Request, data: Any, *, check: bool, restore: bool = False) -> dict[str, Any]:
     """Admit coherent transport outcomes, without re-solving mathematical claims."""
     unknown = {'status': 'unconfirmed'}
     try:
         if type(response) is not dict: return unknown
         status = response.get('status')
+        if restore:
+            if status in ('unconfirmed', 'invalid_puzzle'): return {'status': status}
+            if (status != 'ok' or not same_json(response.get('plan'), request.plan)
+                    or not same_json(response.get('request'), data['request'])
+                    or not same_json(response.get('clues'), data['clues'])
+                    or not _record_ok(response, request)):
+                return unknown
+            return response
         if check:
             if status == 'unconfirmed': return response
             return response if status == 'ok' and type(response.get('correct')) is bool else unknown

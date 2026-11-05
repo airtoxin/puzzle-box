@@ -46,7 +46,10 @@ if __name__ == "__main__":
         # The parent re-encodes JSON with ASCII escapes, which can expand a
         # single UTF-8 byte into at most six characters. Keep stdin bounded.
         data = json.loads(sys.stdin.read(6 * MAX_BODY + 1))
-        if sys.argv[1:] == ["--check"]:
+        if sys.argv[1:] == ["--restore"]:
+            from web_restore import restore
+            result = restore(data)
+        elif sys.argv[1:] == ["--check"]:
             from web_answers import check_answer
             result = check_answer(data)
         else:
