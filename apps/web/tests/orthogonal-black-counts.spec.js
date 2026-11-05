@@ -117,6 +117,25 @@ test('endpoint circles keep the count and answer mark visible',async({page})=>{
   await expect(cell.locator('.cell-mark')).toBeVisible();
 });
 
+test('numbered white endpoints coexist with independent orthogonal counts',async({page})=>{
+  await start(page);await page.getByLabel(field,{exact:true}).fill('1 . .\n. . .');
+  await page.getByLabel('丸を白の端点と一致させる',{exact:true}).check();
+  await page.getByLabel('端点の丸（0は丸なし、1は丸あり）',{exact:true}).fill('1 0 0\n0 0 1');
+  await page.getByLabel('数字から見える白マス数を固定',{exact:true}).check();
+  await page.getByLabel('見える白マス数（0は指定なし）',{exact:true}).fill('3 0 0\n0 0 2');
+  await expect(page.locator('#generate')).toBeEnabled();
+  const generated=page.waitForResponse('**/api/generate');await page.locator('#generate').click();
+  const data=await (await generated).json();expect(data.status).toBe('ok');
+  expect(data.record.solution).toEqual([[0,0,0],[1,1,0]]);
+  await enterAndCheck(page,data);await page.setViewportSize({width:390,height:844});
+  const cell=page.locator('[data-cell-index="0"]');await expect(cell).toHaveClass(/endpoint-marked/);
+  await expect(cell.locator('.orthogonal-number')).toHaveText('接1');
+  await expect(cell.locator('.sight-number')).toHaveText('3');
+  const boxes=await Promise.all(['.orthogonal-number','.sight-number','.cell-mark'].map(selector=>cell.locator(selector).boundingBox()));
+  for(let i=0;i<boxes.length;i++) for(let j=i+1;j<boxes.length;j++) expect(separate(boxes[i],boxes[j])).toBe(true);
+  await page.locator('#board').screenshot({path:test.info().outputPath('orthogonal-numbered-endpoints.png')});
+});
+
 for(const change of ['missing','changed','zero-to-null','unrequested']) test(`${change} orthogonal count plan is rejected`,async({page})=>{
   await start(page);if(change==='zero-to-null') await page.getByLabel(field,{exact:true}).fill('0 . .\n. . .');
   if(change==='unrequested') await page.getByLabel(title,{exact:true}).uncheck();
