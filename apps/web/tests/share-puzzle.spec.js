@@ -176,3 +176,17 @@ test('initial timeout offers to retry the puzzle link', async ({page, browser}) 
   await recipient.locator('#load-shared-settings').click(); await expect(recipient.locator('#actions')).toBeVisible();
   await expect(recipient.locator('#share-status')).toContainText('問題を読み込みました'); await context.close();
 });
+
+
+test('restoring a puzzle clears a previous preview retry', async ({page, browser}) => {
+  const context=await browser.newContext(); const sender=await context.newPage();
+  await sender.goto('/'); await expect(sender.locator('#generate')).toBeEnabled(); await sender.locator('#generate').click();
+  await expect(sender.locator('#actions')).toBeVisible(); await sender.locator('#share-puzzle').click(); const url=await sender.locator('#puzzle-url').inputValue();
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.route('**/api/plan', route => route.fulfill({status:503}));
+  await page.locator('#seed').fill('9'); await expect(page.locator('#retry-plan')).toBeVisible();
+  await page.evaluate(hash => {location.hash=hash;}, new URL(url).hash);
+  await page.locator('#load-shared-settings').click(); await expect(page.locator('#actions')).toBeVisible();
+  await expect(page.locator('#retry-plan')).toBeHidden();
+  await context.close();
+});

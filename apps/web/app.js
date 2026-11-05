@@ -417,6 +417,7 @@ $('family').addEventListener('change', () => chooseProfile());
 form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(); ++settingsRevision; clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
   timer = setTimeout(refresh, 120);});
 function installPuzzle(request, result, restored = false) {
+$('retry-plan').hidden = true;
 $('download').disabled = restored;
 $('download-note').hidden = !restored;
 assertRenderablePlan(result.plan, request);
