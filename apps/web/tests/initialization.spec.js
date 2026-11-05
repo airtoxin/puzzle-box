@@ -170,3 +170,35 @@ test('a preview response with a stalled JSON body times out', async ({page}) => 
   await expect(page.locator('#board .cell')).toHaveCount(12);
   await expect(page.locator('#generate')).toBeEnabled();
 });
+
+for (const operation of ['catalog', 'plan']) {
+  test(`a rejected ${operation} response aborts its unread body`, async ({page}) => {
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch;
+      window.fetch = (path, options) => {
+        if (path !== window.__rejectOperation || !window.__rejectEnabled) return originalFetch(path, options);
+        const body = new ReadableStream({start(controller) {
+          options.signal.addEventListener('abort', () => {
+            window.__rejectedBodyAborted = true;
+            controller.error(new DOMException('Aborted', 'AbortError'));
+          });
+        }});
+        return Promise.resolve(new Response(body, {status: path === '/api/catalog' ? 503 : 429}));
+      };
+    });
+    if (operation === 'catalog') {
+      await page.addInitScript(() => {window.__rejectOperation = '/api/catalog'; window.__rejectEnabled = true;});
+    }
+    await page.goto('/');
+    if (operation === 'plan') {
+      await expect(page.locator('#generate')).toBeEnabled();
+      await page.evaluate(() => {window.__rejectOperation = '/api/plan'; window.__rejectEnabled = true;});
+      await page.locator('#rows').fill('4');
+    }
+    const retry = page.locator(`#retry-${operation}`);
+    await expect(retry).toBeVisible();
+    await expect.poll(() => page.evaluate(() => window.__rejectedBodyAborted === true)).toBe(true);
+    await page.evaluate(() => {window.__rejectEnabled = false;});
+    await retry.click(); await expect(page.locator('#generate')).toBeEnabled();
+  });
+}

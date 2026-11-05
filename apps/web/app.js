@@ -57,8 +57,10 @@ async function fetchJsonWithTimeout(path, options = {}) {
   try {
     const response = await fetch(path, {...options, signal: controller.signal});
     if (path === '/api/catalog' ? !response.ok
-      : response.status === 408 || response.status === 429 || response.status >= 500)
+      : response.status === 408 || response.status === 429 || response.status >= 500) {
+      controller.abort(); // Do not leave an unread error response streaming.
       throw new Error('Service temporarily unavailable');
+    }
     return await response.json();
   } finally {clearTimeout(timeout);}
 }
