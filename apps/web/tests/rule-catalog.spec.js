@@ -105,3 +105,20 @@ test('loading shared settings while searching retains the query and selected rul
   await expect(page.locator('[data-rule-id="no-black-2x2"]')).toBeVisible();
   await expect(page.locator('[data-rule-id="no-black-2x2"] input[type=checkbox]')).toBeChecked();
 });
+
+test('loading a shared puzzle during a search keeps selected rules visible', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#generate').click(); await expect(page.locator('#actions')).toBeVisible();
+  await page.locator('#share-puzzle').click();
+  const url = await page.locator('#puzzle-url').inputValue();
+  expect(url).toContain('#puzzle-v1=');
+  await page.locator('[data-rule-id="count"] input[type=checkbox]').uncheck();
+  const search = page.locator('#rule-search'); await search.fill('不一致xyz');
+  await page.evaluate(hash => {location.hash = hash;}, new URL(url).hash);
+  await page.locator('#load-shared-settings').click();
+  await expect(page.locator('#actions')).toBeVisible({timeout:45000});
+  await expect(page.locator('#share-status')).toContainText('読み込みました');
+  await expect(search).toHaveValue('不一致xyz');
+  await expect(page.locator('[data-rule-id="count"]')).toBeVisible();
+  await expect(page.locator('[data-rule-id="count"] input[type=checkbox]')).toBeChecked();
+});
