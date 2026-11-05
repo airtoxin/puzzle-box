@@ -46,3 +46,25 @@ test('empty target colors are permitted and the Boolean changes the actual const
     expect(data.record.rules.find(r=>r.type==='corner-linked-components').black).toBe(black);
   }
 });
+
+test('six by six corner-linked puzzle renders and checks both answers',async({page})=>{
+  await start(page);
+  await page.locator('#rows').fill('6');
+  await page.locator('#cols').fill('6');
+  await page.getByLabel('黒マス数',{exact:true}).fill('6');
+  await page.locator('#budget').fill('30');
+  const generated=page.waitForResponse('**/api/generate');
+  await page.locator('#generate').click();
+  const data=await (await generated).json();expect(data.status).toBe('ok');
+  await expect(page.locator('#board [data-cell-index]')).toHaveCount(36);
+  for(let i=0;i<36;i++) {
+    const cell=page.locator(`[data-cell-index="${i}"]`);
+    if(await cell.isEnabled()) while(await cell.getAttribute('data-value')!==String(data.record.solution.flat()[i])) await cell.click();
+  }
+  let checked=page.waitForResponse('**/api/check');await page.locator('#check').click();
+  expect(await (await checked).json()).toEqual({status:'ok',correct:true});
+  const editable=page.locator('#board [data-cell-index]:enabled').first();
+  await expect(editable).toBeVisible();await editable.click();
+  checked=page.waitForResponse('**/api/check');await page.locator('#check').click();
+  expect(await (await checked).json()).toEqual({status:'ok',correct:false});
+});
