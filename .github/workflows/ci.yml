@@ -47,7 +47,8 @@ jobs:
   web:
     name: Web / Chromium
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Allow for slow package mirrors as well as the separately bounded suite.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -66,6 +67,8 @@ jobs:
       - run: npm ci --ignore-scripts
         working-directory: apps/web
       - run: npx playwright install --with-deps chromium
+        # Keep dependency installation bounded independently of the test suite.
+        timeout-minutes: 8
         working-directory: apps/web
       - run: npm test
         working-directory: apps/web
