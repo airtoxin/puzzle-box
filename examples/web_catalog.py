@@ -8,6 +8,7 @@ from puzzle_defs import (ShadingRecipe,
 from puzzle_defs.puzzles.shading import CLUE_UI, ClueKind
 from puzzle_defs.puzzles.slitherlink_recipe import LoopClueKind
 from puzzle_defs.puzzles.yajilin_recipe import YajilinClueKind
+from puzzle_defs.run_clue_layout import RunClueGrid
 from puzzle_defs.ui import merge_requirements
 from shading_recipe import (BUILT_IN_RULE_TYPES, MAX_RECIPE_RULES, shared_rooms, shared_numbers,
                             shared_sight_counts, shared_island_areas, shared_neighbor_counts, shared_component_counts, shared_endpoint_markers, shared_black_runs, shared_component_areas, shared_orthogonal_counts)
@@ -25,6 +26,38 @@ LOOP_RENDERERS = {"answer": "binary-edges", "cell-counts": "cell-edge-counts", "
 LOOP_CLUES = (CellEdgeCountClue.ui, EdgeStateClue.ui)
 COUPLED_RENDERERS = {"answer-cells": "binary-cells", "answer-edges": "binary-edges",
                      "givens": "cell-givens", "edge-givens": "edge-givens"}
+
+# Server-side bindings between a declared channel and its fixed plan data.
+# The browser maintains its own capability checks because it can be deployed
+# independently. Each extractor still owns its grid's validation and sharing rules.
+SHADING_PLAN_GRIDS = (
+    ("rooms", "rooms", shared_rooms),
+    ("numbers", "numbers", shared_numbers),
+    ("sight-counts", "sight_counts", shared_sight_counts),
+    ("island-areas", "island_areas", shared_island_areas),
+    ("neighbor-counts", "neighbor_counts", shared_neighbor_counts),
+    ("component-counts", "component_counts", shared_component_counts),
+    ("endpoint-markers", "endpoint_markers", shared_endpoint_markers),
+    ("black-runs", "black_run_clues", shared_black_runs),
+    ("component-areas", "component_areas", shared_component_areas),
+    ("orthogonal-counts", "orthogonal_counts", shared_orthogonal_counts),
+)
+
+
+def shading_plan_grids(recipe: ShadingRecipe, channels: set[str]) -> dict[str, Any]:
+    """Export only declared fixed grids; reject missing or undeclared data."""
+    result: dict[str, Any] = {}
+    for channel, field, extract in SHADING_PLAN_GRIDS:
+        grid = extract(recipe)
+        if (grid is not None) != (channel in channels):
+            raise ValueError(f"Fixed grid and UI channel disagree: {channel}")
+        if grid is not None:
+            if channel == "black-runs":
+                runs = cast(RunClueGrid, grid)
+                result[field] = [[list(clue) if clue is not None else None for clue in row] for row in runs]
+            else:
+                result[field] = [list(row) for row in grid]
+    return result
 
 
 def catalog() -> dict[str, Any]:
@@ -117,26 +150,7 @@ def _read_shading(data: Any) -> Request:
     recipe = ShadingRecipe(rows, cols, tuple(rules), tuple(cast(ClueKind, h) for h in hints))
     plan = {"format": "puzzle-box/web-plan-v1", "rows": rows, "cols": cols,
             "requirements": asdict(merged), "rules": raw, "clue_kinds": hints}
-    if (rooms := shared_rooms(recipe)) is not None:
-        plan["rooms"] = [list(row) for row in rooms]
-    if (numbers := shared_numbers(recipe)) is not None:
-        plan["numbers"] = [list(row) for row in numbers]
-    if (counts := shared_sight_counts(recipe)) is not None:
-        plan["sight_counts"] = [list(row) for row in counts]
-    if (areas := shared_island_areas(recipe)) is not None:
-        plan["island_areas"] = [list(row) for row in areas]
-    if (neighbors := shared_neighbor_counts(recipe)) is not None:
-        plan["neighbor_counts"] = [list(row) for row in neighbors]
-    if (components := shared_component_counts(recipe)) is not None:
-        plan["component_counts"] = [list(row) for row in components]
-    if (markers := shared_endpoint_markers(recipe)) is not None:
-        plan["endpoint_markers"] = [list(row) for row in markers]
-    if (runs := shared_black_runs(recipe)) is not None:
-        plan["black_run_clues"] = [[list(c) if c is not None else None for c in row] for row in runs]
-    if (areas := shared_component_areas(recipe)) is not None:
-        plan["component_areas"] = [list(row) for row in areas]
-    if (counts := shared_orthogonal_counts(recipe)) is not None:
-        plan["orthogonal_counts"] = [list(row) for row in counts]
+    plan.update(shading_plan_grids(recipe, {channel.name for channel in merged.channels}))
     return Request(recipe, seed, budget, plan)
 
 

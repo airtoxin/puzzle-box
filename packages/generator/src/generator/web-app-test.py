@@ -51,6 +51,44 @@ def test_plan_merges_shared_cells_and_only_selected_hint_channels():
     assert api.read_request(data).plan["requirements"] == reduced
 
 
+def test_fixed_grid_declarations_are_bound_to_their_own_channels():
+    # Keep these semantic pairs explicit: several grids contain numbers but
+    # mean different things and must not become interchangeable.
+    pairs = {"rooms": "rooms", "numbers": "numbers", "counts": "sight-counts",
+             "areas": "island-areas", "neighbor_counts": "neighbor-counts",
+             "component_counts": "component-counts", "markers": "endpoint-markers",
+             "run_clues": "black-runs", "component_areas": "component-areas",
+             "orthogonal_counts": "orthogonal-counts"}
+    bindings = {channel for channel, _, _ in api.SHADING_PLAN_GRIDS}
+    assert bindings == set(pairs.values())
+    assert len(bindings) == len(api.SHADING_PLAN_GRIDS)
+    for kind in api.RULE_TYPES:
+        grids = {p.name for p in kind.ui.parameters if p.kind in
+                 {"region-map", "number-grid", "clue-grid", "marker-grid", "run-clue-grid"}}
+        assert grids <= pairs.keys(), kind.ui.identifier
+        channels = {c.name for c in kind.ui.requirements.channels} & bindings
+        assert channels == {pairs[name] for name in grids}, kind.ui.identifier
+
+
+def test_fixed_grid_bindings_reject_missing_or_undeclared_plan_data(monkeypatch):
+    data = request()
+    data["rules"] = [{"id": "adjacent-black-runs", "parameters": {
+        "run_clues": [[[2, 1], None, None], [None, None, [0]]]}}]
+    plan = api.read_request(data).plan
+    assert plan["black_run_clues"] == [[[1, 2], None, None], [None, None, [0]]]
+    assert "black-runs" in {c["name"] for c in plan["requirements"]["channels"]}
+
+    recipe = api.read_request(data).recipe
+    channels = {c["name"] for c in plan["requirements"]["channels"]}
+    with pytest.raises(ValueError, match="black-runs"):
+        api.shading_plan_grids(recipe, channels - {"black-runs"})
+    monkeypatch.setattr(api, "SHADING_PLAN_GRIDS", tuple(
+        (channel, field, (lambda recipe: None) if channel == "black-runs" else extract)
+        for channel, field, extract in api.SHADING_PLAN_GRIDS))
+    with pytest.raises(ValueError, match="black-runs"):
+        api.shading_plan_grids(recipe, channels)
+
+
 @pytest.mark.parametrize("requirements,match", [
     ([UiRequirements(), UiRequirements("vertices")], "Incompatible"),
     ([UiRequirements(channels=(UiChannel("answer", "numbers"),)), UiRequirements()], "Conflicting"),
