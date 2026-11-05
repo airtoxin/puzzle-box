@@ -248,3 +248,35 @@ test('a pending preview does not cancel a valid link navigation', async ({page})
   await expect(page.locator('#seed')).toHaveValue('7');
   await expect(page.locator('#generate')).toBeEnabled();
 });
+
+test('duplicate hashless history entries keep their own settings', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#seed').fill('1'); const first = await share(page);
+  await page.locator('#seed').fill('2'); const second = await share(page);
+  await page.locator('#seed').fill('0'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.evaluate(hash => {location.hash = hash;}, new URL(first).hash);
+  await expect(page.locator('#seed')).toHaveValue('1'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.evaluate(() => {location.hash = '';}); await expect(page).toHaveURL(/\/#?$/);
+  await page.locator('#seed').fill('3'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.evaluate(hash => {location.hash = hash;}, new URL(second).hash);
+  await expect(page.locator('#seed')).toHaveValue('2'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.goBack(); await expect(page.locator('#seed')).toHaveValue('3'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.goBack(); await expect(page.locator('#seed')).toHaveValue('1'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.goBack(); await expect(page.locator('#seed')).toHaveValue('0');
+});
+
+test('sharing while a link is loading cancels the pending restore', async ({page}) => {
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#seed').fill('7'); const url = await share(page);
+  await page.locator('#seed').fill('0'); await expect(page.locator('#generate')).toBeEnabled();
+  let release, started; const gate = new Promise(r => {release = r;});
+  const waiting = new Promise(r => {started = r;});
+  await page.route('**/api/plan', async route => {started(); await gate; await route.continue();});
+  await page.evaluate(hash => {location.hash = hash;}, new URL(url).hash); await waiting;
+  await page.locator('#share-settings').click();
+  await expect(page.locator('#share-status')).toContainText('中止');
+  release(); await expect(page.locator('#seed')).toHaveValue('0');
+  const shared = await page.locator('#share-url').inputValue();
+  const request = JSON.parse(Buffer.from(new URL(shared).hash.slice('#settings-v1='.length), 'base64url').toString());
+  expect(request.seed).toBe(0);
+});
