@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from typing import ClassVar
 
 from puzzle import Cell, Puzzle, SquareGrid, VarMap, non_touching, sum_expr
-from puzzle_defs.polyomino import Placement, different_shape_across, polyomino
+from puzzle_defs.polyomino import Placement, polyomino
 from puzzle_defs.regions import enumerate_connected_regions
 from puzzle_defs.room_layout import RoomMap, room_map
 from puzzle_defs.puzzles.room_fragments import ROOM_PARAMETER, ROOM_UI, _rooms
@@ -22,15 +22,15 @@ class NoTouchingEqualTetrominoes:
 
     ui: ClassVar[RuleUi] = RuleUi("no-touching-equal-tetrominoes", "同形テトロミノの部屋間接触を禁止",
         "各部屋の黒が連結4マスのとき、回転・反転して同じ形同士の辺接触を禁止します。黒数・部屋内連結は別ルールです。",
-        (ROOM_PARAMETER,), replace(ROOM_UI, max_cells=25))
+        (ROOM_PARAMETER,), replace(ROOM_UI, max_cells=100))
     rooms: RoomMap
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "rooms", room_map(self.rooms))
 
     def apply(self, puzzle: Puzzle, board: SquareGrid, black: VarMap) -> None:
-        if len(board.cells) > 25:
-            raise ValueError("Tetromino contacts support at most 25 board cells")
+        if len(board.cells) > 100:
+            raise ValueError("Tetromino contacts support at most 100 board cells")
         groups = _rooms(board, self.rooms)
         placements: list[Placement] = []
         members_by_placement: dict[Placement, list[Cell]] = {}
@@ -44,7 +44,10 @@ class NoTouchingEqualTetrominoes:
                 placements.append(placement)
                 members_by_placement[placement] = members
         active = puzzle.bool_var_map("room_tetromino", placements)
+        by_cell: dict[Cell, list[Placement]] = {cell: [] for cell in board.cells}
         for placement in placements:
+            for cell in placement.cells:
+                by_cell[cell].append(placement)
             members = members_by_placement[placement]
             mismatch = sum_expr(
                 [~black[c] for c in sorted(placement.cells)]
@@ -58,8 +61,9 @@ class NoTouchingEqualTetrominoes:
         for edge in board.edges:
             a, b = board.cells_sharing_edge(edge)
             if a in cells and b in cells and self.rooms[a.row][a.col] != self.rooms[b.row][b.col]:
-                pairs = different_shape_across(edge, active, placements, board).forbidden_pairs
+                pairs = [(left, right) for left in by_cell[a] for right in by_cell[b]
+                         if left.piece_name == right.piece_name]
                 # These are conditional black pieces, not a full-board tiling.
-                # Reuse geometric pair detection with the generic key constraint;
+                # The cell-to-placement index is built once for all boundaries;
                 # do not advertise region_partition/shape_class capabilities.
                 puzzle.add(non_touching(active, pairs))
