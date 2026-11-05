@@ -49,8 +49,25 @@ function readGrid(field) {
     throw new GridInputError(`${field.dataset.label}は、0（丸なし）か1（丸あり）で入力してください。`);
   return values;
 }
+// Catalog and preview requests are safe to retry. Their timeout includes both
+// headers and JSON body; generation and checking keep their existing budgets.
+async function fetchJsonWithTimeout(path, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(path, {...options, signal: controller.signal});
+    if (path === '/api/catalog' ? !response.ok
+      : response.status === 408 || response.status === 429 || response.status >= 500) {
+      controller.abort(); // Do not leave an unread error response streaming.
+      throw new Error('Service temporarily unavailable');
+    }
+    return await response.json();
+  } finally {clearTimeout(timeout);}
+}
 async function post(path, data) {
-  const response = await fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+  const options = {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)};
+  if (path === '/api/plan') return fetchJsonWithTimeout(path, options);
+  const response = await fetch(path, options);
   return response.json();
 }
 function clearArtifact() {
@@ -72,7 +89,7 @@ function syncParameters() {
 }
 async function refresh() {
   const current = ++revision;
-  clearArtifact(); plan = undefined; $('generate').disabled = true; syncParameters();
+  clearArtifact(); plan = undefined; $('generate').disabled = true; $('retry-plan').hidden = true; syncParameters();
   if (!form.checkValidity()) {
     $('status').textContent = '入力値を確認してください。'; $('board').replaceChildren(); return;
   }
@@ -99,7 +116,12 @@ async function refresh() {
     if (current === revision) {
       if (error instanceof UnsupportedUiError) rejectUnsupportedUi();
       else if (error instanceof GridInputError) {$('status').textContent = error.message; $('board').replaceChildren();}
-      else $('status').textContent = 'ローカルサーバーに接続できません。起動状態を確認してください。';
+      else {
+        $('status').textContent = 'プレビューを読み込めません。接続を確認して再試行してください。';
+        $('board').replaceChildren(); $('shape').textContent = '';
+        $('plan-note').textContent = 'プレビューを表示できません。';
+        $('retry-plan').hidden = false;
+      }
     }
   }
 }
@@ -326,10 +348,10 @@ function chooseProfile() {
   $('rows').max = $('cols').max = profile.board.max_cells;
   $('rows').min = profile.board.min_rows; $('cols').min = profile.board.min_cols;
   $('size-note').textContent = `最大${profile.board.max_cells}セル。選ぶルールにより上限が下がります。大きさとルールによっては時間内に生成できません。Seedが同じでも、環境の変更をまたぐ一致は保証しません。`;
-  buildControls(); refresh();
+  buildControls(); $('recipe-fields').disabled = false; refresh();
 }
 $('family').addEventListener('change', chooseProfile);
-form.addEventListener('input', () => {clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true;
+form.addEventListener('input', () => {clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
   timer = setTimeout(refresh, 120);});
 form.addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(timer);
@@ -393,17 +415,32 @@ $('download').addEventListener('click', () => {
   const url = URL.createObjectURL(new Blob([JSON.stringify(artifact.record, null, 2) + '\n'], {type: 'application/json'}));
   const link = node('a'); link.href = url; link.download = 'puzzle.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
-try {
-  const response = await fetch('/api/catalog'); catalog = await response.json();
-  if (catalog.format !== 'puzzle-box/web-catalog-v1') throw new Error('Unsupported catalog');
-  $('budget').max = catalog.limits.max_budget_seconds;
-  if (Number($('budget').value) > catalog.limits.max_budget_seconds) $('budget').value = catalog.limits.max_budget_seconds;
-  if (catalog.hosting) {
-    $('hosting-label').textContent = catalog.hosting.label + ' · セルと辺';
-    $('hosting-note').textContent = `小盤面のWeb実験。計算は1回${catalog.hosting.budget_seconds}秒まで。混雑時や利用枠の上限では使えない場合があります。`;
-  }
-  $('capabilities').replaceChildren(...catalog.profiles.map(p =>
-    node('li', `${p.label}：${p.rules.length}ルール、最大${p.board.max_cells}セル`)));
-  for (const p of catalog.profiles) {const option = node('option', p.label); option.value = p.id; $('family').append(option);}
-  chooseProfile();
-} catch { $('status').textContent = 'UI定義を読み込めません。対応するローカルサーバーの起動状態を確認してください。'; }
+async function loadCatalog() {
+  $('retry-catalog').hidden = true;
+  $('recipe-fields').disabled = true; form.setAttribute('aria-busy', 'true');
+  $('status').textContent = 'ルールを読み込んでいます…';
+  $('plan-note').textContent = 'ルールの宣言を読み込み中…';
+  try {
+    catalog = await fetchJsonWithTimeout('/api/catalog');
+    if (catalog.format !== 'puzzle-box/web-catalog-v1') throw new Error('Unsupported catalog');
+    $('budget').max = catalog.limits.max_budget_seconds;
+    if (Number($('budget').value) > catalog.limits.max_budget_seconds) $('budget').value = catalog.limits.max_budget_seconds;
+    if (catalog.hosting) {
+      $('hosting-label').textContent = catalog.hosting.label + ' · セルと辺';
+      $('hosting-note').textContent = `小盤面のWeb実験。計算は1回${catalog.hosting.budget_seconds}秒まで。混雑時や利用枠の上限では使えない場合があります。`;
+    }
+    $('capabilities').replaceChildren(...catalog.profiles.map(p =>
+      node('li', `${p.label}：${p.rules.length}ルール、最大${p.board.max_cells}セル`)));
+    $('family').replaceChildren();
+    for (const p of catalog.profiles) {const option = node('option', p.label); option.value = p.id; $('family').append(option);}
+    chooseProfile();
+  } catch {
+    $('recipe-fields').disabled = true;
+    $('status').textContent = 'ルールを読み込めません。接続を確認して再試行してください。';
+    $('plan-note').textContent = 'プレビューを表示できません。';
+    $('retry-catalog').hidden = false;
+  } finally { form.setAttribute('aria-busy', 'false'); }
+}
+$('retry-catalog').addEventListener('click', loadCatalog);
+$('retry-plan').addEventListener('click', () => {clearTimeout(timer); refresh();});
+loadCatalog();
