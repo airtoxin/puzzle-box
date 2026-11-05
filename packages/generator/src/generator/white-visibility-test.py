@@ -99,8 +99,8 @@ def test_data_is_immutable_exact_and_dimension_checked():
     with pytest.raises(ValueError,match="exact built-in"):
         codec.rule_record(type("Changed",(WhiteVisibilityCounts,),{})(DEFAULT_SIGHT_COUNTS))
     with pytest.raises(ValueError,match="dimensions"): ShadingRecipe(3,2,(rule,)).create_empty()
-    with pytest.raises(ValueError,match="25 board cells"):
-        ShadingRecipe(5,6,(WhiteVisibilityCounts(((0,)*6,)*5),)).create_empty()
+    with pytest.raises(ValueError,match="100 board cells"):
+        ShadingRecipe(1,101,(WhiteVisibilityCounts(((0,)*101,)),)).create_empty()
     recipe = ShadingRecipe(2,3,(rule,WhiteVisibilityCounts(((0,0,0),(0,0,0)))))
     with pytest.raises(ValueError,match="same sight counts"): codec.recipe_record(recipe)
     with pytest.raises(ValueError,match="same sight counts"): saved.puzzle_record(recipe,[],seed=0)
@@ -111,6 +111,36 @@ def request(recipe):
             "rules":[{"id":(r:=codec.rule_record(rule))["type"],
                       "parameters":{k:v for k,v in r.items() if k != "type"}} for rule in recipe.rules],
             "clue_kinds":list(recipe.clue_kinds),"seed":0,"budget_seconds":10}
+
+
+def test_sight_counts_generate_and_check_a_six_by_six_puzzle():
+    counts = [[0]*6 for _ in range(6)]
+    for r, c in ((0, 0), (2, 2), (4, 4)):
+        counts[r][c] = 4
+    data = {"format": api.FORMAT, "rows": 6, "cols": 6,
+        "rules": [{"id": "count", "parameters": {"count": 6}},
+                  {"id": "connected-white", "parameters": {"nonempty": True}},
+                  {"id": "non-touching", "parameters": {"diagonal": False}},
+                  {"id": "white-visibility-counts", "parameters": {"counts": counts}}],
+        "clue_kinds": ["cell", "row-count", "column-count"], "seed": 0, "budget_seconds": 10}
+    result = worker.generate_request(data)
+    assert result["status"] == "ok" and result["evidence"]["unique"] and result["evidence"]["irreducible"]
+    assert result["plan"]["requirements"]["max_cells"] == 100
+    answer = [bit for row in result["record"]["solution"] for bit in row]
+    assert accepts_counts(counts, answer) and saved.verify(result["record"])["unique"]
+    submission = {"format": checks.FORMAT, "request": data, "clues": result["clues"], "answer": answer}
+    assert checks.check_answer(submission) == {"status": "ok", "correct": True}
+    answer[0] = 1-answer[0]
+    assert checks.check_answer(submission) == {"status": "ok", "correct": False}
+
+
+def test_long_sight_ray_preserves_blockers_and_largest_storable_number():
+    rule = WhiteVisibilityCounts(((99,) + (0,)*99,))
+    recipe = ShadingRecipe(1, 100, (rule,))
+    for bits, expected in [((0,)*99+(1,), True), ((0,)*100, False), ((0,1)+(0,)*98, False)]:
+        puzzle = recipe.build_from_clues([(Cell(0, i), bit) for i, bit in enumerate(bits)])
+        assert (puzzle.solve(seed=0) is not None) == expected
+        assert accepts_counts(rule.counts, bits) == expected
 
 
 def test_kuromasu_composition_generates_unique_without_removing_fixed_numbers():

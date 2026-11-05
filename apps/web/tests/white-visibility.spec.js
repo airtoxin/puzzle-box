@@ -8,6 +8,34 @@ async function configure(page) {
   await expect(page.locator('#generate')).toBeEnabled();
 }
 
+test('sight counts work on a six by six board', async ({page}) => {
+  await page.goto('/');
+  await expect(page.locator('#board .cell')).toHaveCount(6);
+  await page.getByLabel('行数', {exact: true}).fill('6');
+  await page.getByLabel('列数', {exact: true}).fill('6');
+  await page.getByLabel('黒マス数', {exact: true}).fill('6');
+  await page.getByLabel('黒マスを離す', {exact: true}).check();
+  await page.getByLabel('数字から見える白マス数を固定', {exact: true}).check();
+  await page.getByLabel('見える白マス数（0は指定なし）', {exact: true})
+    .fill('4 0 0 0 0 0\n0 0 0 0 0 0\n0 0 4 0 0 0\n0 0 0 0 0 0\n0 0 0 0 4 0\n0 0 0 0 0 0');
+  await expect(page.locator('#board .cell')).toHaveCount(36);
+  await expect(page.locator('#generate')).toBeEnabled();
+  const generated = page.waitForResponse('**/api/generate');
+  await page.locator('#generate').click();
+  const data = await (await generated).json();
+  expect(data.status).toBe('ok');
+  expect(data.evidence).toMatchObject({unique: true, irreducible: true});
+  for (const [index, value] of data.record.solution.flat().entries()) {
+    const cell = page.locator('#board .cell').nth(index);
+    if (await cell.isEnabled()) {
+      while (await cell.getAttribute('data-value') !== String(value)) await cell.click();
+    }
+  }
+  const checked = page.waitForResponse('**/api/check');
+  await page.locator('#check').click();
+  expect(await (await checked).json()).toEqual({status: 'ok', correct: true});
+});
+
 test('sight counts, Hitori labels, and rooms have independent inputs and compose', async ({page}) => {
   const errors=[]; page.on('pageerror', e => errors.push(e.message));
   await configure(page);
