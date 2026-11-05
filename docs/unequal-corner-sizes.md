@@ -60,6 +60,7 @@ uv run --no-sync python examples/generate_shading.py verify nuribou.json
 保存IDは `unequal-corner-component-sizes`、パラメータは `black` だけで、厳密な真偽値が必要です。
 0・1・文字列・小数・null、未知・欠落フィールド、独自サブクラスの暗黙の保存を拒否します。
 旧読込器は新IDを拒否し、ファイルからimportや任意コードを実行しません。既存IDの意味は変更しません。
+Python・保存形式では同じルールを繰り返せますが、Web要求のID重複は既存仕様どおり拒否します。
 
 Python・保存形式・Webとも、この断片の盤面は9セル以下です。Webと有限診断は引き続き最大8ルールです。
 サイズ上限は成分候補の組合せを制限するためで、任意の大きさのぬりぼうに対応するものではありません。

@@ -107,6 +107,21 @@ def test_repeated_global_witnesses_do_not_follow_user_room_boundaries():
     p.add(unique()); assert p.solve(seed=0) is not None
 
 
+def test_identical_rule_occurrences_preserve_answers_and_saved_occurrences():
+    rule = UnequalCornerComponentSizes()
+    recipe = ShadingRecipe(2,3,(rule,rule))  # Reapply the same immutable instance.
+    expected = {b for b in product((0,1),repeat=6) if reference(b,2,3,True)}
+    assert all_answers(recipe) == expected
+    record = codec.recipe_record(recipe)
+    assert record["rules"] == [codec.rule_record(rule),codec.rule_record(rule)]
+    assert codec.read_recipe(record) == recipe
+    p = fixed(2,3,(1,1,0,0,1,1),rule,rule)
+    p.add(unique()); assert p.solve(seed=0) is not None
+    # Saved/Python rule occurrences and closed Web IDs have different contracts.
+    with pytest.raises(ValueError,match="duplicate"):
+        api.read_request(request(recipe))
+
+
 @pytest.mark.parametrize("bad",[0,1,None,"black",1.0])
 def test_strict_color_input(bad):
     with pytest.raises(ValueError): UnequalCornerComponentSizes(bad)
