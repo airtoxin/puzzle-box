@@ -96,6 +96,20 @@ test(`a ${side}x${side} generated board remains scrollable and operable at ${wid
   await last.focus(); await page.keyboard.press('Enter');
   await expect(last).toHaveAttribute('data-value', '1');
   await expect(last).toBeFocused();
+  // Tabbing must not leave a focused cell behind the sticky row clue.
+  async function expectFocusedCellVisible() {
+    const focused = page.locator('#board .cell:focus');
+    await expect(focused).toHaveCount(1);
+    const index = Number(await focused.getAttribute('data-cell-index'));
+    const clue = page.locator('#board th[scope="row"]').nth(Math.floor(index / side));
+    const [cellBox, clueBox, boardBox] = await Promise.all([focused.boundingBox(), clue.boundingBox(), board.boundingBox()]);
+    expect(cellBox.x).toBeGreaterThanOrEqual(clueBox.x + clueBox.width + 2);
+    expect(cellBox.x + cellBox.width).toBeLessThanOrEqual(boardBox.x + boardBox.width + 1);
+  }
+  for (const key of ['Shift+Tab', 'Tab']) for (let i = 0; i < side; i++) {
+    await page.keyboard.press(key);
+    await expectFocusedCellVisible();
+  }
   await expectContainedPage(page);
 });
 }

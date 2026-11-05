@@ -6,6 +6,12 @@ let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 
 const selected = new Map();
 const hints = new Map();
 const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid', 'run-clue-grid'];
+$('board').addEventListener('focusin', event => {
+  // Account for a sticky row clue even when the cell was already within the
+  // browser's ordinary scrollport and automatic focus scrolling did nothing.
+  if (event.target instanceof HTMLElement && event.target.matches('.cell, .edge'))
+    event.target.scrollIntoView({block:'nearest', inline:'nearest'});
+});
 class GridInputError extends Error {}
 function rejectUnsupportedUi() {
   plan = undefined; clearArtifact(); $('board').replaceChildren(); $('generate').disabled = true;

@@ -228,6 +228,7 @@ button:disabled {
 
 .board {
   overflow:auto;
+  scroll-padding-inline-start:2.5rem;
   padding:28px 0;
   min-height:230px;
   display:flex;
