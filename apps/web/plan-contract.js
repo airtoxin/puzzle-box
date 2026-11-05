@@ -7,6 +7,13 @@ const renderers = {
   coupled: {topology: 'rectangular-cell-centers', maxCells: 9, minSide: 2, required: ['answer-cells', 'answer-edges'],
     channels: {'answer-cells': 'binary-cells', 'answer-edges': 'binary-edges', givens: 'cell-givens', 'edge-givens': 'edge-givens'}},
 };
+// These are browser capabilities, not server declarations. A known channel
+// alone is insufficient if a selected clue needs a different, missing channel.
+const clueChannels = {
+  shading: {cell: 'givens', 'row-count': 'row-counts', 'column-count': 'column-counts'},
+  slitherlink: {'cell-count': 'cell-counts', edge: 'edge-givens'},
+  coupled: {black: 'givens', edge: 'edge-givens'},
+};
 export class UnsupportedUiError extends Error {}
 function checkedGrid(value, rows, cols, maximum, nullable = false) {
   if (!Array.isArray(value) || value.length !== rows || value.some(row => !Array.isArray(row)
@@ -48,6 +55,8 @@ export function assertRenderablePlan(candidate, request) {
     seen.add(channel.name);
   }
   if (renderer.required.some(name => !seen.has(name))) throw new UnsupportedUiError();
+  if (!Array.isArray(request.clue_kinds) || request.clue_kinds.some(clue =>
+    !Object.hasOwn(clueChannels[request.family], clue) || !seen.has(clueChannels[request.family][clue]))) throw new UnsupportedUiError();
   const requestedRuns = request.rules.filter(r => Object.hasOwn(r.parameters,'run_clues')).map(r => r.parameters.run_clues);
   if (seen.has('black-runs') !== (requestedRuns.length > 0) || !seen.has('black-runs') && candidate.black_run_clues !== undefined) throw new UnsupportedUiError();
   if (seen.has('black-runs')) {

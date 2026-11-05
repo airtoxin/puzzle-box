@@ -1,4 +1,14 @@
 import {test, expect} from '@playwright/test';
+import {assertRenderablePlan, UnsupportedUiError} from '../plan-contract.js';
+
+test('unselected clues do not require channels, and unknown clue kinds are rejected', () => {
+  const request = {family: 'shading', rows: 2, cols: 2, rules: [], clue_kinds: []};
+  const plan = {format: 'puzzle-box/web-plan-v2', family: 'shading', rows: 2, cols: 2,
+    requirements: {topology: 'rectangular-cells', max_cells: 100, min_rows: 1, min_cols: 1,
+      channels: [{name: 'answer', kind: 'binary-cells'}]}};
+  expect(() => assertRenderablePlan(plan, request)).not.toThrow();
+  expect(() => assertRenderablePlan(plan, {...request, clue_kinds: ['future-hint']})).toThrow(UnsupportedUiError);
+});
 
 test('unsupported coupled UI declarations stop preview and generation', async ({page}) => {
   const changes = [
@@ -54,6 +64,44 @@ test('known UI combinations accept channel reordering and wider advertised limit
     await expect(page.locator('.cell')).toHaveCount(cells);
     await expect(page.locator('.edge')).toHaveCount(edges);
   }
+});
+
+test('selected clues require their own supported display channels', async ({page}) => {
+  let missing;
+  await page.route('**/api/plan', async route => {
+    const result = await (await route.fetch()).json();
+    result.plan.requirements.channels = result.plan.requirements.channels.filter(c => c.name !== missing);
+    await route.fulfill({json: result});
+  });
+  for (const [family, channels] of [
+    ['shading', ['givens', 'row-counts', 'column-counts']],
+    ['slitherlink', ['cell-counts', 'edge-givens']],
+    ['coupled', ['givens', 'edge-givens']],
+  ]) {
+    for (missing of channels) {
+      await page.goto('/');
+      if (family !== 'shading') await page.locator('#family').selectOption(family);
+      await expect(page.locator('#generate')).toBeDisabled();
+      await expect(page.locator('#board')).toBeEmpty();
+      await expect(page.locator('#status')).toContainText('このUI定義には対応していません');
+    }
+  }
+});
+
+test('a generation plan missing a selected clue channel cannot expose the puzzle', async ({page}) => {
+  await page.goto('/');
+  await expect(page.locator('#generate')).toBeEnabled();
+  await page.route('**/api/generate', async route => {
+    const result = await (await route.fetch()).json();
+    expect(result.status).toBe('ok');
+    result.plan.requirements.channels = result.plan.requirements.channels.filter(c => c.name !== 'row-counts');
+    await route.fulfill({json: result});
+  });
+  await page.locator('#generate').click();
+  await expect(page.locator('#status')).toContainText('このUI定義には対応していません');
+  await expect(page.locator('#generate')).toBeDisabled();
+  await expect(page.locator('#board')).toBeEmpty();
+  await expect(page.locator('#actions')).toBeHidden();
 });
 
 test('a changed generation UI contract cannot expose an unsupported answer', async ({page}) => {
