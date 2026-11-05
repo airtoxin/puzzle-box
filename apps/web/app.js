@@ -2,7 +2,7 @@ import {UnsupportedUiError, canonicalRunClues, assertRenderablePlan, assertRende
 
 let $ = id => document.getElementById(id);
 let form = $('recipe-form');
-let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, timer;
+let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, settingsRevision = 0, timer;
 let selected = new Map();
 let hints = new Map();
 const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid', 'run-clue-grid'];
@@ -372,7 +372,7 @@ function chooseProfile(startRefresh = true, isolated = false) {
   buildControls(); $('recipe-fields').disabled = false; if (startRefresh) refresh();
 }
 $('family').addEventListener('change', () => chooseProfile());
-form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(); clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
+form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(); ++settingsRevision; clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
   timer = setTimeout(refresh, 120);});
 form.addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(timer);
@@ -574,7 +574,7 @@ async function restoreSharedSettings() {
     if (result.status !== 'ok') throw new Error('invalid plan');
     assertRenderablePlan(result.plan, request);
     if (navigation !== shareNavigation || hash !== location.hash || form.inert) return;
-    applySharedSettings(request);
+    applySharedSettings(request); ++settingsRevision;
     $('share-url').value = ''; $('load-shared-settings').hidden = true;
     $('navigation-status').textContent = ''; $('share-status').textContent = '共有された設定を読み込みました。';
     return true;
@@ -593,14 +593,14 @@ $('share-settings').addEventListener('click', async () => {
     if (!plan || $('generate').disabled || !form.reportValidity()) throw new Error('invalid');
     const cancelledShare = cancelPendingShare();
     const url = new URL(location.pathname, location.origin); url.hash = shareHash(readRequest());
-    const copiedRevision = revision;
+    const copiedRevision = settingsRevision;
     $('share-url').value = url.href;
     $('share-url').select();
     try {
       await navigator.clipboard.writeText(url.href);
-      $('share-status').textContent = copiedRevision === revision ? '共有URLをコピーしました。' : '設定変更前のURLがコピーされました。現在の設定で作り直してください。';
+      $('share-status').textContent = copiedRevision === settingsRevision ? '共有URLをコピーしました。' : '設定変更前のURLがコピーされました。現在の設定で作り直してください。';
     } catch {
-      $('share-status').textContent = copiedRevision === revision ? '共有URLを選択しました。コピーして共有してください。' : '設定が変更されました。URLを作り直してください。';
+      $('share-status').textContent = copiedRevision === settingsRevision ? '共有URLを選択しました。コピーして共有してください。' : '設定が変更されました。URLを作り直してください。';
     }
     if (cancelledShare) $('share-status').textContent += ' 共有設定の読み込みは中止しました。';
   } catch { $('share-status').textContent = '設定を確認してください。URLが長すぎる場合は設定を減らしてください。'; $('share-url').value = ''; }

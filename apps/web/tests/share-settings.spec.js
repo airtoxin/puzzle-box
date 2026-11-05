@@ -212,3 +212,13 @@ test('sharing works when history writes are unavailable', async ({page}) => {
   await expect(recipient.locator('#share-status')).toContainText('読み込みました');
   await expect(recipient.locator('#generate')).toBeEnabled(); await recipient.close();
 });
+
+test('delayed clipboard completion does not treat generation as a settings change', async ({page}) => {
+  await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', {value: {writeText: () => new Promise(resolve => {window.finishCopy = resolve;})}}));
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#share-settings').click();
+  const generation = page.waitForResponse('**/api/generate'); await page.locator('#generate').click();
+  await page.evaluate(() => window.finishCopy());
+  await expect(page.locator('#share-status')).toContainText('コピーしました');
+  expect((await (await generation).json()).status).toBe('ok');
+});
