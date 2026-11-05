@@ -12,4 +12,4 @@
 
 参照: [Web アプリ](web-app.md)、[生成と計算予算](finite-shading-generation.md)、[公開方法](deploy-vercel.md)、[ルールの盤面上限](shading-rule-limits.md)。
 
-固定グリッドのサーバー側の plan 項目は xamples/web_catalog.py の SHADING_PLAN_GRIDS で表示チャネルと対応づける。各 shared_* は従来どおり値の検証と共有条件を担い、対応するチャネルと値の有無が一致しない場合は plan を拒否する。新しい種類を加える際はルールの宣言、共有条件、plan、ブラウザ側の独立した検証・描画と配信経路を併せて確認する。
+固定グリッドのサーバー側の plan 項目は `examples/web_catalog.py` の `SHADING_PLAN_GRIDS` で表示チャネルと対応づける。各 `shared_*` は従来どおり値の検証と共有条件を担い、対応するチャネルと値の有無が一致しない場合は plan を拒否する。新しい種類を加える際はルールの宣言、共有条件、plan、ブラウザ側の独立した検証・描画と配信経路を併せて確認する。
