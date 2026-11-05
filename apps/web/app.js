@@ -456,7 +456,9 @@ form.addEventListener('submit', async event => {
         $('status').textContent = messages.unconfirmed; return;
       }
       installPuzzle(request, result);
-      $('status').textContent = '生成しました。唯一解とヒントの既約性を検証済みです。';
+      $('status').textContent = `生成しました。唯一解・ヒント既約性を検証済み。\n${result.clues.length}個のヒント / ` + (result.evidence.method === 'cp-sat'
+        ? `ソルバーで別解がないことを証明。${result.evidence.candidates}候補を探索。`
+        : `${result.evidence.enumerated_boards}盤面を独立列挙して照合。`);
     } else $('status').textContent = messages[result.status] || `設定を確認してください。${result.message || ''}`;
   } catch (error) {
     if (error instanceof UnsupportedUiError) rejectUnsupportedUi();
