@@ -383,6 +383,20 @@ class Puzzle:
             cp_model.LinearExpr.sum(root_list) == 1
         ).only_enforce_if(any_active)
 
+        # A connected nonempty selection admits a spanning tree rooted at any
+        # active cell. Pick the first active cell in the supplied order to
+        # remove equivalent root choices without constraining visible answers.
+        # Duplicate cells have historical root-count semantics; leave them as
+        # they were rather than imposing an additional rule on that input.
+        if len(cell_set) == len(cells) and cells:
+            previous = active[cells[0]]
+            for i, c in enumerate(cells[1:], 1):
+                self._model.add(previous == 0).only_enforce_if(is_root[c])
+                if i < len(cells) - 1:
+                    seen = self._model.new_bool_var(f"_conn_seen_{self._indicator_count}_{i}")
+                    self._model.add_max_equality(seen, [previous, active[c]])
+                    previous = seen
+
     def _add_no_boundary_cross(self, constraint: NoBoundaryCrossConstraint) -> None:
         for bridges in constraint.vertex_bridges:
             if not bridges:

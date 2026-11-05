@@ -20,8 +20,10 @@ def closure_reference(cells,selected,diagonal):
 
 
 @pytest.mark.parametrize("diagonal", [False,True])
-def test_all_two_by_three_assignments_match_transitive_closure(diagonal):
+@pytest.mark.parametrize("reverse", [False,True])
+def test_all_two_by_three_assignments_match_transitive_closure(diagonal, reverse):
     cells=SquareGrid(2,3).cells
+    if reverse: cells=list(reversed(cells))
     p=Puzzle("connectivity")
     active=p.int_var_map("active",cells,0,1)
     p.add(connected(cells,lambda c: active[c],diagonal=diagonal))
@@ -34,6 +36,14 @@ def test_all_two_by_three_assignments_match_transitive_closure(diagonal):
         actual.add(bits)
         p.add(at_least_one(active[c] != solution.value(active[c]) for c in cells))
     assert actual == expected
+
+
+def test_duplicate_cells_keep_existing_root_selection_behavior():
+    a,b=Cell(0,0),Cell(0,1)
+    p=Puzzle("duplicate cells")
+    active=p.int_var_map("active",[a,b],1,1)
+    p.add(connected([a,a,b],lambda c: active[c]))
+    assert p.solve() is not None
 
 
 def test_default_and_direct_legacy_constructor_still_require_edge_connections():

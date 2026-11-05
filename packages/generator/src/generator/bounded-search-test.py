@@ -8,7 +8,7 @@ import pytest
 
 from generator.search import generate_bounded
 from puzzle import Puzzle, SolveResult
-from puzzle_defs import BlackCount, ColorComponentSize, NonTouchingBlack, ShadingRecipe
+from puzzle_defs import BlackCount, ColorComponentSize, ConnectedWhite, NonTouchingBlack, ShadingRecipe
 
 with pytest.MonkeyPatch.context() as patch:
     patch.syspath_prepend(str(Path(__file__).resolve().parents[4] / "examples"))
@@ -20,8 +20,10 @@ with pytest.MonkeyPatch.context() as patch:
 
 
 @pytest.mark.parametrize("seed", [0, 1, 42])
-def test_small_generated_puzzle_is_independently_unique_and_irreducible(seed):
-    recipe = ShadingRecipe(2, 3, (BlackCount(2), NonTouchingBlack()), ("cell", "row-count", "column-count"))
+@pytest.mark.parametrize("connected", [False, True])
+def test_small_generated_puzzle_is_independently_unique_and_irreducible(seed, connected):
+    rules = (BlackCount(2), NonTouchingBlack()) + ((ConnectedWhite(),) if connected else ())
+    recipe = ShadingRecipe(2, 3, rules, ("cell", "row-count", "column-count"))
     result = generate_bounded(recipe, seed=seed)
     assert result.status == "ok" and result.unique and result.irreducible
     boards = [bits for bits in product((0, 1), repeat=6)
@@ -30,6 +32,18 @@ def test_small_generated_puzzle_is_independently_unique_and_irreducible(seed):
         return [bits for bits in boards if set(clues) <= set(oracle.full_clues(recipe, bits))]
     assert len(matches(result.clues)) == 1
     assert all(len(matches(result.clues[:i]+result.clues[i+1:])) > 1 for i in range(len(result.clues)))
+
+
+def test_three_by_three_connected_recipe_matches_independent_oracle_for_every_board():
+    recipe = ShadingRecipe(3, 3, (BlackCount(4), NonTouchingBlack(), ConnectedWhite()))
+    for bits in product((0, 1), repeat=9):
+        expected = all(oracle.accepts(rule, bits, 3, 3) for rule in recipe.rules)
+        puzzle = recipe.create_empty()
+        for cell, bit in zip(puzzle.board.cells, bits):
+            puzzle.add(puzzle.black[cell] == bit)
+        result = puzzle.solve_result(seed=0, time_limit=5)
+        assert result.status in ("sat", "unsat")
+        assert (result.status == "sat") == expected
 
 
 def test_proven_impossibility_is_separate_from_attempt_limit_and_timeout():
