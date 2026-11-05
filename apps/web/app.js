@@ -49,9 +49,23 @@ function readGrid(field) {
     throw new GridInputError(`${field.dataset.label}は、0（丸なし）か1（丸あり）で入力してください。`);
   return values;
 }
+// Catalog and preview requests are safe to retry. Their timeout includes both
+// headers and JSON body; generation and checking keep their existing budgets.
+async function fetchJsonWithTimeout(path, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(path, {...options, signal: controller.signal});
+    if (path === '/api/catalog' ? !response.ok
+      : response.status === 408 || response.status === 429 || response.status >= 500)
+      throw new Error('Service temporarily unavailable');
+    return await response.json();
+  } finally {clearTimeout(timeout);}
+}
 async function post(path, data) {
-  const response = await fetch(path, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
-  if (response.status >= 500) throw new Error('Server unavailable');
+  const options = {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)};
+  if (path === '/api/plan') return fetchJsonWithTimeout(path, options);
+  const response = await fetch(path, options);
   return response.json();
 }
 function clearArtifact() {
@@ -405,9 +419,7 @@ async function loadCatalog() {
   $('status').textContent = 'ルールを読み込んでいます…';
   $('plan-note').textContent = 'ルールの宣言を読み込み中…';
   try {
-    const response = await fetch('/api/catalog');
-    if (!response.ok) throw new Error('Catalog unavailable');
-    catalog = await response.json();
+    catalog = await fetchJsonWithTimeout('/api/catalog');
     if (catalog.format !== 'puzzle-box/web-catalog-v1') throw new Error('Unsupported catalog');
     $('budget').max = catalog.limits.max_budget_seconds;
     if (Number($('budget').value) > catalog.limits.max_budget_seconds) $('budget').value = catalog.limits.max_budget_seconds;

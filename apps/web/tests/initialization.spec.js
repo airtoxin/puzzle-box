@@ -70,3 +70,103 @@ test('failed preview can be retried without losing edited settings', async ({pag
   await expect(page.locator('#rows')).toHaveValue('4');
   await expect(page.locator('#generate')).toBeEnabled();
 });
+
+for (const status of [408, 429]) {
+  test(`transient HTTP ${status} preview failure offers retry`, async ({page}) => {
+    let transient = false;
+    await page.route('**/api/plan', route => transient
+      ? route.fulfill({status, json: {status: 'error'}}) : route.continue());
+    await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+    transient = true; await page.locator('#rows').fill('4');
+    await expect(page.locator('#retry-plan')).toBeVisible();
+    await expect(page.locator('#rows')).toHaveValue('4');
+    transient = false; await page.locator('#retry-plan').click();
+    await expect(page.locator('#board .cell')).toHaveCount(12);
+    await expect(page.locator('#generate')).toBeEnabled();
+  });
+}
+
+test('a delayed preview cannot replace a newer configuration', async ({page}) => {
+  let releaseSlow, slowStarted;
+  const gate = new Promise(resolve => {releaseSlow = resolve;});
+  const started = new Promise(resolve => {slowStarted = resolve;});
+  await page.route('**/api/plan', async route => {
+    if (route.request().postDataJSON().rows === 4) {
+      const response = await route.fetch(); slowStarted(); await gate;
+      await route.fulfill({response});
+    } else await route.continue();
+  });
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#rows').fill('4'); await started;
+  await page.locator('#rows').fill('5');
+  await expect(page.locator('#board .cell')).toHaveCount(15);
+  const oldResponse = page.waitForResponse(response => response.url().endsWith('/api/plan')
+    && response.request().postDataJSON().rows === 4);
+  releaseSlow(); await oldResponse;
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  await expect(page.locator('#board .cell')).toHaveCount(15);
+  await expect(page.locator('#rows')).toHaveValue('5');
+  await expect(page.locator('#generate')).toBeEnabled();
+});
+
+for (const operation of ['catalog', 'plan']) {
+  test(`a stalled ${operation} request times out and can be retried`, async ({page}) => {
+    await page.clock.install();
+    let release, markStarted, stall = true;
+    const gate = new Promise(resolve => {release = resolve;});
+    const started = new Promise(resolve => {markStarted = resolve;});
+    await page.route(`**/api/${operation}`, async route => {
+      if (stall) {markStarted(); await gate;}
+      try {await route.continue();} catch {} // The browser may have aborted the stalled request.
+    });
+    if (operation === 'plan') {
+      stall = false; await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+      stall = true; await page.locator('#rows').fill('4'); await page.clock.fastForward(121);
+    } else await page.goto('/', {waitUntil: 'domcontentloaded'});
+    await started; await page.clock.fastForward(15001);
+    const retry = page.locator(`#retry-${operation}`);
+    await expect(retry).toBeVisible();
+    if (operation === 'catalog') await expect(page.locator('#rows')).toBeDisabled();
+    else await expect(page.locator('#rows')).toHaveValue('4');
+    stall = false; release(); await retry.click();
+    await expect(page.locator('#generate')).toBeEnabled();
+    await expect(page.locator('#board .cell')).toHaveCount(operation === 'catalog' ? 6 : 12);
+  });
+}
+
+test('invalid plan input remains an input error rather than a retry prompt', async ({page}) => {
+  let invalid = false;
+  await page.route('**/api/plan', route => invalid
+    ? route.fulfill({status:400, json: {status: 'invalid', message: 'invalid test setting'}}) : route.continue());
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  invalid = true; await page.locator('#rows').fill('4');
+  await expect(page.locator('#status')).toContainText('invalid test setting');
+  await expect(page.locator('#retry-plan')).toBeHidden();
+  await expect(page.locator('#generate')).toBeDisabled();
+});
+
+test('a preview response with a stalled JSON body times out', async ({page}) => {
+  await page.clock.install();
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch;
+    window.fetch = (path, options) => {
+      if (path !== '/api/plan' || !window.__stallPlanBody) return originalFetch(path, options);
+      window.__planBodyStarted = true;
+      const body = new ReadableStream({start(controller) {
+        options.signal.addEventListener('abort', () => controller.error(new DOMException('Aborted', 'AbortError')));
+      }});
+      return Promise.resolve(new Response(body, {status: 200}));
+    };
+  });
+  await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
+  await page.evaluate(() => {window.__stallPlanBody = true;});
+  await page.locator('#rows').fill('4'); await page.clock.fastForward(121);
+  await page.waitForFunction(() => window.__planBodyStarted);
+  await page.clock.fastForward(15001);
+  await expect(page.locator('#retry-plan')).toBeVisible();
+  await expect(page.locator('#rows')).toHaveValue('4');
+  await page.evaluate(() => {window.__stallPlanBody = false;});
+  await page.locator('#retry-plan').click();
+  await expect(page.locator('#board .cell')).toHaveCount(12);
+  await expect(page.locator('#generate')).toBeEnabled();
+});
