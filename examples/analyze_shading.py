@@ -25,7 +25,7 @@ from puzzle_defs import NoTouchingEqualTetrominoes
 from puzzle_defs import WhiteVisibilityCounts
 from puzzle_defs import ComponentsTouchBorder
 from puzzle_defs import WhiteIslandAreas, WhiteAreaClues
-from puzzle_defs import AdjacentBlackCounts
+from puzzle_defs import AdjacentBlackCounts, OrthogonalBlackCounts
 from puzzle_defs import ColorDegreeRange, ColorEndpointCount
 from puzzle_defs import AdjacentBlackComponentSum
 from puzzle_defs import UniformRooms, AcyclicColor, RoomFillLevels
@@ -62,6 +62,9 @@ def accepts(rule: ShadingRule, bits: Bits, rows: int, cols: int) -> bool:
     black = {(r, c) for r in range(rows) for c in range(cols) if bits[r * cols + c]}
     if type(rule) is BlackCount:
         return len(black) == rule.count
+    if type(rule) is OrthogonalBlackCounts:
+        return all(n is None or sum(abs(r-s)+abs(c-t) == 1 for s,t in black) == n
+                   for r,row in enumerate(rule.orthogonal_counts) for c,n in enumerate(row))
     if type(rule) is RoomMajorityCount:
         for label in {n for row in rule.rooms for n in row}:
             values = [bits[r*cols+c] for r in range(rows) for c in range(cols) if rule.rooms[r][c] == label]
