@@ -15,6 +15,15 @@ const clueChannels = {
   coupled: {black: 'givens', edge: 'edge-givens'},
 };
 export class UnsupportedUiError extends Error {}
+// Called after assertRenderablePlan: each returned clue must be one the user
+// selected and must have a channel that this browser knows how to display.
+export function assertRenderableClues(clues, plan, request) {
+  const supported = clueChannels[request.family];
+  const channels = new Set(plan.requirements.channels.map(channel => channel.name));
+  if (!Array.isArray(clues) || clues.some(clue => !clue || typeof clue.type !== 'string'
+      || !Object.hasOwn(supported, clue.type) || !request.clue_kinds.includes(clue.type)
+      || !channels.has(supported[clue.type]))) throw new UnsupportedUiError();
+}
 function checkedGrid(value, rows, cols, maximum, nullable = false) {
   if (!Array.isArray(value) || value.length !== rows || value.some(row => !Array.isArray(row)
       || row.length !== cols || row.some(n => !(nullable && n === null) && (!Number.isInteger(n) || n < 0 || n > maximum)))) throw new UnsupportedUiError();

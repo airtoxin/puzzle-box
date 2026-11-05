@@ -1,5 +1,5 @@
 import {test, expect} from '@playwright/test';
-import {assertRenderablePlan, UnsupportedUiError} from '../plan-contract.js';
+import {assertRenderablePlan, assertRenderableClues, UnsupportedUiError} from '../plan-contract.js';
 
 test('unselected clues do not require channels, and unknown clue kinds are rejected', () => {
   const request = {family: 'shading', rows: 2, cols: 2, rules: [], clue_kinds: []};
@@ -8,6 +8,21 @@ test('unselected clues do not require channels, and unknown clue kinds are rejec
       channels: [{name: 'answer', kind: 'binary-cells'}]}};
   expect(() => assertRenderablePlan(plan, request)).not.toThrow();
   expect(() => assertRenderablePlan(plan, {...request, clue_kinds: ['future-hint']})).toThrow(UnsupportedUiError);
+});
+
+test('returned clues must be selected and supported by their family and plan', () => {
+  for (const [family, type, channel] of [
+    ['shading', 'row-count', 'row-counts'], ['slitherlink', 'cell-count', 'cell-counts'],
+    ['coupled', 'black', 'givens'], ['coupled', 'edge', 'edge-givens'],
+  ]) {
+    const request = {family, clue_kinds: [type]};
+    const plan = {requirements: {channels: [{name: channel}]}};
+    expect(() => assertRenderableClues([{type}], plan, request)).not.toThrow();
+    expect(() => assertRenderableClues([{type}], plan, {...request, clue_kinds: []})).toThrow(UnsupportedUiError);
+    expect(() => assertRenderableClues([{type}], {requirements: {channels: []}}, request)).toThrow(UnsupportedUiError);
+    expect(() => assertRenderableClues([{type: 'future-hint'}], plan, request)).toThrow(UnsupportedUiError);
+    expect(() => assertRenderableClues(null, plan, request)).toThrow(UnsupportedUiError);
+  }
 });
 
 test('unsupported coupled UI declarations stop preview and generation', async ({page}) => {
@@ -95,6 +110,26 @@ test('a generation plan missing a selected clue channel cannot expose the puzzle
     const result = await (await route.fetch()).json();
     expect(result.status).toBe('ok');
     result.plan.requirements.channels = result.plan.requirements.channels.filter(c => c.name !== 'row-counts');
+    await route.fulfill({json: result});
+  });
+  await page.locator('#generate').click();
+  await expect(page.locator('#status')).toContainText('このUI定義には対応していません');
+  await expect(page.locator('#generate')).toBeDisabled();
+  await expect(page.locator('#board')).toBeEmpty();
+  await expect(page.locator('#actions')).toBeHidden();
+});
+
+test('an unselected returned clue cannot expose a puzzle with a hidden hint', async ({page}) => {
+  await page.goto('/');
+  await expect(page.locator('#generate')).toBeEnabled();
+  await page.locator('#hints input').nth(1).uncheck(); // row-count
+  await expect(page.locator('#generate')).toBeEnabled();
+  await page.route('**/api/generate', async route => {
+    expect(route.request().postDataJSON().clue_kinds).not.toContain('row-count');
+    const result = await (await route.fetch()).json();
+    expect(result.status).toBe('ok');
+    expect(result.plan.requirements.channels.map(c => c.name)).not.toContain('row-counts');
+    result.clues.push({type: 'row-count', row: 0, count: 1});
     await route.fulfill({json: result});
   });
   await page.locator('#generate').click();
