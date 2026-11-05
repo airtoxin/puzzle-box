@@ -10,6 +10,7 @@ from puzzle_defs import RoomBlackCount, RoomConnectedBlack, LineBlackCount, NoWh
 from puzzle_defs import RectangularComponents, NonRectangularComponents
 from puzzle_defs import DistinctWhiteNumbers
 from puzzle_defs import RunLengthLimit
+from puzzle_defs import DiagonalRunLimit
 from puzzle_defs import RoomRotationalSymmetry
 from puzzle_defs import ColorComponentSize
 from puzzle_defs import NoTouchingEqualTetrominoes
@@ -53,7 +54,7 @@ BUILT_IN_RULE_TYPES = (BlackCount, NonTouchingBlack, ConnectedWhite, NoWhite2x2,
                       RunLengthLimit, RoomRotationalSymmetry, ColorComponentSize, NoTouchingEqualTetrominoes, WhiteVisibilityCounts,
                       ComponentsTouchBorder, WhiteIslandAreas, AdjacentBlackCounts, ColorDegreeRange, ColorEndpointCount,
                       AdjacentBlackComponentSum, UniformRooms, AcyclicColor, CornerConnectedColor, WhiteAreaClues, WhiteEndpointMarkers, AdjacentBlackRuns, RoomFillLevels,
-                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount, OrthogonalBlackCounts)
+                      NoColorAcrossRooms, AdjacentRoomCountsDiffer, RoomComponentCount, EqualRoomComponentSizes, ComponentAreaClues, CornerLinkedComponents, OneFalseAdjacentCountPerRoom, DirectionalRunLimit, RoomMajorityCount, OrthogonalBlackCounts, DiagonalRunLimit)
 RULES = tuple(kind.ui.identifier for kind in BUILT_IN_RULE_TYPES)
 
 
@@ -69,6 +70,7 @@ def rule_choices(*, count: int = 3, diagonal: bool = False, allow_empty_white: b
             "no-white-across-three-rooms": NoWhiteAcrossThreeRooms(DEFAULT_ROOMS),
             "distinct-white-numbers": DistinctWhiteNumbers(DEFAULT_NUMBERS),
             "run-length-limit": RunLengthLimit(),
+            "diagonal-run-limit": DiagonalRunLimit(),
             "room-rotational-symmetry": RoomRotationalSymmetry(DEFAULT_ROOMS),
             "color-component-size": ColorComponentSize(3),
             "no-touching-equal-tetrominoes": NoTouchingEqualTetrominoes(DEFAULT_ROOMS),
@@ -156,6 +158,8 @@ def rule_record(rule: ShadingRule) -> dict[str, Any]:
         return {"type": rule.ui.identifier, "component_counts": [list(row) for row in rule.component_counts]}
     if type(rule) is RunLengthLimit:
         return {"type": rule.ui.identifier, "max_length": rule.max_length}
+    if type(rule) is DiagonalRunLimit:
+        return {"type": rule.ui.identifier, "max_length": rule.max_length}
     if type(rule) is ColorComponentSize:
         return {"type": rule.ui.identifier, "size": rule.size, "black": rule.black}
     if type(rule) is ComponentsTouchBorder:
@@ -207,6 +211,8 @@ def read_rule(data: Any) -> ShadingRule:
         return LineBlackCount(data["count"])
     if kind == "run-length-limit" and set(data) == {"type", "max_length"}:
         return RunLengthLimit(data["max_length"])
+    if kind == "diagonal-run-limit" and set(data) == {"type", "max_length"}:
+        return DiagonalRunLimit(data["max_length"])
     if kind == "color-component-size" and set(data) == {"type","size","black"}:
         return ColorComponentSize(data["size"],data["black"])
     if kind == "color-degree-range" and set(data) == {"type", "minimum", "maximum", "black"}:

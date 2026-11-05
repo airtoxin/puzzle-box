@@ -118,7 +118,13 @@ assert reply == ['200 OK'] and json.loads(body)['status'] == 'ok', body
 print('artifact generation passed')
 """
     data = request()
-    if rule_group == "rooms":
+    if rule_group == "diagonal-runs":
+        data["rows"],data["cols"] = 3,3
+        data["rules"] = [{"id":"room-black-count","parameters":{"rooms":[[0,0,1],[2,1,1],[2,3,3]],"count":1}},
+                         {"id":"no-three-consecutive","parameters":{}},
+                         {"id":"diagonal-run-limit","parameters":{"max_length":2}}]
+        data["clue_kinds"] = ["cell"]
+    elif rule_group == "rooms":
         data["rules"] = [{"id": "room-black-count", "parameters": {"rooms": [[0,0,0], [1,1,1]], "count": 2}},
                          {"id": "black-dominoes", "parameters": {}}]
     elif rule_group == "component-shapes":
@@ -247,3 +253,7 @@ print('artifact generation passed')
                             env={**os.environ, "PYTHONPATH": "", "PUZZLE_TEST_REQUEST": json.dumps(data),
                                  "PUZZLE_TEST_VENDOR": str(vendor)}, timeout=20)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_curated_export_supports_diagonal_run_composition(tmp_path):
+    test_curated_export_contains_no_worktree_metadata_tests_or_developer_environment(tmp_path, "diagonal-runs")

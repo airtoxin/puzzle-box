@@ -21,6 +21,7 @@ from puzzle_defs import (
     RectangularComponents, NonRectangularComponents,
     DistinctWhiteNumbers,
     RunLengthLimit,
+    DiagonalRunLimit,
     RoomRotationalSymmetry,
     ColorComponentSize,
     NoTouchingEqualTetrominoes,
@@ -293,6 +294,8 @@ def _rule_text(rule: ShadingRule) -> str:
         return f"Every edge-connected {color} component reaches the board boundary through {color} cells; separate border components and absence of {color} cells are allowed."
     if type(rule) is RunLengthLimit:
         return f"Each horizontal or vertical run of black or white cells has length at most {rule.max_length}."
+    if type(rule) is DiagonalRunLimit:
+        return f"Each straight diagonal run of black or white cells has length at most {rule.max_length}; rows and columns are unrestricted by this rule. Every cell participates."
     if type(rule) is RoomRotationalSymmetry:
         return "Black cells in each room have 180-degree symmetry about its bounding-box center; rotation outside the room is forbidden."
     if type(rule) is ColorComponentSize:
