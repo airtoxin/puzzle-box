@@ -39,6 +39,8 @@ def test_git_and_export_routes_headers_and_limits_match():
     assert config["headers"] == exported["headers"]
     assert config["functions"]["api/index.py"]["maxDuration"] == exported["functions"]["api/index.py"]["maxDuration"]
     assert config["outputDirectory"] == "build/vercel-public"
+    frontend = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    assert config["buildCommand"] == frontend["scripts"]["build"]
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
     puzzle = tomllib.loads((ROOT / "packages/puzzle/pyproject.toml").read_text(encoding="utf-8"))

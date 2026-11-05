@@ -37,6 +37,7 @@ Vercel側の所有権と既存GitHub Appのアクセス権が必要です。設�
 
 Gitビルドはレビュー対象のリポジトリをVercelへ渡します。実行時依存はルートの `pyproject.toml` と `uv.lock` から解決し、
 開発環境のコピーを使いません。`api/index.py` は配信物方式と同じWSGI入口を再利用します。
+ルートの `package.json` は静的ビルドの検出用で、追加のnpm実行時依存はありません。
 静的ビルドは `python3 examples/prepare_web_static.py` でHTML・CSS・JavaScriptの3ファイルだけを
 `build/vercel-public` へコピーするため、`apps/web/tests` や `node_modules` を公開しません。
 関数からも静的画面・文書・テスト・開発環境を除外します。Gitビルドのソース集合は、次の専用エクスポート方式と異なります。
