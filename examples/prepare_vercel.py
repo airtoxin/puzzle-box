@@ -5,10 +5,12 @@ from pathlib import Path
 import subprocess
 import tomllib
 
+from web_assets import ASSET_TYPES
+
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = {"analyze_shading", "finite_shading", "generate_shading", "generate_slitherlink", "generate_yajilin",
            "shading_recipe", "edge_answers", "json_records", "web_answers", "web_catalog", "web_coupled",
-           "web_loop", "web_server", "web_worker", "web_hosted"}
+           "web_loop", "web_server", "web_worker", "web_hosted", "web_assets"}
 PACKAGES = ("puzzle", "puzzle-defs", "generator")
 DEPENDENCIES = {"absl-py", "immutabledict", "numpy", "ortools", "pandas", "protobuf", "python-dateutil", "six", "typing-extensions"}
 
@@ -25,7 +27,7 @@ def files() -> dict[str, bytes]:
         name = f"examples/{module}.py"
         if name not in tracked: raise ValueError(f"Required source is not tracked: {name}")
         result[name] = (ROOT / name).read_bytes()
-    for name in ("index.html", "app.js", "style.css"):
+    for name in ASSET_TYPES:
         result[f"public/{name}"] = (ROOT / "apps/web" / name).read_bytes()
     for name in ("vercel.json", "api/index.py"):
         result[name] = (ROOT / "deploy/vercel" / name).read_bytes()

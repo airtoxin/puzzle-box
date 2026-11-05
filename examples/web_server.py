@@ -13,11 +13,12 @@ from typing import Any, cast
 from json_records import _constant, _finite_float, _object
 from web_catalog import catalog, read_request
 from web_answers import read_check
+from web_assets import ASSET_TYPES
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_BODY = 32768
-ASSETS = {"/": ("index.html", "text/html"), "/app.js": ("app.js", "text/javascript"),
-          "/style.css": ("style.css", "text/css")}
+ASSETS = {"/": ("index.html", ASSET_TYPES["index.html"]),
+          **{f"/{name}": (name, mime) for name, mime in ASSET_TYPES.items() if name != "index.html"}}
 
 
 def run_generation(data: Any) -> dict[str, Any]:
