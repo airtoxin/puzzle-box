@@ -1,10 +1,10 @@
 import {UnsupportedUiError, canonicalRunClues, assertRenderablePlan, assertRenderableClues} from './plan-contract.js';
 
-const $ = id => document.getElementById(id);
-const form = $('recipe-form');
-let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, timer;
-const selected = new Map();
-const hints = new Map();
+let $ = id => document.getElementById(id);
+let form = $('recipe-form');
+let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, settingsRevision = 0, timer;
+let selected = new Map();
+let hints = new Map();
 const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid', 'run-clue-grid'];
 $('board').addEventListener('focusin', event => {
   // Account for a sticky row clue even when the cell was already within the
@@ -240,6 +240,7 @@ function cellButton(index, r, c, value, reveal) {
   };
   paint(value);
   button.addEventListener('click', () => {
+    cancelPendingShare();
     input[index] = (input[index]+2)%3-1; paint(input[index]); $('answer-status').textContent = '';
   });
   return button;
@@ -309,7 +310,7 @@ function edgeButton(edge, index, value, reveal, offset = 0) {
     button.setAttribute('aria-label', `${horizontal ? '横辺' : '縦辺'} ${edge[0]+1}行${edge[1]+1}列: ${value === -1 ? '未入力' : value === 0 ? '線なし' : '線あり'}${artifact && fixed.has(target) ? '（固定ヒント）' : ''}`);
   };
   paint(value);
-  button.addEventListener('click', () => {input[target] = (input[target]+2)%3-1; paint(input[target]); $('answer-status').textContent = '';});
+  button.addEventListener('click', () => {cancelPendingShare(); input[target] = (input[target]+2)%3-1; paint(input[target]); $('answer-status').textContent = '';});
   return button;
 }
 function renderLoop(reveal, channels) {
@@ -361,22 +362,22 @@ function renderCoupled(reveal) {
   }
   $('board').replaceChildren(table);
 }
-function chooseProfile() {
-  clearTimeout(timer); ++revision;
+function chooseProfile(startRefresh = true, isolated = false) {
+  if (!isolated) {clearTimeout(timer); ++revision;}
   profile = catalog.profiles.find(p => p.id === $('family').value);
   $('rows').value = profile.defaults.rows; $('cols').value = profile.defaults.cols;
   $('rows').max = $('cols').max = profile.board.max_cells;
   $('rows').min = profile.board.min_rows; $('cols').min = profile.board.min_cols;
   $('size-note').textContent = `最大${profile.board.max_cells}セル。選ぶルールにより上限が下がります。大きさとルールによっては時間内に生成できません。Seedが同じでも、環境の変更をまたぐ一致は保証しません。`;
-  buildControls(); $('recipe-fields').disabled = false; refresh();
+  buildControls(); $('recipe-fields').disabled = false; if (startRefresh) refresh();
 }
-$('family').addEventListener('change', chooseProfile);
-form.addEventListener('input', () => {clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
+$('family').addEventListener('change', () => chooseProfile());
+form.addEventListener('input', () => {$('share-url').value = ''; $('share-status').textContent = ''; cancelPendingShare(); ++settingsRevision; clearTimeout(timer); ++revision; clearArtifact(); $('generate').disabled = true; $('retry-plan').hidden = true;
   timer = setTimeout(refresh, 120);});
 form.addEventListener('submit', async event => {
   event.preventDefault(); clearTimeout(timer);
   if (!plan || !form.reportValidity()) return;
-  ++revision; clearArtifact(); renderBoard(); form.inert = true; $('generate').disabled = true;
+  cancelPendingShare(); ++revision; clearArtifact(); renderBoard(); form.inert = true; $('generate').disabled = true;
   $('status').textContent = '生成・唯一解検証中…';
   try {
     const request = readRequest(), result = await post('/api/generate', request);
@@ -419,6 +420,7 @@ form.addEventListener('submit', async event => {
 });
 $('check').addEventListener('click', async () => {
   if (!artifact) return;
+  cancelPendingShare();
   if (input.includes(-1)) {$('answer-status').textContent = '未入力のマスまたは辺があります。'; return;}
   form.inert = $('board').inert = $('answer-buttons').inert = true;
   $('answer-status').textContent = 'サーバーでルールとヒントを確認中…';
@@ -435,6 +437,7 @@ $('check').addEventListener('click', async () => {
 });
 $('reveal').addEventListener('click', () => {
   if (!artifact) return;
+  cancelPendingShare();
   const show = $('reveal').textContent === '答えを表示'; renderBoard(show);
   $('reveal').textContent = show ? '自分の解答へ戻る' : '答えを表示';
 });
@@ -444,6 +447,7 @@ $('download').addEventListener('click', () => {
   const link = node('a'); link.href = url; link.download = 'puzzle.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 async function loadCatalog() {
+  catalogReady = false;
   $('retry-catalog').hidden = true;
   $('recipe-fields').disabled = true; form.setAttribute('aria-busy', 'true');
   $('status').textContent = 'ルールを読み込んでいます…';
@@ -461,7 +465,13 @@ async function loadCatalog() {
       node('li', `${p.label}：${p.rules.length}ルール、最大${p.board.max_cells}セル`)));
     $('family').replaceChildren();
     for (const p of catalog.profiles) {const option = node('option', p.label); option.value = p.id; $('family').append(option);}
-    chooseProfile();
+    chooseProfile(false);
+    $('recipe-fields').disabled = true;
+    let loadingHash;
+    do { loadingHash = location.hash; await restoreSharedSettings(); } while (loadingHash !== location.hash);
+    catalogReady = true;
+    $('recipe-fields').disabled = false;
+    refresh();
   } catch {
     $('recipe-fields').disabled = true;
     $('status').textContent = 'ルールを読み込めません。接続を確認して再試行してください。';
@@ -469,6 +479,148 @@ async function loadCatalog() {
     $('retry-catalog').hidden = false;
   } finally { form.setAttribute('aria-busy', 'false'); }
 }
+// The fragment stays in the browser, rather than being sent on every HTTP request.
+const sharePrefix = '#settings-v1=';
+const shareLimit = 8192;
+function sameJson(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) return a.length === b.length && a.every((item, i) => sameJson(item, b[i]));
+  const keys = Object.keys(a), other = Object.keys(b);
+  return keys.length === other.length && keys.every(key => Object.hasOwn(b, key) && sameJson(a[key], b[key]));
+}
+function decodeSharedSettings(hash = location.hash) {
+  if (!hash) return null;
+  if (!hash.startsWith(sharePrefix) || hash.length > shareLimit) throw new Error('unsupported link');
+  const encoded = hash.slice(sharePrefix.length);
+  if (!encoded || !/^[A-Za-z0-9_-]+$/.test(encoded)) throw new Error('invalid encoding');
+  const bytes = Uint8Array.from(atob(encoded.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(bytes));
+}
+function shareHash(request) {
+  const bytes = new TextEncoder().encode(JSON.stringify(request));
+  const encoded = btoa(Array.from(bytes, b => String.fromCharCode(b)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const hash = sharePrefix + encoded;
+  if (hash.length > shareLimit) throw new Error('too long');
+  return hash;
+}
+let validatingShare = false;
+function applySharedSettings(request) {
+  // Reconstruct through the actual controls and require an exact round trip.
+  // This rejects unknown fields, changed catalog parameters and rule order.
+  if (!request || typeof request !== 'object' || Array.isArray(request)) throw new Error('invalid request');
+  const candidate = catalog.profiles.find(p => p.id === request.family);
+  if (!candidate || !Array.isArray(request.rules) || !Array.isArray(request.clue_kinds)) throw new Error('unknown profile');
+  $('family').value = candidate.id; chooseProfile(false, validatingShare);
+  for (const name of ['rows', 'cols', 'seed', 'budget_seconds']) {
+    if (!Number.isSafeInteger(request[name])) throw new Error('invalid number');
+    $(name === 'budget_seconds' ? 'budget' : name).value = request[name];
+  }
+  for (const state of selected.values()) state.toggle.checked = false;
+  const shared = new Map();
+  for (const rule of request.rules) {
+    const state = selected.get(rule?.id);
+    if (!state || state.toggle.checked || !rule.parameters || typeof rule.parameters !== 'object' || Array.isArray(rule.parameters)) throw new Error('unknown rule');
+    state.toggle.checked = true;
+    for (const [name, field] of state.parameters) {
+      if (!Object.hasOwn(rule.parameters, name)) throw new Error('missing parameter');
+      const value = rule.parameters[name];
+      if (gridKinds.includes(field.dataset.kind)) {
+        if (!Array.isArray(value) || value.length > 100 || value.some(row => !Array.isArray(row) || row.length > 100 || row.some(n => !(n === null || Number.isSafeInteger(n) || (Array.isArray(n) && n.length <= 8 && n.every(Number.isSafeInteger)))))) throw new Error('invalid grid');
+        const text = value.map(row => row.map(n => n === null ? '.' : Array.isArray(n) ? n.join(',') : n).join(' ')).join('\n');
+        if (text.length > 512 || (shared.has(field) && shared.get(field) !== text)) throw new Error('invalid shared grid');
+        shared.set(field, text); field.value = text;
+      } else if (field.type === 'checkbox') {
+        if (typeof value !== 'boolean') throw new Error('invalid boolean'); field.checked = value;
+      } else {
+        if (!Number.isSafeInteger(value)) throw new Error('invalid parameter'); field.value = value;
+      }
+    }
+  }
+  for (const rule of profile.rules) if (rule.required && !selected.get(rule.identifier).toggle.checked) throw new Error('missing required rule');
+  for (const [id, toggle] of hints) toggle.checked = request.clue_kinds.includes(id);
+  syncParameters();
+  if (!form.checkValidity() || !sameJson(readRequest(), request)) throw new Error('settings cannot be represented');
+}
+// Validate against a detached copy of the real controls. Invalid links never
+// touch the live form, generated puzzle, or answer. This section is synchronous.
+function validateSharedControls(request) {
+  const saved = {$, form, profile, selected, hints, artifact};
+  const detached = document.implementation.createHTMLDocument('');
+  detached.replaceChild(detached.importNode(document.documentElement, true), detached.documentElement);
+  try {
+    $ = id => detached.getElementById(id); form = $('recipe-form');
+    selected = new Map(); hints = new Map(); validatingShare = true;
+    applySharedSettings(request);
+  } finally {
+    ({$, form, profile, selected, hints, artifact} = saved); validatingShare = false;
+  }
+}
+let shareNavigation = 0, catalogReady = false, sharePending = false;
+function cancelPendingShare() {
+  if (!sharePending) return false;
+  ++shareNavigation; sharePending = false;
+  $('navigation-status').textContent = '作業が変更されたため、共有設定の読み込みを中止しました。';
+  return true;
+}
+async function restoreSharedSettings() {
+  const hash = location.hash, navigation = ++shareNavigation;
+  if (!hash) {sharePending = false; return;}
+  sharePending = true;
+  try {
+    const request = decodeSharedSettings(hash);
+    validateSharedControls(request);
+    const result = await post('/api/plan', request);
+    if (result.status !== 'ok') throw new Error('invalid plan');
+    assertRenderablePlan(result.plan, request);
+    if (navigation !== shareNavigation || hash !== location.hash || form.inert) return;
+    applySharedSettings(request); ++settingsRevision;
+    $('share-url').value = ''; $('load-shared-settings').hidden = true;
+    $('navigation-status').textContent = ''; $('share-status').textContent = '共有された設定を読み込みました。';
+    return true;
+  } catch {
+    if (navigation === shareNavigation && hash === location.hash) {
+      $('share-status').textContent = '共有URLを読み込めませんでした。URL、接続、対応バージョンを確認してください。';
+      $('load-shared-settings').hidden = false;
+      $('navigation-status').textContent = '共有設定はまだ読み込まれていません。現在の設定と解答は維持されています。';
+    }
+  } finally {
+    if (navigation === shareNavigation) sharePending = false;
+  }
+}
+$('share-settings').addEventListener('click', async () => {
+  try {
+    if (!plan || $('generate').disabled || !form.reportValidity()) throw new Error('invalid');
+    const cancelledShare = cancelPendingShare();
+    const url = new URL(location.pathname, location.origin); url.hash = shareHash(readRequest());
+    const copiedRevision = settingsRevision;
+    $('share-url').value = url.href;
+    $('share-url').select();
+    try {
+      await navigator.clipboard.writeText(url.href);
+      $('share-status').textContent = copiedRevision === settingsRevision ? '共有URLをコピーしました。' : '設定変更前のURLがコピーされました。現在の設定で作り直してください。';
+    } catch {
+      $('share-status').textContent = copiedRevision === settingsRevision && $('share-url').value === url.href
+        ? '共有URL欄からコピーして共有してください。' : '設定またはURLが変更されました。共有URLを作り直してください。';
+    }
+    if (cancelledShare) $('share-status').textContent += ' 共有設定の読み込みは中止しました。';
+  } catch { $('share-status').textContent = '設定を確認してください。URLが長すぎる場合は設定を減らしてください。'; $('share-url').value = ''; }
+});
+// Hash navigation never replaces the current work without an explicit action.
+window.addEventListener('hashchange', () => {
+  if (!catalogReady) return; // Initial loading reads the latest location.
+  ++shareNavigation; sharePending = false;
+  $('share-url').value = ''; $('share-status').textContent = '';
+  $('load-shared-settings').hidden = !location.hash;
+  $('navigation-status').textContent = location.hash
+    ? 'URLが変わりました。現在の設定と解答は維持されています。新しいURLの設定はまだ読み込まれていません。読み込むと現在の問題と回答は消えます。'
+    : 'URLが変わりました。現在の設定と解答は維持されています。';
+});
+$('load-shared-settings').addEventListener('click', async () => {
+  if (form.inert) return;
+  if (await restoreSharedSettings()) refresh();
+});
+
 $('retry-catalog').addEventListener('click', loadCatalog);
 $('retry-plan').addEventListener('click', () => {clearTimeout(timer); refresh();});
 loadCatalog();

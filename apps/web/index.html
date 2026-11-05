@@ -25,6 +25,12 @@
         <section class="panel"><h2><span>02</span> 組み合わせるルール</h2><div id="rules"></div></section>
         <section class="panel"><h2><span>03</span> 候補にするヒント</h2><div id="hints"></div>
           <p class="note">不要なヒントは生成時に削減します。数だけで一意にならないときは、セルや辺の固定ヒントも選んでください。</p></section>
+        <div class="share-settings"><button id="share-settings" type="button">設定の共有URLを作成</button>
+          <label class="parameter" for="share-url">共有URL</label><input id="share-url" type="text" readonly>
+          <p class="note">URLには選択した設定が含まれます。公開してよい内容だけを共有してください。完成問題や解答途中の状態は含まれません。</p>
+          <p id="share-status" role="status" aria-live="polite"></p>
+          <p id="navigation-status" role="status" aria-live="polite"></p>
+          <button id="load-shared-settings" type="button" hidden>URLの設定を読み込む（現在の問題・回答は消えます）</button></div>
         <button class="primary" id="generate" type="submit" disabled>この組合せで生成する →</button>
         </fieldset>
       </form>
