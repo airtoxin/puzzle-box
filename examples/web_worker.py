@@ -3,12 +3,19 @@
 import json
 import sys
 from typing import Any
-from puzzle_defs import SlitherlinkRecipe, YajilinRecipe
+from puzzle import Cell, Var
+from puzzle_defs import ShadingPuzzle, SlitherlinkRecipe, YajilinRecipe
 
 from generator.search import generate_bounded
 from generate_shading import clue_record, encode_record
 from web_catalog import read_request
 from web_limits import MAX_BODY
+
+
+def _shading_answer_variables(puzzle: ShadingPuzzle) -> dict[Cell, Var]:
+    # Coordinates are stable across models; auxiliary rule witnesses are not
+    # part of the shading answer. The generator verifies the full projection.
+    return {cell: puzzle.black[cell] for cell in puzzle.board.cells}
 
 
 def generate_request(data: Any) -> dict[str, Any]:
@@ -20,7 +27,8 @@ def generate_request(data: Any) -> dict[str, Any]:
     if isinstance(recipe, SlitherlinkRecipe):
         from web_loop import generate_loop
         return generate_loop(request, data)
-    result = generate_bounded(recipe, seed=request.seed, budget=request.budget)
+    result = generate_bounded(recipe, seed=request.seed, budget=request.budget,
+                              answer_variables=_shading_answer_variables)
     evidence = {"method": "cp-sat", "candidates": result.candidates,
                 "unique": result.unique, "irreducible": result.irreducible}
     if result.status != "ok":

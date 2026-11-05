@@ -440,6 +440,26 @@ class Puzzle:
             [var._internal for var in variables], [[solution.value(var) for var in variables]],
         )
 
+    def exclude_projected_assignment(self, variables: Sequence[Var], values: Sequence[int]) -> None:
+        """Exclude a complete visible assignment, leaving auxiliary witnesses out.
+
+        Variables must be this model's entire answer projection, without
+        duplicates. The caller is responsible for the meaning of the values;
+        this method does not establish that the assignment is feasible.
+        """
+        projection = self._vars if self._solution_vars is None else self._solution_vars
+        if (len(variables) != len(values) or any(type(value) is not int for value in values)
+                or len({id(var) for var in variables}) != len(variables)
+                or len({id(var) for var in projection}) != len(projection)
+                or {id(var) for var in variables} != {id(var) for var in projection}):
+            raise ValueError("Assignment must cover each projected variable exactly once")
+        if not variables:
+            self._model.add_bool_or([])
+            return
+        self._model.add_forbidden_assignments(
+            [var._internal for var in variables], [list(values)],
+        )
+
     def solve_result(self, seed: int | None = None, *, time_limit: float | None = None,
                      check_unique: bool = False) -> SolveResult:
         """Solve within one shared time budget, preserving unknown outcomes.
