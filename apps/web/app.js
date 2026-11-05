@@ -146,6 +146,17 @@ function syncParameters() {
     }
   }
 }
+function renderPlanDescription() {
+  $('shape').textContent = `${plan.rows} × ${plan.cols}`;
+  $('plan-note').textContent = isCoupled() ? '線はマスの中心同士を結びます。黒白と辺は別々に入力し、両方の整合を確認します。' : '選択したルールとヒントが要求する盤面を表示しています。UIの適合は、問題の成立を保証しません。';
+  const numericLegend = [['numbers','通常の数字は固定ラベル'], ['sight_counts','丸数字は見える白数'],
+    ['orthogonal_counts','「接n」は上下左右の黒数（数字セルの色は自由、0もヒント）'], ['component_areas','「面n」は所属する同色成分の面積（数字セルの色は自由）'], ['island_areas','四角の数字は白い島の面積'], ['neighbor_counts','「隣n」は周囲の黒数（0もヒント）'],
+    ['component_counts','「塊n」は接する黒成分の面積合計（同じ成分は1回）'],
+    ['endpoint_markers','マス全体を囲む大きな丸は白の端点（白い隣接マスは1個）'], ['black_run_clues','「連1,2」等は周囲8マスの黒い連続長（順序不問、0もヒント）']]
+    .filter(([key]) => plan[key] !== undefined).map(([,text]) => text);
+  if (numericLegend.length) $('plan-note').textContent += ` ${numericLegend.join('、')}。`;
+  if (plan.endpoint_markers && plan.sight_counts) $('plan-note').textContent += ' 端点上の可視数は丸自身を含む直線長です。';
+}
 async function refresh() {
   const current = ++revision;
   clearArtifact(); plan = undefined; $('generate').disabled = true; $('retry-plan').hidden = true; syncParameters();
@@ -160,15 +171,7 @@ async function refresh() {
       $('board').replaceChildren(); return;
     }
     assertRenderablePlan(result.plan, request); plan = result.plan;
-    $('shape').textContent = `${plan.rows} × ${plan.cols}`;
-    $('plan-note').textContent = isCoupled() ? '線はマスの中心同士を結びます。黒白と辺は別々に入力し、両方の整合を確認します。' : '選択したルールとヒントが要求する盤面を表示しています。UIの適合は、問題の成立を保証しません。';
-    const numericLegend = [['numbers','通常の数字は固定ラベル'], ['sight_counts','丸数字は見える白数'],
-      ['orthogonal_counts','「接n」は上下左右の黒数（数字セルの色は自由、0もヒント）'], ['component_areas','「面n」は所属する同色成分の面積（数字セルの色は自由）'], ['island_areas','四角の数字は白い島の面積'], ['neighbor_counts','「隣n」は周囲の黒数（0もヒント）'],
-      ['component_counts','「塊n」は接する黒成分の面積合計（同じ成分は1回）'],
-      ['endpoint_markers','マス全体を囲む大きな丸は白の端点（白い隣接マスは1個）'], ['black_run_clues','「連1,2」等は周囲8マスの黒い連続長（順序不問、0もヒント）']]
-      .filter(([key]) => plan[key] !== undefined).map(([,text]) => text);
-    if (numericLegend.length) $('plan-note').textContent += ` ${numericLegend.join('、')}。`;
-    if (plan.endpoint_markers && plan.sight_counts) $('plan-note').textContent += ' 端点上の可視数は丸自身を含む直線長です。';
+    renderPlanDescription();
     $('status').textContent = '生成前のプレビューです。';
     renderBoard(); $('generate').disabled = false;
   } catch (error) {
@@ -606,6 +609,9 @@ function cancelPendingShare() {
   $('navigation-status').textContent = '作業が変更されたため、共有URLの読み込みを中止しました。';
   return true;
 }
+function labelSharedLoad(hash) {
+  $('load-shared-settings').textContent = hash.startsWith(puzzlePrefix) ? 'URLの問題を読み込む（現在の問題・回答は消えます）' : 'URLの設定を読み込む（現在の問題・回答は消えます）';
+}
 async function restoreSharedSettings() {
   const hash = location.hash, navigation = ++shareNavigation;
   if (!hash) {sharePending = false; return;}
@@ -628,14 +634,14 @@ async function restoreSharedSettings() {
     }
     if (navigation !== shareNavigation || hash !== location.hash || form.inert) return;
     applySharedSettings(request); ++settingsRevision;
-    if (isPuzzle) { ++revision; clearArtifact(); installPuzzle(request, result, true); $('generate').disabled = false; $('shape').textContent = `${plan.rows} × ${plan.cols}`; $('plan-note').textContent = '共有された問題の盤面とヒントです。'; $('status').textContent = '共有された問題を開きました。唯一解を検証済みです。'; }
+    if (isPuzzle) { ++revision; clearArtifact(); installPuzzle(request, result, true); $('generate').disabled = false; renderPlanDescription(); $('status').textContent = '共有された問題を開きました。唯一解を検証済みです。'; }
     $('share-url').value = ''; $('load-shared-settings').hidden = true;
     $('navigation-status').textContent = ''; $('share-status').textContent = isPuzzle ? '共有された問題を読み込みました。' : '共有された設定を読み込みました。';
     return isPuzzle ? 'puzzle' : true;
   } catch (error) {
     if (navigation === shareNavigation && hash === location.hash) {
       $('share-status').textContent = error.message === 'unconfirmed puzzle' ? '時間切れまたは通信等により唯一解を確認できませんでした。問題が無効とは限りません。後でもう一度お試しください。' : '共有URLを読み込めませんでした。URL、接続、対応バージョンを確認してください。';
-      $('load-shared-settings').hidden = false;
+      labelSharedLoad(hash); $('load-shared-settings').hidden = false;
       $('navigation-status').textContent = '共有URLはまだ読み込まれていません。現在の設定と解答は維持されています。';
     }
   } finally {
@@ -662,12 +668,21 @@ $('share-settings').addEventListener('click', async () => {
 });
 $('share-puzzle').addEventListener('click', async () => {
   if (!artifact) return;
+  const copiedArtifact = artifact;
+  const cancelledShare = cancelPendingShare();
   try {
-    const payload = {format: 'puzzle-box/web-puzzle-v1', request: artifact.request, clues: artifact.clues};
+    const payload = {format: 'puzzle-box/web-puzzle-v1', request: copiedArtifact.request, clues: copiedArtifact.clues};
     const url = new URL(location.pathname, location.origin); url.hash = shareHash(payload, puzzlePrefix);
     $('puzzle-url').value = url.href; $('puzzle-url').select();
-    try { await navigator.clipboard.writeText(url.href); $('puzzle-share-status').textContent = '問題のURLをコピーしました。'; }
-    catch { $('puzzle-share-status').textContent = '問題のURLを手動でコピーしてください。'; }
+    try {
+      await navigator.clipboard.writeText(url.href);
+      $('puzzle-share-status').textContent = artifact === copiedArtifact && $('puzzle-url').value === url.href
+        ? '問題のURLをコピーしました。' : '前の問題のURLをコピーしました。現在の問題のURLを作り直してください。';
+    } catch {
+      $('puzzle-share-status').textContent = artifact === copiedArtifact && $('puzzle-url').value === url.href
+        ? '問題のURLを手動でコピーしてください。' : '問題またはURLが変わりました。共有URLを作り直してください。';
+    }
+    if (cancelledShare) $('puzzle-share-status').textContent += ' 共有URLの読み込みは中止しました。';
   } catch { $('puzzle-url').value = ''; $('puzzle-share-status').textContent = 'URLが長すぎるため共有できません。'; }
 });
 // Hash navigation never replaces the current work without an explicit action.
@@ -676,7 +691,7 @@ window.addEventListener('hashchange', () => {
   ++shareNavigation; sharePending = false;
   $('share-url').value = ''; $('share-status').textContent = '';
   $('load-shared-settings').hidden = !location.hash;
-  $('load-shared-settings').textContent = location.hash.startsWith(puzzlePrefix) ? 'URLの問題を読み込む（現在の問題・解答は消えます）' : 'URLの設定を読み込む（現在の問題・解答は消えます）';
+  labelSharedLoad(location.hash);
   $('navigation-status').textContent = location.hash
     ? 'URLが変わりました。現在の設定と解答は維持されています。新しいURLはまだ読み込まれていません。読み込むと現在の問題と回答は消えます。'
     : 'URLが変わりました。現在の設定と解答は維持されています。';
