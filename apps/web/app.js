@@ -9,7 +9,9 @@ const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid', 'run
 $('board').addEventListener('focusin', event => {
   // Account for a sticky row clue even when the cell was already within the
   // browser's ordinary scrollport and automatic focus scrolling did nothing.
-  if (event.target instanceof HTMLElement && event.target.matches('.cell, .edge'))
+  // Do not move the target between pointer-down and pointer-up; browsers
+  // expose keyboard-style focus using :focus-visible.
+  if (event.target instanceof HTMLElement && event.target.matches('.cell:focus-visible, .edge:focus-visible'))
     event.target.scrollIntoView({block:'nearest', inline:'nearest'});
 });
 class GridInputError extends Error {}
