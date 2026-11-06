@@ -471,3 +471,5 @@ footer {
 .rule-group-count { float:right; font-size:.8rem; font-weight:400; color:#526c60; }
 .rule-group .rule-card { padding: .75rem 0; }
 .rule-group summary:focus-visible { outline:2px solid #267a60; outline-offset:3px; }
+
+.cell.next-step-target { box-shadow: inset 0 0 0 4px #e29019; }
