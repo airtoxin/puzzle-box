@@ -52,6 +52,48 @@ export function nextShadingStep(request, clues, input) {
           reason:`左上が${position(item.cells[0])}の2×2では、他の3マスが白なので、このマスは黒です。`};
     }
   }
+  // Enumerate a short clued line under non-touching and visible entries.
+  // Outside unknowns remain unconstrained: only known outside black cells can
+  // rule a placement out. List every placement used in the explanation.
+  const separation = rules.find(rule => rule.id === 'non-touching');
+  if (separation) for (const line of constraints) {
+    if (line.kind !== 'count' || line.cells.length > 10 || line.source === '黒マスの個数ルール') continue;
+    const cells = line.cells, lineSet = new Set(cells), external = new Set();
+    const neighbors = i => {
+      const r=Math.floor(i/cols), c=i%cols, result=[];
+      for (let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++) {
+        if ((!dr && !dc) || (!separation.parameters.diagonal && Math.abs(dr)+Math.abs(dc)!==1)) continue;
+        const nr=r+dr,nc=c+dc; if(nr>=0 && nr<rows && nc>=0 && nc<cols) result.push(nr*cols+nc);
+      }
+      return result;
+    };
+    const around = cells.map(neighbors);
+    for (const adjacent of around) for (const i of adjacent) if (!lineSet.has(i) && input[i]===1) external.add(i);
+    const placements=[];
+    for (let mask=0;mask<2**cells.length;mask++) {
+      let blacks=0, valid=true;
+      for(let k=0;k<cells.length;k++) {
+        const value=(mask>>k)&1; blacks+=value;
+        if(input[cells[k]]!==-1 && input[cells[k]]!==value) {valid=false; break;}
+        if(value && around[k].some(i => lineSet.has(i) ? ((mask>>cells.indexOf(i))&1)===1 : input[i]===1)) {valid=false; break;}
+      }
+      if(valid && blacks===line.target) {placements.push(mask); if(placements.length>8) break;}
+    }
+    if(!placements.length) return {status:'conflict',
+      reason:`${line.source}と黒マスを離すルールでは、この行または列に可能な黒の配置がありません。ルール・ヒントまたは入力を見直してください。`};
+    // Long lists are intentionally unsupported. Continue looking for a
+    // conflict in other supported lines even if a simpler step was found.
+    if(placements.length>8 || step) continue;
+    const k=cells.findIndex((i,k)=>input[i]===-1 && placements.every(mask=>((mask>>k)&1)===((placements[0]>>k)&1)));
+    if(k<0) continue;
+    const value=(placements[0]>>k)&1;
+    const axis=line.source.includes('行') ? '列' : '行';
+    const lists=placements.map(mask=>{const positions=cells.flatMap((i,j)=>(mask>>j)&1 ? [`${axis==='列' ? i%cols+1 : Math.floor(i/cols)+1}${axis}`] : []); return `【${positions.join('・') || 'なし'}】`;}).join('、');
+    step={status:'step',index:cells[k],value,source:`${line.source}と黒マスを離すルール`,
+      evidence:{kind:'scope',cells:[...new Set([...cells,...external])]},
+      witness:{line:cells,placements:placements.map(mask=>cells.filter((_,i)=>(mask>>i)&1))},
+      reason:`入力済みのマスと周囲の黒を踏まえると、この行または列の黒の配置は${lists}の${placements.length}通り。いずれもこのマスは${value ? '黒' : '白'}です。`};
+  }
   if (connectedWhite) {
     // Unknown cells are traversable: if even this maximally permissive graph
     // separates known whites, no completion can connect them.
