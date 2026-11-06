@@ -27,7 +27,7 @@ export function nextShadingStep(request, clues, input) {
     }
   }
   const position = i => `${Math.floor(i / cols)+1}行${i % cols+1}列`;
-  let step;
+  let step, isolationFallback;
   for (const item of constraints) {
     const unknown = item.cells.filter(i => input[i] === -1);
     const black = item.cells.filter(i => input[i] === 1);
@@ -115,11 +115,15 @@ export function nextShadingStep(request, clues, input) {
     const value=(choices[0]>>k)&1;
     const lists=choices.map(describe).join('、');
     const exclusions=excluded.map(explainExclusion).join('。');
-    step={status:'step',index:cells[k],value,source:`${line.source}と黒マスを離すルール${excluded.length ? 'と白マスをつなぐルール' : ''}`,
+    const lineStep={status:'step',index:cells[k],value,source:`${line.source}と黒マスを離すルール${excluded.length ? 'と白マスをつなぐルール' : ''}`,
       evidence:{kind:'scope',cells:[...new Set([...cells,...external,...excluded.flatMap(x=>[...x.terminals,...x.blockers])])]},
       witness:{line:cells,placements:choices.map(mask=>cells.filter((_,i)=>(mask>>i)&1)), rejected:excluded.map(({mask,terminals,blockers})=>({placement:cells.filter((_,i)=>(mask>>i)&1),terminals,blockers}))},
       reason:`入力済みのマスと周囲の黒を踏まえると、${excluded.length ? exclusions+'。' : ''}この行または列の残る黒の配置は${lists}の${choices.length}通り。いずれもこのマスは${value ? '黒' : '白'}です。`};
+    // A later line may have a simpler deduction, independent of isolation.
+    if(excluded.length) isolationFallback ||= lineStep;
+    else step = lineStep;
   }
+  step ||= isolationFallback;
   if (connectedWhite) {
     // Unknown cells are traversable: if even this maximally permissive graph
     // separates known whites, no completion can connect them.

@@ -43,6 +43,21 @@ test('one white alone is not rejected, and contradictions take priority',()=>{
   expect(contradiction.status).toBe('conflict');expect(contradiction.reason).toContain('1行1列の白');expect(contradiction.reason).toContain('1行3列');
 });
 
+test('a later simple line takes priority over an isolation fallback in either clue order',()=>{
+  const rules=[{id:'non-touching',parameters:{diagonal:false}},{id:'connected-white',parameters:{nonempty:true}}];
+  const request={rows:4,cols:3,rules};
+  const input=[0,-1,-1,1,0,-1,0,-1,-1,-1,-1,-1];
+  const clues=[{type:'row-count',row:0,count:1},{type:'row-count',row:3,count:2}];
+  for(const ordered of [clues,[...clues].reverse()]) {
+    const result=nextShadingStep(request,ordered,input);
+    expect(result).toMatchObject({status:'step',index:9,value:1,source:'4行の黒数ヒントと黒マスを離すルール'});
+    expect(result.witness.rejected).toHaveLength(0);
+  }
+  // A later impossible line must still override both kinds of proposed step.
+  const conflict=nextShadingStep(request,[clues[0],{type:'row-count',row:3,count:3}],input);
+  expect(conflict.status).toBe('conflict');
+});
+
 test('10x10 benchmark cases retain bounded, reproducible progress',()=>{
   const results=[0,1,2].map(seed=>{const {request,clues}=JSON.parse(readFileSync(new URL(`./fixtures/measurement-benchmark-${seed}.json`,import.meta.url),'utf8'));const input=Array(100).fill(-1);for(const clue of clues)if(clue.type==='cell')input[clue.row*10+clue.col]=clue.value;let steps=0,r;while(steps<100){r=nextShadingStep(request,clues,input);if(r.status!=='step')break;input[r.index]=r.value;steps++;}return {steps,remaining:input.filter(v=>v===-1).length,status:r.status};});
   expect(results).toEqual([{steps:69,remaining:16,status:'stalled'},{steps:68,remaining:18,status:'stalled'},{steps:65,remaining:13,status:'stalled'}]);
