@@ -52,23 +52,6 @@ export function nextShadingStep(request, clues, input) {
           reason:`左上が${position(item.cells[0])}の2×2では、他の3マスが白なので、このマスは黒です。`};
     }
   }
-  // Subtract a row or column clue from the total count. The remainder is a
-  // count constraint on the cells outside that line, using visible entries only.
-  const total = constraints.find(item => item.kind === 'count' && item.cells.length === all.length && item.source === '黒マスの個数ルール');
-  if (total) for (const line of constraints) {
-    if (line.kind !== 'count' || line === total || line.cells.length >= all.length) continue;
-    const inside = new Set(line.cells), outside = all.filter(i => !inside.has(i));
-    const target = total.target - line.target;
-    const black = outside.filter(i => input[i] === 1), unknown = outside.filter(i => input[i] === -1);
-    const source = `${total.source}と${line.source}`;
-    if (target < black.length || target > black.length + unknown.length)
-      return {status:'conflict', reason:`${source}から、この行または列の外の黒は${target}マスですが、ルール・ヒントまたは入力と矛盾します。それぞれを見直してください。`};
-    if (!step && unknown.length && (black.length === target || black.length + unknown.length === target)) {
-      const value = black.length === target ? 0 : 1;
-      step = {status:'step', index:unknown[0], value, source, evidence:{kind:'scope', cells:all},
-        reason:`全体の黒${total.target}マスから${line.source}の${line.target}マスを引くと、その行または列の外の黒は${target}マス。外の入力済みの黒は${black.length}マス、未入力は${unknown.length}マスなので、外の残りはすべて${value ? '黒' : '白'}です。`};
-    }
-  }
   if (connectedWhite) {
     // Unknown cells are traversable: if even this maximally permissive graph
     // separates known whites, no completion can connect them.
