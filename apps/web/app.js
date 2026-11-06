@@ -1,3 +1,4 @@
+import {nextShadingStep} from './next-shading-step.js';
 import {UnsupportedUiError, canonicalRunClues, assertRenderablePlan, assertRenderableClues} from './plan-contract.js';
 
 let $ = id => document.getElementById(id);
@@ -19,13 +20,13 @@ function editAnswer(index, paint) {
   const before = input[index], after = (before + 2) % 3 - 1;
   input[index] = after; undoStack.push({index, before, after});
   if (undoStack.length > historyLimit) undoStack.shift();
-  redoStack = []; updateHistoryButtons(); paint(after); $('answer-status').textContent = '';
+  redoStack = []; updateHistoryButtons(); paint(after); $('answer-status').textContent = ''; clearNextStep();
 }
 function moveHistory(from, to, field) {
   if (!artifact || showingAnswer || !from.length) return;
   cancelPendingShare();
   const change = from.pop(); input[change.index] = change[field]; to.push(change);
-  updateHistoryButtons(); renderBoard(); $('answer-status').textContent = '';
+  updateHistoryButtons(); renderBoard(); $('answer-status').textContent = ''; clearNextStep();
 }
 $('undo').addEventListener('click', () => moveHistory(undoStack, redoStack, 'before'));
 $('redo').addEventListener('click', () => moveHistory(redoStack, undoStack, 'after'));
@@ -115,7 +116,7 @@ async function post(path, data) {
   return fetchJsonWithTimeout(path, options, (budget + 15) * 1000);
 }
 function clearArtifact() {
-  resetHistory();
+  resetHistory(); clearNextStep();
   $('puzzle-url').value = ''; $('puzzle-share-status').textContent = '';
   artifact = undefined; $('generated-rules').hidden = true; $('generated-rules-list').replaceChildren(); $('generated-clues-list').replaceChildren(); $('generated-clues').hidden = true; $('actions').hidden = true; $('answer-status').textContent = '';
   $('reveal').textContent = '答えを表示';
@@ -502,7 +503,8 @@ $('download').disabled = restored;
 $('download-note').hidden = !restored;
 assertRenderablePlan(result.plan, request);
 assertRenderableClues(result.clues, result.plan, request);
-artifact = result; plan = result.plan; fixed = new Set(); resetHistory();
+artifact = result; plan = result.plan; fixed = new Set(); resetHistory(); clearNextStep();
+$('next-step-panel').hidden = request.family !== 'shading';
 const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
 const area = plan.rows * plan.cols;
 input = Array(isCoupled() ? area + loopEdges().length : isLoop ? loopEdges().length : area).fill(-1);
@@ -546,6 +548,22 @@ form.addEventListener('submit', async event => {
   }
   finally { form.inert = false; $('generate').disabled = !plan; }
 });
+function clearNextStep() {
+  $('next-step-result').textContent = ''; $('next-step').disabled = false;
+  $('board').querySelector('.next-step-target')?.classList.remove('next-step-target');
+}
+$('next-step').addEventListener('click', () => {
+  if (!artifact || artifact.request.family !== 'shading' || showingAnswer) return;
+  const result = nextShadingStep(artifact.request, artifact.clues, input);
+  $('board').querySelector('.next-step-target')?.classList.remove('next-step-target');
+  if (result.status === 'conflict') $('next-step-result').textContent = result.reason;
+  else if (result.status === 'stalled') $('next-step-result').textContent = '対応する推論では次の一手が見つかりませんでした。他のルールや推論は調べていません。';
+  else {
+    const r = Math.floor(result.index / plan.cols) + 1, c = result.index % plan.cols + 1;
+    $('board').querySelector(`[data-cell-index="${result.index}"]`)?.classList.add('next-step-target');
+    $('next-step-result').textContent = `${r}行${c}列は${result.value ? '黒' : '白'}。根拠：${result.source}。${result.reason} 現在の入力が正しいと仮定した結論です。`;
+  }
+});
 $('check').addEventListener('click', async () => {
   if (!artifact) return;
   cancelPendingShare();
@@ -566,7 +584,8 @@ $('check').addEventListener('click', async () => {
 $('reveal').addEventListener('click', () => {
   if (!artifact) return;
   cancelPendingShare();
-  showingAnswer = !showingAnswer; renderBoard(showingAnswer); updateHistoryButtons();
+  showingAnswer = !showingAnswer; renderBoard(showingAnswer); updateHistoryButtons(); clearNextStep();
+  $('next-step').disabled = showingAnswer;
   $('reveal').textContent = showingAnswer ? '自分の解答へ戻る' : '答えを表示';
 });
 $('download').addEventListener('click', () => {

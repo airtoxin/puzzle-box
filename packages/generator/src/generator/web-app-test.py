@@ -236,6 +236,9 @@ def test_http_catalog_static_allowlist_and_real_plan(local_server):
     status, headers, module = send(local_server, "/plan-contract.js")
     assert status == 200 and headers["Content-Type"].startswith("text/javascript")
     assert b"export function assertRenderablePlan" in module
+    status, headers, module = send(local_server, "/next-shading-step.js")
+    assert status == 200 and headers["Content-Type"].startswith("text/javascript")
+    assert b"export function nextShadingStep" in module
     assert send(local_server, "/api/catalog")[0] == 200
     assert send(local_server, "/../uv.lock")[0] == 404
     assert send(local_server, "/", host="attacker.example")[0] == 403
