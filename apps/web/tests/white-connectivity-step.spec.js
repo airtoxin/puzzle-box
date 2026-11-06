@@ -54,6 +54,11 @@ test('connection conflict takes priority and alternative paths or one white do n
   expect(nextShadingStep(connectedOnly,[],[0,-1,-1,-1,-1,0]).status).toBe('stalled');
   expect(nextShadingStep(connectedOnly,[],[0,-1,-1,1,1,1]).status).toBe('stalled');
   expect(nextShadingStep(connectedOnly,[],[-1,-1,-1,-1,-1,-1]).status).toBe('stalled');
+  // Nonempty=true alone is deliberately unsupported, including an already
+  // all-black board and a single remaining unknown that must be white.
+  const nonemptyOnly={rows:1,cols:2,rules:[{id:'connected-white',parameters:{nonempty:true}}]};
+  expect(nextShadingStep(nonemptyOnly,[],[1,1]).status).toBe('stalled');
+  expect(nextShadingStep(nonemptyOnly,[],[1,-1]).status).toBe('stalled');
 });
 
 test('board explains a white connector and clears it after an incorrect entry', async ({page}) => {
@@ -69,6 +74,7 @@ test('board explains a white connector and clears it after an incorrect entry', 
     await route.fulfill({json:{...result,clues}});
   });
   await page.locator('#generate').click(); await expect(page.locator('#actions')).toBeVisible();
+  await expect(page.locator('#next-step-panel')).toContainText('白を1つ以上にする条件だけからは推論しません');
   const target=page.locator('[data-cell-index="1"]'); await page.locator('#next-step').click();
   await expect(page.locator('#next-step-result')).toContainText('1行2列は白');
   await expect(page.locator('#next-step-result')).toContainText('1行1列と2行3列');
