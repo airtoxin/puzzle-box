@@ -68,6 +68,8 @@ test('large shading boards offer a conditional explanation without changing entr
 test('unsupported deductions stop honestly and non-shading boards do not offer them', async ({page}) => {
   await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
   await page.getByLabel('黒マスの個数',{exact:true}).uncheck();
+  await page.getByLabel('白マスをつなぐ',{exact:true}).uncheck();
+  await page.getByLabel('黒マスをつなぐ',{exact:true}).check();
   await page.getByLabel('各行の黒マス数',{exact:true}).uncheck();
   await page.getByLabel('各列の黒マス数',{exact:true}).uncheck();
   await expect(page.locator('#generate')).toBeEnabled();

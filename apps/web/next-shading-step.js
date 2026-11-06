@@ -3,6 +3,7 @@
 export function nextShadingStep(request, clues, input) {
   const {rows, cols, rules} = request;
   const constraints = [];
+  const connectedWhite = rules.some(rule => rule.id === 'connected-white');
   const all = Array.from({length: rows * cols}, (_, i) => i);
   const count = (cells, target, source) => constraints.push({kind:'count', cells, target, source});
   for (const clue of clues) {
@@ -49,6 +50,42 @@ export function nextShadingStep(request, clues, input) {
       if (!step && white.length === 3 && unknown.length === 1)
         step = {status:'step', index:unknown[0], value:1, source:item.source,
           reason:`左上が${position(item.cells[0])}の2×2では、他の3マスが白なので、このマスは黒です。`};
+    }
+  }
+  if (connectedWhite) {
+    // Unknown cells are traversable: if even this maximally permissive graph
+    // separates known whites, no completion can connect them.
+    const white = all.filter(i => input[i] === 0);
+    if (white.length >= 2) {
+      const start = white[0];
+      const reachable = excluded => {
+        const seen = new Set([start]), pending = [start];
+        while (pending.length) {
+          const i = pending.pop(), r = Math.floor(i / cols), c = i % cols;
+          for (const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+            const nr=r+dr, nc=c+dc, n=nr*cols+nc;
+            if (nr>=0 && nr<rows && nc>=0 && nc<cols && n!==excluded && input[n]!==1 && !seen.has(n)) {
+              seen.add(n); pending.push(n);
+            }
+          }
+        }
+        return seen;
+      };
+      const initial = reachable(-1), disconnected = white.find(i => !initial.has(i));
+      if (disconnected !== undefined) return {status:'conflict',
+        reason:`白マスをつなぐルールでは、${position(start)}と${position(disconnected)}の白をつなげません。入力を見直してください。`};
+      // Prefer the simpler local deduction already found, but still detect a
+      // connectivity conflict above before offering it.
+      if (!step) for (const candidate of all) {
+        if (input[candidate] !== -1) continue;
+        const reached = reachable(candidate), other = white.find(i => !reached.has(i));
+        if (other !== undefined) {
+          step = {status:'step', index:candidate, value:0, source:'白マスをつなぐルール',
+            reason:`このマスを黒にすると、他の未入力をすべて白としても${position(start)}と${position(other)}の白が分断されます。白をつなぐため、このマスは白です。`,
+            witness:{terminals:[start,other], reachableWithoutCell:[...reached].sort((a,b)=>a-b)}};
+          break;
+        }
+      }
     }
   }
   return step || {status:'stalled'};
