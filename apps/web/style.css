@@ -476,3 +476,7 @@ footer {
 
 .cell.next-step-evidence { outline: 3px dashed #176187; outline-offset: -5px; }
 .cell.next-step-evidence[data-value="1"] { outline-color: #8bd8ff; }
+
+/* Keep keyboard focus distinct from the inset evidence marker. */
+.cell.next-step-evidence:focus-visible { outline: 3px solid #99601f; outline-offset: 3px; box-shadow: inset 0 0 0 3px #176187; }
+.cell.next-step-evidence[data-value="1"]:focus-visible { box-shadow: inset 0 0 0 3px #8bd8ff; }

@@ -58,6 +58,9 @@ test('large shading boards offer a conditional explanation without changing entr
   await expect(page.locator('#next-step-result')).toContainText('現在の入力が正しいと仮定');
   await expect(cell).toHaveAttribute('data-value','-1'); await expect(cell).toHaveClass(/next-step-target/);
   await expect(page.locator('.next-step-evidence')).toHaveCount(99);
+  const evidence = page.locator('.next-step-evidence').first(); await evidence.focus();
+  await expect(evidence).toHaveCSS('outline-style', 'solid');
+  await expect(evidence).toHaveCSS('outline-offset', '3px');
   await expect(page.locator('#next-step-result')).toContainText('根拠の対象範囲');
   await cell.click(); await expect(cell).not.toHaveClass(/next-step-target/); await expect(page.locator('.next-step-evidence')).toHaveCount(0); await expect(page.locator('#next-step-result')).toBeEmpty();
   await cell.click(); await page.locator('#next-step').click();
