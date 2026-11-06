@@ -46,7 +46,7 @@ test('three 10x10 benchmark examples improve without consulting saved solutions'
     let steps=0,result;while(steps<100){result=nextShadingStep(request,clues,input);if(result.status!=='step')break;input[result.index]=result.value;steps++;}
     return {steps,remaining:input.filter(v=>v===-1).length,status:result.status};
   });
-  expect(results).toEqual([{steps:69,remaining:16,status:'stalled'},{steps:54,remaining:32,status:'stalled'},{steps:65,remaining:13,status:'stalled'}]);
+  expect(results).toEqual([{steps:69,remaining:16,status:'stalled'},{steps:68,remaining:18,status:'stalled'},{steps:65,remaining:13,status:'stalled'}]);
 });
 
 test('a clued line shows all black placements without editing the board',async({page})=>{

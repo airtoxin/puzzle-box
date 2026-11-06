@@ -81,18 +81,44 @@ export function nextShadingStep(request, clues, input) {
     }
     if(!placements.length) return {status:'conflict',
       reason:`${line.source}と黒マスを離すルールでは、この行または列に可能な黒の配置がありません。ルール・ヒントまたは入力を見直してください。`};
-    // Long lists are intentionally unsupported. Continue looking for a
-    // conflict in other supported lines even if a simpler step was found.
-    if(placements.length>8 || step) continue;
-    const k=cells.findIndex((i,k)=>input[i]===-1 && placements.every(mask=>((mask>>k)&1)===((placements[0]>>k)&1)));
-    if(k<0) continue;
-    const value=(placements[0]>>k)&1;
+    // Keep both the presented cases and any eliminated cases bounded.
+    if(placements.length>8) continue;
+    const rejected=[], remaining=[];
+    for (const mask of placements) {
+      if (!connectedWhite) {remaining.push(mask); continue;}
+      // A hypothetical line-white cell surrounded by black or board edges
+      // cannot connect to another known or hypothetical line-white cell.
+      const white=all.filter(i=>lineSet.has(i) ? !((mask>>cells.indexOf(i))&1) : input[i]===0);
+      if (white.length<2) {remaining.push(mask); continue;}
+      let witness;
+      for(const i of white) {
+        const r=Math.floor(i/cols),c=i%cols,neighbors=[];
+        for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+          const nr=r+dr,nc=c+dc; if(nr>=0&&nr<rows&&nc>=0&&nc<cols)neighbors.push(nr*cols+nc);
+        }
+        if(neighbors.every(j=>lineSet.has(j) ? ((mask>>cells.indexOf(j))&1)===1 : input[j]===1)) {
+          witness={mask,terminals:[i,white.find(j=>j!==i)],blockers:neighbors}; break;
+        }
+      }
+      if(witness) rejected.push(witness); else remaining.push(mask);
+    }
     const axis=line.source.includes('行') ? '列' : '行';
-    const lists=placements.map(mask=>{const positions=cells.flatMap((i,j)=>(mask>>j)&1 ? [`${axis==='列' ? i%cols+1 : Math.floor(i/cols)+1}${axis}`] : []); return `【${positions.join('・') || 'なし'}】`;}).join('、');
-    step={status:'step',index:cells[k],value,source:`${line.source}と黒マスを離すルール`,
-      evidence:{kind:'scope',cells:[...new Set([...cells,...external])]},
-      witness:{line:cells,placements:placements.map(mask=>cells.filter((_,i)=>(mask>>i)&1))},
-      reason:`入力済みのマスと周囲の黒を踏まえると、この行または列の黒の配置は${lists}の${placements.length}通り。いずれもこのマスは${value ? '黒' : '白'}です。`};
+    const describe=mask=>{const positions=cells.flatMap((i,j)=>(mask>>j)&1 ? [`${axis==='列' ? i%cols+1 : Math.floor(i/cols)+1}${axis}`] : []); return `【${positions.join('・') || 'なし'}】`;};
+    const explainExclusion=({mask,terminals})=>`${describe(mask)}では、${position(terminals[0])}の白は上下左右が黒か盤の端で囲まれ、別の白${position(terminals[1])}とつながりません`;
+    if(!remaining.length) return {status:'conflict', reason:`${line.source}と黒マスを離すルールで可能な配置はすべて白連結と矛盾します。${rejected.map(explainExclusion).join('。')}。ルール・ヒントまたは入力を見直してください。`};
+    if(step) continue;
+    const forced = choices => cells.findIndex((i,k)=>input[i]===-1 && choices.every(mask=>((mask>>k)&1)===((choices[0]>>k)&1)));
+    const simple=forced(placements), choices=simple>=0 ? placements : remaining;
+    const excluded=simple>=0 ? [] : rejected;
+    const k=simple>=0 ? simple : forced(remaining);
+    if(k<0) continue;
+    const value=(choices[0]>>k)&1;
+    const lists=choices.map(describe).join('、');
+    const exclusions=excluded.map(explainExclusion).join('。');
+    step={status:'step',index:cells[k],value,source:`${line.source}と黒マスを離すルール${excluded.length ? 'と白マスをつなぐルール' : ''}`,
+      evidence:{kind:'scope',cells:[...new Set([...cells,...external,...excluded.flatMap(x=>[...x.terminals,...x.blockers])])]},
+      witness:{line:cells,placements:choices.map(mask=>cells.filter((_,i)=>(mask>>i)&1)), rejected:excluded.map(({mask,terminals,blockers})=>({placement:cells.filter((_,i)=>(mask>>i)&1),terminals,blockers}))},
+      reason:`入力済みのマスと周囲の黒を踏まえると、${excluded.length ? exclusions+'。' : ''}この行または列の残る黒の配置は${lists}の${choices.length}通り。いずれもこのマスは${value ? '黒' : '白'}です。`};
   }
   if (connectedWhite) {
     // Unknown cells are traversable: if even this maximally permissive graph

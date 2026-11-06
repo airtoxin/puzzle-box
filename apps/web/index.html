@@ -54,7 +54,7 @@
         <button id="retry-catalog" type="button" hidden>読み込みを再試行</button>
         <button id="retry-plan" type="button" hidden>プレビューを再試行</button>
         <div id="actions" hidden><p class="note" id="entry-note"></p>
-          <div id="next-step-panel" hidden><button type="button" id="next-step">根拠つきの一手を見る</button><p class="note">現在の入力が正しいと仮定します。個数・行列ヒント・黒の非接触（10マス以下の行列で配置が8通り以下の場合を含む）・白2×2禁止・白連結の通路に限って調べます。白連結は入力済みの白2マス以上をつなぐ通路だけを調べ、白を1つ以上にする条件だけからは推論しません。入力の正しさや、他のルールで進めるかは検証しません。</p><p id="next-step-result" role="status" aria-live="polite"></p></div>
+          <div id="next-step-panel" hidden><button type="button" id="next-step">根拠つきの一手を見る</button><p class="note">現在の入力が正しいと仮定します。個数・行列ヒント・黒の非接触（10マス以下の行列で配置が8通り以下の場合を含む）・白2×2禁止・白連結の通路に限って調べます。白連結では入力済みの白をつなぐ必須通路と、候補配置で別の白から孤立する白を調べます。白を1つ以上にする条件だけからは推論しません。入力の正しさや、他のルールで進めるかは検証しません。</p><p id="next-step-result" role="status" aria-live="polite"></p></div>
           <div class="actions" id="answer-buttons"><button type="button" id="undo" disabled>一手戻す</button><button type="button" id="redo" disabled>やり直す</button><button type="button" id="check">解答を確認</button><button type="button" id="reveal">答えを表示</button>
             <button type="button" id="share-puzzle">この問題の共有URLを作成</button>
               <button type="button" id="download">問題JSONを保存</button></div><label for="puzzle-url">問題の共有URL</label><input id="puzzle-url" type="text" readonly><p class="note">同じ盤面とヒント、設定をURLに含めます。公開してよい内容だけ共有してください。途中の回答や答えは含まれません。開く際に唯一解を検証します。</p><p id="puzzle-share-status" role="status"></p><p id="download-note" class="note" hidden>共有問題は唯一解を確認しますが、ヒントの既約性は再検証しないためJSON保存はできません。</p><p id="answer-status" role="status"></p></div>
