@@ -32,7 +32,8 @@ test('isolated-white exclusions and conflicts follow the cited rules on all part
       }
     }
   }
-  expect(deductions).toBeGreaterThan(0);expect(exclusions).toBeGreaterThan(0);expect(conflicts).toBeGreaterThan(0);
+  // The simpler white-connector deduction subsumes isolation steps on 2x3.
+  expect(deductions).toBe(0);expect(exclusions).toBe(0);expect(conflicts).toBeGreaterThan(0);
 });
 
 test('one white alone is not rejected, and contradictions take priority',()=>{
@@ -58,16 +59,40 @@ test('a later simple line takes priority over an isolation fallback in either cl
   expect(conflict.status).toBe('conflict');
 });
 
+test('a simple white connector precedes the isolation fallback',()=>{
+  const request={rows:2,cols:3,rules:[{id:'non-touching',parameters:{diagonal:false}},{id:'connected-white',parameters:{nonempty:true}}]};
+  const result=nextShadingStep(request,[{type:'row-count',row:0,count:1}],[0,-1,-1,1,0,-1]);
+  expect(result).toMatchObject({status:'step',index:1,value:0,source:'白マスをつなぐルール'});
+});
+
+test('isolation witness is retained when no simpler step exists',()=>{
+  const {request,clues}=JSON.parse(readFileSync(new URL('./fixtures/measurement-benchmark-1.json',import.meta.url),'utf8'));
+  const {input}=JSON.parse(readFileSync(new URL('./fixtures/white-isolation-state.json',import.meta.url),'utf8'));
+  const result=nextShadingStep(request,clues,input);
+  expect(result).toMatchObject({status:'step',index:30,value:1});
+  expect(result.source).toContain('白マスをつなぐルール');
+  expect(result.witness.rejected).toHaveLength(2);
+  for(const witness of result.witness.rejected) {
+    expect(witness.terminals).toEqual([33,2]);
+    expect([...witness.blockers].sort((a,b)=>a-b)).toEqual([23,32,34,43]);
+  }
+});
+
 test('10x10 benchmark cases retain bounded, reproducible progress',()=>{
   const results=[0,1,2].map(seed=>{const {request,clues}=JSON.parse(readFileSync(new URL(`./fixtures/measurement-benchmark-${seed}.json`,import.meta.url),'utf8'));const input=Array(100).fill(-1);for(const clue of clues)if(clue.type==='cell')input[clue.row*10+clue.col]=clue.value;let steps=0,r;while(steps<100){r=nextShadingStep(request,clues,input);if(r.status!=='step')break;input[r.index]=r.value;steps++;}return {steps,remaining:input.filter(v=>v===-1).length,status:r.status};});
   expect(results).toEqual([{steps:69,remaining:16,status:'stalled'},{steps:68,remaining:18,status:'stalled'},{steps:65,remaining:13,status:'stalled'}]);
 });
 
 test('board explains the excluded black placement and clears it on input',async({page})=>{
+  const {clues}=JSON.parse(readFileSync(new URL('./fixtures/measurement-benchmark-1.json',import.meta.url),'utf8'));
+  const {input}=JSON.parse(readFileSync(new URL('./fixtures/white-isolation-state.json',import.meta.url),'utf8'));
+  const fixed=new Set(clues.filter(c=>c.type==='cell').map(c=>c.row*10+c.col));
+  const entries=input.flatMap((value,i)=>value===-1||fixed.has(i)?[]:[{type:'cell',row:Math.floor(i/10),col:i%10,value}]);
   await page.goto('/');await expect(page.locator('#generate')).toBeEnabled();
-  await page.getByLabel('黒マスの個数',{exact:true}).uncheck();await page.getByLabel('黒マスを離す',{exact:true}).check();
-  await page.route('**/api/generate',async route=>{const response=await route.fetch(),result=await response.json();expect(result.status).toBe('ok');const clues=[{type:'row-count',row:0,count:1},{type:'cell',row:0,col:0,value:0},{type:'cell',row:1,col:0,value:1},{type:'cell',row:1,col:1,value:0}];await route.fulfill({json:{...result,clues}});});
-  await expect(page.locator('#generate')).toBeEnabled();await page.locator('#generate').click();await expect(page.locator('#actions')).toBeVisible();await page.locator('#next-step').click();
-  const text=page.locator('#next-step-result');await expect(text).toContainText('【2列】');await expect(text).toContainText('1行1列の白');await expect(text).toContainText('別の白1行3列');await expect(text).toContainText('【3列】');await expect(text).toContainText('現在の入力が正しいと仮定');
-  const target=page.locator('[data-cell-index="1"]');await expect(target).toHaveClass(/next-step-target/);await expect(target).toHaveAttribute('data-value','-1');await expect(page.locator('.next-step-evidence')).toHaveCount(3);await target.click();await expect(text).toBeEmpty();await expect(page.locator('.next-step-evidence')).toHaveCount(0);
+  await page.locator('#rows').fill('10');await page.locator('#cols').fill('10');
+  await page.getByLabel('黒マス数',{exact:true}).fill('25');await page.getByLabel('黒マスを離す',{exact:true}).check();
+  await page.route('**/api/generate',async route=>{const response=await route.fetch(),result=await response.json();expect(result.status).toBe('ok');await route.fulfill({json:{...result,clues:[...clues,...entries]}});});
+  await expect(page.locator('#generate')).toBeEnabled();await page.locator('#generate').click();await expect(page.locator('#actions')).toBeVisible({timeout:45000});await page.locator('#next-step').click();
+  const text=page.locator('#next-step-result');await expect(text).toContainText('【1列・3列・5列】');await expect(text).toContainText('4行4列の白');await expect(text).toContainText('別の白1行3列');await expect(text).toContainText('【1列・3列・7列】');await expect(text).toContainText('現在の入力が正しいと仮定');
+  const target=page.locator('[data-cell-index="30"]');await expect(target).toHaveClass(/next-step-target/);await expect(target).toHaveAttribute('data-value','-1');await expect(page.locator('.next-step-evidence').first()).toBeVisible();await target.click();await expect(text).toBeEmpty();await expect(page.locator('.next-step-evidence')).toHaveCount(0);
 });

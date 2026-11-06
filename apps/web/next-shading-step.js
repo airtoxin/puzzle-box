@@ -123,7 +123,6 @@ export function nextShadingStep(request, clues, input) {
     if(excluded.length) isolationFallback ||= lineStep;
     else step = lineStep;
   }
-  step ||= isolationFallback;
   if (connectedWhite) {
     // Unknown cells are traversable: if even this maximally permissive graph
     // separates known whites, no completion can connect them.
@@ -161,5 +160,6 @@ export function nextShadingStep(request, clues, input) {
       }
     }
   }
+  step ||= isolationFallback;
   return step || {status:'stalled'};
 }
