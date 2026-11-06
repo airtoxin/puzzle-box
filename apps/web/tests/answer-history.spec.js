@@ -82,6 +82,23 @@ test('generation and shared puzzle restoration reset history', async ({page}) =>
 
 for (const action of ['undo', 'redo']) {
   test(`${action} cancels an in-flight shared puzzle restore`, async ({page}) => {
+    // Signal on the next task after the restore body is parsed: the app's
+    // awaiting continuation has then had a chance to process the result.
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch;
+      window.fetch = async (...args) => {
+        const response = await originalFetch(...args);
+        if (String(args[0]).endsWith('/api/restore')) {
+          const originalJson = response.json.bind(response);
+          response.json = async () => {
+            const body = await originalJson();
+            setTimeout(() => {window.restoreHandled = true;}, 0);
+            return body;
+          };
+        }
+        return response;
+      };
+    });
     await page.goto('/'); await expect(page.locator('#generate')).toBeEnabled();
     await page.locator('#generate').click(); await expect(page.locator('#actions')).toBeVisible();
     await page.locator('#share-puzzle').click(); const url = await page.locator('#puzzle-url').inputValue();
@@ -97,6 +114,7 @@ for (const action of ['undo', 'redo']) {
     const value = action === 'undo' ? '-1' : '0';
     await expect(page.locator(selector)).toHaveAttribute('data-value', value);
     release(); await response;
+    await page.waitForFunction(() => window.restoreHandled === true);
     await expect(page.locator('#navigation-status')).toContainText('中止');
     await expect(page.locator(selector)).toHaveAttribute('data-value', value);
   });
