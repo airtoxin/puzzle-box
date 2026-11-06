@@ -79,10 +79,13 @@ test('board explains a white connector and clears it after an incorrect entry', 
   await expect(page.locator('#next-step-result')).toContainText('1行2列は白');
   await expect(page.locator('#next-step-result')).toContainText('1行1列と2行3列');
   await expect(page.locator('#next-step-result')).toContainText('現在の入力が正しいと仮定');
-  await expect(target).toHaveClass(/next-step-target/); await expect(target).toHaveAttribute('data-value','-1');
+  await expect(target).toHaveClass(/next-step-target/);
+  await expect(page.locator('.next-step-evidence')).toHaveCount(2);
+  await expect(page.locator('#next-step-result')).toContainText('通路全体を示すものではありません'); await expect(target).toHaveAttribute('data-value','-1');
   await target.click(); await target.click(); await page.locator('#next-step').click();
   await expect(page.locator('#next-step-result')).toContainText('つなげません');
   await expect(target).not.toHaveClass(/next-step-target/);
+  await expect(page.locator('.next-step-evidence')).toHaveCount(0);
 });
 
 test('10x10 benchmark recipe gains a step from connectivity after local rules stall', () => {
@@ -106,5 +109,6 @@ test('10x10 benchmark recipe gains a step from connectivity after local rules st
   const result=nextShadingStep({rows,cols,rules:[...rules,{id:'connected-white',parameters:{nonempty:true}}]},[],input);
   expect(result).toMatchObject({status:'step',index:1,value:0,source:'白マスをつなぐルール'});
   expect(result.witness.terminals).toEqual([0,2]);
+  expect(result.evidence).toEqual({kind:'terminals',cells:[0,2]});
   expect(result.witness.reachableWithoutCell).toEqual(reach(input,rows,cols,0,1));
 });

@@ -37,18 +37,18 @@ export function nextShadingStep(request, clues, input) {
         return {status:'conflict', reason:`${item.source}と入力が矛盾しています。入力を見直してください。`};
       if (!step && unknown.length && (black.length === item.target || black.length + unknown.length === item.target)) {
         const value = black.length === item.target ? 0 : 1;
-        step = {status:'step', index:unknown[0], value, source:item.source,
+        step = {status:'step', index:unknown[0], value, source:item.source, evidence:{kind:'scope', cells:item.cells},
           reason:`対象範囲の黒は${item.target}マス。入力済みの黒は${black.length}マス、未入力は${unknown.length}マスなので、残りはすべて${value ? '黒' : '白'}です。`};
       }
     } else if (item.kind === 'non-touching') {
       if (black.length === 2) return {status:'conflict', reason:`${item.source}では${black.map(position).join('と')}を両方黒にできません。入力を見直してください。`};
       if (!step && black.length === 1 && unknown.length === 1)
-        step = {status:'step', index:unknown[0], value:0, source:item.source,
+        step = {status:'step', index:unknown[0], value:0, source:item.source, evidence:{kind:'premises', cells:black},
           reason:`${position(black[0])}が黒なので、接するこのマスは白です。`};
     } else {
       if (white.length === 4) return {status:'conflict', reason:`${item.source}に反する白だけの2×2があります（左上は${position(item.cells[0])}）。入力を見直してください。`};
       if (!step && white.length === 3 && unknown.length === 1)
-        step = {status:'step', index:unknown[0], value:1, source:item.source,
+        step = {status:'step', index:unknown[0], value:1, source:item.source, evidence:{kind:'scope', cells:item.cells},
           reason:`左上が${position(item.cells[0])}の2×2では、他の3マスが白なので、このマスは黒です。`};
     }
   }
@@ -82,6 +82,7 @@ export function nextShadingStep(request, clues, input) {
         if (other !== undefined) {
           step = {status:'step', index:candidate, value:0, source:'白マスをつなぐルール',
             reason:`このマスを黒にすると、他の未入力をすべて白としても${position(start)}と${position(other)}の白が分断されます。白をつなぐため、このマスは白です。`,
+            evidence:{kind:'terminals', cells:[start,other]},
             witness:{terminals:[start,other], reachableWithoutCell:[...reached].sort((a,b)=>a-b)}};
           break;
         }
