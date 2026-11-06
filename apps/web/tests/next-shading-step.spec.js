@@ -9,6 +9,28 @@ test('every proposed deduction follows from the cited supported constraints on a
     {rules:[{id:'no-white-2x2',parameters:{}}],clues:[],valid:b => [0,1].every(c => [c,c+1,c+3,c+4].some(i=>b[i]===1))},
     {rules:[],clues:[{type:'row-count',row:1,count:1},{type:'column-count',col:0,count:0}],valid:b => b.slice(3).reduce((a,x)=>a+x,0)===1 && b[0]+b[3]===0},
   ];
+  // Check the cited constraint in isolation, not just the full puzzle: a
+  // wrong explanation must not pass merely because another rule fixes a cell.
+  const citedSatisfied = (source, board, scenario) => {
+    if (source === '黒マスの個数ルール') {
+      const target=scenario.rules.find(r=>r.id==='count').parameters.count;
+      return board.reduce((a,x)=>a+x,0)===target;
+    }
+    if (source === '黒マスを離すルール') {
+      const diagonal=scenario.rules.find(r=>r.id==='non-touching').parameters.diagonal;
+      return board.every((v,i)=>!v || board.every((w,j)=>!w || i===j ||
+        (diagonal ? Math.max(Math.abs(Math.floor(i/3)-Math.floor(j/3)),Math.abs(i%3-j%3)) :
+          Math.abs(Math.floor(i/3)-Math.floor(j/3))+Math.abs(i%3-j%3))!==1));
+    }
+    if (source === '白の2×2を禁止するルール')
+      return [0,1].every(c=>[c,c+1,c+3,c+4].some(i=>board[i]===1));
+    const clue=scenario.clues.find(c=>source === `${c.type==='row-count' ? c.row+1+'行' : c.col+1+'列'}の黒数ヒント`);
+    if (!clue) throw new Error(`Unknown source ${source}`);
+    const scope=board.filter((_,i)=>clue.type==='row-count' ? Math.floor(i/cols)===clue.row : i%cols===clue.col);
+    return scope.reduce((a,x)=>a+x,0)===clue.count;
+  };
+  scenarios.push({rules:[{id:'count',parameters:{count:2}},{id:'non-touching',parameters:{diagonal:false}}],clues:[],
+    valid:b=>b.reduce((a,x)=>a+x,0)===2 && b.every((v,i)=>!v || b.every((w,j)=>!w || i===j || Math.abs(Math.floor(i/3)-Math.floor(j/3))+Math.abs(i%3-j%3)!==1))});
   for (const scenario of scenarios) for (let state=0;state<729;state++) {
     let n=state; const input=Array.from({length:6},()=>{const v=n%3-1;n=Math.floor(n/3);return v;});
     const completions=all.filter(b => scenario.valid(b) && b.every((v,i)=>input[i]===-1 || input[i]===v));
@@ -16,6 +38,9 @@ test('every proposed deduction follows from the cited supported constraints on a
     if (result.status==='step') {
       expect(input[result.index]).toBe(-1);
       for (const board of completions) expect(board[result.index]).toBe(result.value);
+      const cited=all.filter(b=>citedSatisfied(result.source,b,scenario) && b.every((v,i)=>input[i]===-1 || input[i]===v));
+      expect(cited.length).toBeGreaterThan(0);
+      for (const board of cited) expect(board[result.index]).toBe(result.value);
     } else if (result.status==='conflict') expect(completions).toHaveLength(0);
   }
 });
