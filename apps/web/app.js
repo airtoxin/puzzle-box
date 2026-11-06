@@ -5,6 +5,30 @@ let form = $('recipe-form');
 let catalog, profile, plan, artifact, input = [], fixed = new Set(), revision = 0, settingsRevision = 0, timer;
 let selected = new Map();
 let hints = new Map();
+let undoStack = [], redoStack = [], showingAnswer = false;
+const historyLimit = 1000;
+function updateHistoryButtons() {
+  $('undo').disabled = showingAnswer || !undoStack.length;
+  $('redo').disabled = showingAnswer || !redoStack.length;
+}
+function resetHistory() {
+  undoStack = []; redoStack = []; showingAnswer = false; updateHistoryButtons();
+}
+function editAnswer(index, paint) {
+  cancelPendingShare();
+  const before = input[index], after = (before + 2) % 3 - 1;
+  input[index] = after; undoStack.push({index, before, after});
+  if (undoStack.length > historyLimit) undoStack.shift();
+  redoStack = []; updateHistoryButtons(); paint(after); $('answer-status').textContent = '';
+}
+function moveHistory(from, to, field) {
+  if (!artifact || showingAnswer || !from.length) return;
+  cancelPendingShare();
+  const change = from.pop(); input[change.index] = change[field]; to.push(change);
+  updateHistoryButtons(); renderBoard(); $('answer-status').textContent = '';
+}
+$('undo').addEventListener('click', () => moveHistory(undoStack, redoStack, 'before'));
+$('redo').addEventListener('click', () => moveHistory(redoStack, undoStack, 'after'));
 const gridKinds = ['region-map', 'number-grid', 'clue-grid', 'marker-grid', 'run-clue-grid'];
 $('board').addEventListener('focusin', event => {
   // Account for a sticky row clue even when the cell was already within the
@@ -91,6 +115,7 @@ async function post(path, data) {
   return fetchJsonWithTimeout(path, options, (budget + 15) * 1000);
 }
 function clearArtifact() {
+  resetHistory();
   $('puzzle-url').value = ''; $('puzzle-share-status').textContent = '';
   artifact = undefined; $('generated-rules').hidden = true; $('generated-rules-list').replaceChildren(); $('generated-clues-list').replaceChildren(); $('generated-clues').hidden = true; $('actions').hidden = true; $('answer-status').textContent = '';
   $('reveal').textContent = '答えを表示';
@@ -283,8 +308,7 @@ function cellButton(index, r, c, value, reveal) {
   };
   paint(value);
   button.addEventListener('click', () => {
-    cancelPendingShare();
-    input[index] = (input[index]+2)%3-1; paint(input[index]); $('answer-status').textContent = '';
+    editAnswer(index, paint);
   });
   return button;
 }
@@ -400,7 +424,7 @@ function edgeButton(edge, index, value, reveal, offset = 0) {
     button.setAttribute('aria-label', `${horizontal ? '横辺' : '縦辺'} ${edge[0]+1}行${edge[1]+1}列: ${value === -1 ? '未入力' : value === 0 ? '線なし' : '線あり'}${artifact && fixed.has(target) ? '（固定ヒント）' : ''}`);
   };
   paint(value);
-  button.addEventListener('click', () => {cancelPendingShare(); input[target] = (input[target]+2)%3-1; paint(input[target]); $('answer-status').textContent = '';});
+  button.addEventListener('click', () => editAnswer(target, paint));
   return button;
 }
 function renderLoop(reveal, channels) {
@@ -478,7 +502,7 @@ $('download').disabled = restored;
 $('download-note').hidden = !restored;
 assertRenderablePlan(result.plan, request);
 assertRenderableClues(result.clues, result.plan, request);
-artifact = result; plan = result.plan; fixed = new Set();
+artifact = result; plan = result.plan; fixed = new Set(); resetHistory();
 const isLoop = plan.requirements.channels.find(c => c.name === 'answer')?.kind === 'binary-edges';
 const area = plan.rows * plan.cols;
 input = Array(isCoupled() ? area + loopEdges().length : isLoop ? loopEdges().length : area).fill(-1);
@@ -542,8 +566,8 @@ $('check').addEventListener('click', async () => {
 $('reveal').addEventListener('click', () => {
   if (!artifact) return;
   cancelPendingShare();
-  const show = $('reveal').textContent === '答えを表示'; renderBoard(show);
-  $('reveal').textContent = show ? '自分の解答へ戻る' : '答えを表示';
+  showingAnswer = !showingAnswer; renderBoard(showingAnswer); updateHistoryButtons();
+  $('reveal').textContent = showingAnswer ? '自分の解答へ戻る' : '答えを表示';
 });
 $('download').addEventListener('click', () => {
   if (!artifact) return;
