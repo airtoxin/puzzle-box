@@ -78,6 +78,28 @@ test('isolation witness is retained when no simpler step exists',()=>{
   }
 });
 
+test('10x10 isolation witness matches independent enumeration of every line placement',()=>{
+  const {request,clues}=JSON.parse(readFileSync(new URL('./fixtures/measurement-benchmark-1.json',import.meta.url),'utf8'));
+  const {input}=JSON.parse(readFileSync(new URL('./fixtures/white-isolation-state.json',import.meta.url),'utf8'));
+  const result=nextShadingStep(request,clues,input);
+  expect(result).toMatchObject({status:'step',index:30,value:1});
+  const line=Array.from({length:10},(_,c)=>30+c), inLine=new Set(line);
+  const neighbors=i=>{const r=Math.floor(i/10),c=i%10;return [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].filter(([rr,cc])=>rr>=0&&rr<10&&cc>=0&&cc<10).map(([rr,cc])=>rr*10+cc);};
+  const accepted=[], rejected=[];
+  for(let mask=0;mask<1024;mask++) {
+    const black=new Set(line.filter((_,i)=>mask&(1<<i)));
+    if(black.size!==3 || line.some(i=>input[i]!==-1 && input[i]!==Number(black.has(i)))) continue;
+    if([...black].some(i=>neighbors(i).some(j=>inLine.has(j)?black.has(j):input[j]===1))) continue;
+    const whites=Array.from({length:100},(_,i)=>i).filter(i=>inLine.has(i)?!black.has(i):input[i]===0);
+    const isolated=whites.length>=2 && whites.some(i=>neighbors(i).every(j=>inLine.has(j)?black.has(j):input[j]===1));
+    (isolated?rejected:accepted).push([...black]);
+  }
+  const sorted=xs=>xs.map(x=>JSON.stringify(x)).sort();
+  expect(sorted(result.witness.placements)).toEqual(sorted(accepted));
+  expect(sorted(result.witness.rejected.map(x=>x.placement))).toEqual(sorted(rejected));
+  expect(accepted).toHaveLength(2);expect(rejected).toHaveLength(2);
+});
+
 test('10x10 benchmark cases retain bounded, reproducible progress',()=>{
   const results=[0,1,2].map(seed=>{const {request,clues}=JSON.parse(readFileSync(new URL(`./fixtures/measurement-benchmark-${seed}.json`,import.meta.url),'utf8'));const input=Array(100).fill(-1);for(const clue of clues)if(clue.type==='cell')input[clue.row*10+clue.col]=clue.value;let steps=0,r;while(steps<100){r=nextShadingStep(request,clues,input);if(r.status!=='step')break;input[r.index]=r.value;steps++;}return {steps,remaining:input.filter(v=>v===-1).length,status:r.status};});
   expect(results).toEqual([{steps:69,remaining:16,status:'stalled'},{steps:68,remaining:18,status:'stalled'},{steps:65,remaining:13,status:'stalled'}]);
