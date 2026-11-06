@@ -57,7 +57,12 @@ test('large shading boards offer a conditional explanation without changing entr
   await expect(page.locator('#next-step-result')).toContainText('1行1列は白');
   await expect(page.locator('#next-step-result')).toContainText('現在の入力が正しいと仮定');
   await expect(cell).toHaveAttribute('data-value','-1'); await expect(cell).toHaveClass(/next-step-target/);
-  await cell.click(); await expect(cell).not.toHaveClass(/next-step-target/); await expect(page.locator('#next-step-result')).toBeEmpty();
+  await expect(page.locator('.next-step-evidence')).toHaveCount(99);
+  const evidence = page.locator('.next-step-evidence').first(); await page.keyboard.press('Tab'); await evidence.focus();
+  await expect(evidence).toHaveCSS('outline-style', 'solid');
+  await expect(evidence).toHaveCSS('outline-offset', '3px');
+  await expect(page.locator('#next-step-result')).toContainText('根拠の対象範囲');
+  await cell.click(); await expect(cell).not.toHaveClass(/next-step-target/); await expect(page.locator('.next-step-evidence')).toHaveCount(0); await expect(page.locator('#next-step-result')).toBeEmpty();
   await cell.click(); await page.locator('#next-step').click();
   await expect(page.locator('#next-step-result')).toContainText('矛盾');
   await page.locator('#undo').click(); await expect(page.locator('#next-step-result')).toBeEmpty();
@@ -93,4 +98,15 @@ test('a non-touching deduction can unlock the total-count rule', () => {
   expect(second).toMatchObject({status:'step',index:3,value:0});
   input[second.index]=second.value;
   expect(nextShadingStep(request,[],input)).toMatchObject({status:'step',index:2,value:1,source:'黒マスの個数ルール'});
+});
+
+
+test('evidence identifies the constraint used for each local deduction', () => {
+  const request = rules => ({rows:2, cols:3, rules});
+  expect(nextShadingStep(request([]), [{type:'row-count',row:1,count:0}], [-1,-1,-1,-1,-1,-1]).evidence)
+    .toEqual({kind:'scope',cells:[3,4,5]});
+  expect(nextShadingStep(request([{id:'non-touching',parameters:{diagonal:false}}]), [], [1,-1,-1,-1,-1,-1]).evidence)
+    .toEqual({kind:'premises',cells:[0]});
+  expect(nextShadingStep(request([{id:'no-white-2x2',parameters:{}}]), [], [0,0,-1,0,-1,-1]).evidence)
+    .toEqual({kind:'scope',cells:[0,1,3,4]});
 });

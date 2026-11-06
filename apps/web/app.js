@@ -550,18 +550,22 @@ form.addEventListener('submit', async event => {
 });
 function clearNextStep() {
   $('next-step-result').textContent = ''; $('next-step').disabled = false;
-  $('board').querySelector('.next-step-target')?.classList.remove('next-step-target');
+  $('board').querySelectorAll('.next-step-target, .next-step-evidence').forEach(cell => cell.classList.remove('next-step-target', 'next-step-evidence'));
 }
 $('next-step').addEventListener('click', () => {
   if (!artifact || artifact.request.family !== 'shading' || showingAnswer) return;
   const result = nextShadingStep(artifact.request, artifact.clues, input);
-  $('board').querySelector('.next-step-target')?.classList.remove('next-step-target');
+  $('board').querySelectorAll('.next-step-target, .next-step-evidence').forEach(cell => cell.classList.remove('next-step-target', 'next-step-evidence'));
   if (result.status === 'conflict') $('next-step-result').textContent = result.reason;
   else if (result.status === 'stalled') $('next-step-result').textContent = '対応する推論では次の一手が見つかりませんでした。他のルールや推論は調べていません。';
   else {
     const r = Math.floor(result.index / plan.cols) + 1, c = result.index % plan.cols + 1;
     $('board').querySelector(`[data-cell-index="${result.index}"]`)?.classList.add('next-step-target');
-    $('next-step-result').textContent = `${r}行${c}列は${result.value ? '黒' : '白'}。根拠：${result.source}。${result.reason} 現在の入力が正しいと仮定した結論です。`;
+    for (const index of result.evidence.cells) if (index !== result.index)
+      $('board').querySelector(`[data-cell-index="${index}"]`)?.classList.add('next-step-evidence');
+    const evidenceDescription = result.evidence.kind === 'scope' ? '青枠と橙枠が根拠の対象範囲です。' :
+      result.evidence.kind === 'terminals' ? '青枠は説明に使った2つの白マスです。通路全体を示すものではありません。' : '青枠は根拠の入力済みマスです。';
+    $('next-step-result').textContent = `${r}行${c}列は${result.value ? '黒' : '白'}。根拠：${result.source}。${result.reason} 橙枠が次の一手。${evidenceDescription} 現在の入力が正しいと仮定した結論です。`;
   }
 });
 $('check').addEventListener('click', async () => {
